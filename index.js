@@ -101,10 +101,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ كولداون: استنى 15 دقيقة كاملة عشان يقل الضغط ولا ينكشف البوت
+      // ✅ كولداون: استنى 5 دقائق ثم أعد الفحص
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
-        await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
+        console.log(`⏳ في كولداون: ${state.cd} - سأتحقق كل 5 دقائق`);
+        for (let i = 0; i < 3; i++) {
+            await sleep(300000); // 5 دقائق
+            console.log(`⏳ لسه في كولداون (مرت ${(i + 1) * 5} دقيقة)... هستنى 5 دقائق تاني`);
+        }
         continue;
       }
 
@@ -142,8 +145,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
-               await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - سأتحقق كل 5 دقائق`);
+               for (let i = 0; i < 3; i++) {
+                   await sleep(300000); // 5 دقائق
+                   console.log(`⏳ لسه في كولداون (مرت ${(i + 1) * 5} دقيقة)... هستنى 5 دقائق تاني`);
+               }
                continue;
            }
 
@@ -198,8 +204,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
-               await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - سأتحقق كل 5 دقائق`);
+               for (let i = 0; i < 3; i++) {
+                   await sleep(300000); // 5 دقائق
+                   console.log(`⏳ لسه في كولداون (مرت ${(i + 1) * 5} دقيقة)... هستنى 5 دقائق تاني`);
+               }
                continue;
            }
 
