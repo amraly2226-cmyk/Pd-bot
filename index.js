@@ -5,8 +5,6 @@ const USERNAME = 'amr.aly.2226@gmail.com';
 const PASSWORD = 'Gun@12345';
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
-let currentBuyItem = "Anabolic steroid";
-let buyItemInTokyo = "Electronics";
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -52,8 +50,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     try {
       let state = await page.evaluate(() => {
         let body = document.body.innerText;
-        let cityMatch = body.match(/Black Market - ([A-Za-z ]+)/i);
-        let loc = cityMatch ? cityMatch[1].trim() : null;
+        
+        // دالة قوية جداً لمعرفة المدينة الحالية
+        let loc = null;
+        let m = body.match(/Black Market - ([A-Za-z ]+)/i); if (m) loc = m[1].trim();
+        if (!loc) { m = body.match(/You have traveled to ([A-Za-z ]+)!/i); if (m) loc = m[1].trim(); }
+        if (!loc) {
+            let cur = [...document.querySelectorAll('*')].find(e=>e.innerText&&e.innerText.trim()==='CURRENT LOCATION');
+            if(cur){ let p=cur.closest('div').innerText.toUpperCase(); for(let c of ["Cairo","Tokyo","London","Moscow","Rome","Capetown","Sydney","Ottawa","Rio de Janeiro"]) if(p.includes(c.toUpperCase())) loc = c; }
+        }
+        if (!loc) { let sm = body.match(/Location\s*\n?\s*(Cairo|Tokyo|London|Moscow|Rome|Capetown|Sydney|Ottawa|Rio de Janeiro)/i); if(sm) loc = sm[1].trim(); }
         
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
         let holdMatch = body.match(/holding (\d+) items/i); 
@@ -69,7 +75,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             break;
           }
         }
-        return { loc, cd: cd ? cd[1] : null, hold, heldItem, body };
+        
+        // طباعة المدينة في السجل عشان نشوف
+        console.log("📡 المدينة المكتشفة:", loc);
+        
+        return { loc, cd: cd ? cd[1] : null, hold, heldItem };
       });
 
       if (state.cd) {
@@ -82,6 +92,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
+      // ✅ الحالة 1: إنت في كايرو
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics") {
            console.log("📍 في كايرو... شايل إلكترونيكس، هبيعها الأول");
@@ -114,7 +125,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                   if (mb) { mb.click(); break; }
                 }
               }
-           }, currentBuyItem);
+           }, "Anabolic steroid");
            await sleep(1000);
            await page.evaluate(() => {
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX');
@@ -133,6 +144,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
 
+      // ✅ الحالة 2: إنت في طوكيو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" || state.hold > 0) {
            console.log("📍 في طوكيو... شايل أنابوليك، هبيعها الأول");
@@ -165,7 +177,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                   if (mb) { mb.click(); break; }
                 }
               }
-           }, buyItemInTokyo);
+           }, "Electronics");
            await sleep(1000);
            await page.evaluate(() => {
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX');
@@ -182,6 +194,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(2000);
            continue;
         }
+      }
+      
+      // لو مفيش مدينة اتحددت، استنى شوية وكرر
+      else {
+          console.log("⚠️ مش قادر أحدد المدينة الحالية، بجرب تاني خلال 5 ثواني...");
+          await sleep(5000);
+          continue;
       }
 
     } catch (e) {
