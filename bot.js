@@ -1,24 +1,218 @@
-// Final v2.2 - شراء مباشر
-require('dotenv').config();
-const puppeteer = require('puppeteer-extra');
-const Stealth = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(Stealth());
-const CONFIG = {
-  "Cairo": { item: "Alcohol", to: "Tokyo" },
-  "Tokyo": { item: "Electronics", to: "Cairo" },
+const puppeteer = require('puppeteer');
+
+// =================================================
+// ⚠️ هات بيانات الدخول بتاعتك من هنا (عدلها)
+// =================================================
+const LOGIN = {
+  username: 'إسم_المستخدم_بتاعك',
+  password: 'كلمة_السر_بتاعتك'
 };
-const USER = process.env.PD_USER;
-const PASS = process.env.PD_PASS;
-const LOGIN_URL = "https://www.project-dark.co.uk/login";
-const BM_URL = "https://www.project-dark.co.uk/blackmarket";
-const TRAVEL_URL = "https://www.project-dark.co.uk/travel";
-function log(m){ console.log(`[${new Date().toLocaleTimeString()}] ${m}`); }
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function parseCooldown(s){ if(!s) return 0; let sec=0; let h=s.match(/(\d+)\s*h/); if(h) sec+=+h[1]*3600; let mm=s.match(/(\d+)\s*m/); if(mm) sec+=+mm[1]*60; let ss=s.match(/(\d+)\s*s/); if(ss) sec+=+ss[1]; if(sec==0){let n=s.match(/(\d+)/); if(n) sec=+n[1]*60;} return sec; }
-async function getCooldowns(page){ let txt=await page.evaluate(()=>document.body.innerText); let tm=txt.match(/You cannot travel for:?\s*([0-9hms ]+)/i); let bm=txt.match(/You cannot buy for:?\s*([0-9hms ]+)/i); return { travel: tm?{sec:parseCooldown(tm[1]),str:tm[1].trim()}:null, buy: bm?{sec:parseCooldown(bm[1]),str:bm[1].trim()}:null }; }
-async function getCurrentCity(page){ return await page.evaluate(()=>{ let t=document.body.innerText; let m=t.match(/Black Market - ([A-Za-z ]+)/i); if(m) return m[1].trim(); m=t.match(/You have traveled to ([A-Za-z ]+)!/i); if(m) return m[1].trim(); return null; }); }
-async function login(page){ await page.goto(LOGIN_URL,{waitUntil:'networkidle2'}); try{ await page.type('input[name="username"]',USER,{delay:50}); await page.type('input[name="password"]',PASS,{delay:50}); await page.click('button[type="submit"]'); await page.waitForNavigation({waitUntil:'networkidle2'}); log("✅ لوجن"); }catch{ log("⚠️ هكمل"); } }
-async function sellAll(page){ log("💸 ببيع..."); await page.goto(BM_URL,{waitUntil:'networkidle2'}); await sleep(2000); let c=await page.evaluate(()=>{ let rows=[...document.querySelectorAll('tr')]; for(let r of rows){ if(r.innerHTML.includes('Sell All')&&!r.innerText.includes('Confirm')){ let b=[...r.querySelectorAll('button')].find(x=>x.innerText.includes('Sell All')); if(b){b.click(); return true;} } } return false; }); if(!c) return false; await sleep(1500); let cr=await page.evaluate(()=>{ let b=[...document.querySelectorAll('button')].find(x=>x.innerText.trim().toUpperCase()==='SELL ALL'&&x.offsetParent!==null); if(b){b.click(); return true;} return false; }); if(cr){ log("🔴 بعت"); await sleep(3000); await page.reload({waitUntil:'networkidle2'}); return true;} return false; }
-async function buyItem(page,itemName){ log(`💰 بحاول اشتري ${itemName}`); await page.goto(BM_URL,{waitUntil:'networkidle2'}); await sleep(2500); let cds=await getCooldowns(page); if(cds.buy){ log(`⏳ كولدون شراء: ${cds.buy.str}`); await sleep((cds.buy.sec+3)*1000); } let clickedMax=await page.evaluate((item)=>{ let rows=[...document.querySelectorAll('tr')]; for(let tr of rows){ if(tr.innerText.toLowerCase().includes(item.toLowerCase())&&tr.innerText.includes('£')){ let btns=[...tr.querySelectorAll('button')]; let b=btns.find(x=>x.innerText.toLowerCase().includes('max buy')); if(b){b.click(); return true;} } } return false; },itemName); if(!clickedMax){ log(`❌ مش لاقي Max Buy لـ ${itemName}`); return false; } await sleep(1200); let clickedConfirm=await page.evaluate(()=>{ let btns=[...document.querySelectorAll('button')]; let b=btns.find(x=>x.innerText.trim().toUpperCase()==='BUY MAX'); if(b){b.click(); return true;} return false; }); if(clickedConfirm){ log(`✅ اشتريت ${itemName}`); await sleep(3000); return true; } return false; }
-async function travelTo(page,toCity){ log(`✈️ مسافر ${toCity}`); await page.goto(TRAVEL_URL,{waitUntil:'networkidle2'}); await sleep(2000); let cds=await getCooldowns(page); if(cds.travel){ await sleep((cds.travel.sec+5)*1000); } let picked=await page.evaluate((to)=>{ let els=[...document.querySelectorAll('*')]; for(let el of els){ if(el.innerText&&el.innerText.trim().toUpperCase()===to.toUpperCase()&&el.offsetParent!==null&&el.children.length===0){ let card=el.parentElement; for(let i=0;i<5;i++){ if(card&&card.offsetWidth>150) break; card=card.parentElement; } if(card){card.click(); return true;} } } return false; },toCity); if(!picked) return false; await sleep(1500); let c1=await page.evaluate(()=>{ let b=[...document.querySelectorAll('button')].find(x=>x.innerText.includes('Travel to Selected Location')); if(b){b.click(); return true;} return false; }); if(c1) await sleep(1200); let c2=await page.evaluate(()=>{ let b=[...document.querySelectorAll('button')].find(x=>x.innerText.trim()==='TRAVEL'); if(b){b.click(); return true;} return false; }); if(c2){ log(`✈️ سافرت ${toCity}`); await sleep(4000); return true;} return false; }
-async function main(){ const browser=await puppeteer.launch({headless:true,args:['--no-sandbox']}); const page=await browser.newPage(); await login(page); let last="Cairo"; while(true){ try{ let cur=await getCurrentCity(page)||last; last=cur; let cfg=CONFIG[cur]||CONFIG["Cairo"]; log(`📍 في ${cur} - هشتري ${cfg.item} -> ${cfg.to}`); let cds=await getCooldowns(page); if(cds.travel){ await page.goto(TRAVEL_URL,{waitUntil:'networkidle2'}); await sleep((cds.travel.sec+5)*1000); continue; } await page.goto(BM_URL,{waitUntil:'networkidle2'}); await sleep(1500); let held=await page.evaluate(()=>{ let rows=[...document.querySelectorAll('tr')]; for(let r of rows){ if(r.innerHTML.includes('Sell All')&&!r.innerText.includes('Confirm')) return r.innerText.split('\n')[0]; } return null; }); if(held&&!held.toLowerCase().includes(cfg.item.toLowerCase())){ await sellAll(page); } let hold=await page.evaluate(()=>{ let m=document.body.innerText.match(/holding (\d+)/i); return m?+m[1]:0; }); if(hold===0){ let ok=await buyItem(page,cfg.item); if(!ok){ await sleep(8000); continue; } } await travelTo(page,cfg.to); let after=await getCooldowns(page); if(after.travel) await sleep((after.travel.sec+5)*1000); }catch(e){ log(`❌ ${e.message}`); await sleep(10000); } } } main();
+
+const CONFIG = {
+  FROM: 'Tokyo',
+  TO: 'Cairo',
+  ITEM: 'Electronics'
+};
+// =================================================
+
+let state = { step: 'buy', isSelling: false, running: true };
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+(async () => {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  
+  const page = await browser.newPage();
+  console.log('🚀 Bot Starting...');
+
+  // ===== 1. تسجيل الدخول التلقائي =====
+  try {
+    console.log('🔐 جاري تسجيل الدخول...');
+    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
+    
+    // كتابة اليوزر والباس
+    await page.type('input[name="username"]', LOGIN.username); // غير الـ selector لو مختلف
+    await page.type('input[name="password"]', LOGIN.password);
+    
+    // دوس زر Login
+    await page.click('button[type="submit"]');
+    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 10000 });
+    
+    console.log('✅ تم تسجيل الدخول بنجاح!');
+  } catch (err) {
+    console.log('⚠️ ممكن تكون مسجل دخول قبل كده أو في مشكلة في الـ selectors، هكمل عادي...');
+  }
+
+  // ===== 2. روح للسوق مباشرة =====
+  await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+  
+  // ===== 3. الحلقة الرئيسية (نفس المنطق القديم) =====
+  while (state.running) {
+    try {
+      await page.waitForSelector('body', { timeout: 5000 });
+      
+      const pageData = await page.evaluate(() => {
+        const bodyText = document.body.innerText;
+        const holdMatch = bodyText.match(/holding (\d+) items/i);
+        const holding = holdMatch ? parseInt(holdMatch[1]) : 0;
+        
+        let city = null;
+        const cityMatch = bodyText.match(/Black Market - ([A-Za-z ]+)/i);
+        if (cityMatch) city = cityMatch[1].trim();
+        else {
+          const travelMatch = bodyText.match(/You have traveled to ([A-Za-z ]+)!/i);
+          if (travelMatch) city = travelMatch[1].trim();
+        }
+        
+        let heldItem = null;
+        const rows = document.querySelectorAll('tr');
+        const items = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
+        for (const row of rows) {
+          if (row.innerHTML.includes('Sell All') && !row.innerText.includes('Confirm Sell All')) {
+            const txt = row.innerText.toLowerCase();
+            for (const it of items) {
+              if (txt.includes(it.toLowerCase())) { heldItem = it; break; }
+            }
+            if (!heldItem && row.cells[0]) heldItem = row.cells[0].innerText.trim();
+            break;
+          }
+        }
+        
+        const cdMatch = bodyText.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
+        let cd = cdMatch ? cdMatch[1].trim() : null;
+        
+        return { holding, city, heldItem, cd };
+      });
+      
+      const { holding, heldItem, cd } = pageData;
+      const targetItem = CONFIG.ITEM;
+      const targetTo = CONFIG.TO;
+      
+      if (cd) {
+        console.log(`⏳ كولداون: ${cd}`);
+        await delay(15000);
+        continue;
+      }
+      
+      // ---------- منطق الشراء ----------
+      if (state.step === 'buy') {
+        const currentUrl = page.url();
+        if (!currentUrl.includes('blackmarket')) {
+          console.log('➡️ رايح Blackmarket...');
+          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+          await delay(2000);
+          continue;
+        }
+        
+        const confirmOpen = await page.evaluate(() => document.body.innerText.includes('Confirm Sell All'));
+        if (confirmOpen) {
+          const btn = await page.$('button:has-text("SELL ALL")');
+          if (btn) { console.log('🔴 بدوس SELL ALL تأكيد'); await btn.click(); await delay(2000); }
+          continue;
+        }
+        
+        if (holding > 0 && heldItem && heldItem.toLowerCase() !== targetItem.toLowerCase()) {
+          console.log(`⚠️ شايل ${heldItem} غلط - هبيعه`);
+          const sellBtn = await page.evaluate((itemName) => {
+            const rows = document.querySelectorAll('tr');
+            for (const row of rows) {
+              if (row.innerText.toLowerCase().includes(itemName.toLowerCase()) && row.innerHTML.includes('Sell All')) {
+                const btn = row.querySelector('button:has-text("Sell All")');
+                if (btn) { btn.click(); return true; }
+              }
+            }
+            return false;
+          }, heldItem);
+          if (sellBtn) await delay(3000);
+          continue;
+        }
+        
+        if (holding > 0 && (!heldItem || heldItem.toLowerCase() === targetItem.toLowerCase())) {
+          console.log(`✅ شايل ${holding} ${targetItem} صح - رايح Travel`);
+          state.step = 'travel';
+          await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+          await delay(2000);
+          continue;
+        }
+        
+        console.log(`🛒 بجيب ${targetItem}...`);
+        const bought = await page.evaluate((itemName) => {
+          const rows = document.querySelectorAll('tr');
+          for (const row of rows) {
+            if (row.innerText.toLowerCase().includes(itemName.toLowerCase()) && row.innerText.includes('£')) {
+              const btn = row.querySelector('button:has-text("Max Buy")');
+              if (btn) { btn.click(); return true; }
+            }
+          }
+          return false;
+        }, targetItem);
+        
+        if (bought) {
+          await delay(1500);
+          const confirmBuy = await page.$('button:has-text("BUY MAX")');
+          if (confirmBuy) {
+            await confirmBuy.click();
+            console.log(`✅ اشتريت ${targetItem}`);
+            state.step = 'travel';
+            await delay(2000);
+            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+          }
+        } else {
+          console.log(`❌ مش لاقي ${targetItem}`);
+          await delay(5000);
+        }
+      } 
+      // ---------- منطق السفر ----------
+      else if (state.step === 'travel') {
+        const currentUrl = page.url();
+        if (!currentUrl.includes('travel')) {
+          await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+          await delay(2000);
+          continue;
+        }
+        
+        console.log(`✈️ بسافر لـ ${targetTo}...`);
+        const cityClicked = await page.evaluate((cityName) => {
+          const elements = document.querySelectorAll('*');
+          for (const el of elements) {
+            if (el.innerText?.trim()?.toUpperCase() === cityName.toUpperCase() && el.offsetParent !== null && el.children.length === 0) {
+              let parent = el.parentElement;
+              for (let i=0; i<3; i++) {
+                if (parent && parent.offsetWidth > 150) break;
+                parent = parent.parentElement;
+              }
+              if (parent) { parent.click(); return true; }
+            }
+          }
+          return false;
+        }, targetTo);
+        
+        if (!cityClicked) { console.log(`❌ مش لاقي ${targetTo}`); await delay(5000); continue; }
+        
+        await delay(1500);
+        const travelBtn = await page.$('button:has-text("Travel to Selected Location")');
+        if (travelBtn) {
+          await travelBtn.click();
+          await delay(1500);
+          const confirmTravel = await page.$('button:has-text("TRAVEL")');
+          if (confirmTravel) {
+            await confirmTravel.click();
+            console.log(`✅ وصلت ${targetTo}`);
+            state.step = 'buy';
+            await delay(3000);
+            await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+          }
+        }
+      }
+      
+      await delay(3000);
+      
+    } catch (err) {
+      console.error('⚠️ خطأ:', err.message);
+      await delay(5000);
+      await page.reload({ waitUntil: 'networkidle2' });
+    }
+  }
+})();
