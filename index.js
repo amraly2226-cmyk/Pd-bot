@@ -1,8 +1,9 @@
 const puppeteer = require('puppeteer');
 
-// القراءة من الـ Secrets (آمن ومظبوط)
+// ✅ اقرأ بياناتك من المتغيرات البيئية في Railway (مهم جدًا تفتح "Variables" وتحطها هناك)
 const USERNAME = process.env.PD_USER;
 const PASSWORD = process.env.PD_PASS;
+const COOKIE_VALUE = process.env.PD_COOKIE; // القيمة بتاعة الكوكيز (هتاخدها من متصفحك)
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 let step = 'buy'; 
@@ -10,45 +11,58 @@ let targetCity = "Cairo";
 let targetItem = "Electronics"; 
 
 (async () => {
-  console.log("🚀 البوت بيشتغل... جاري فتح المتصفح المخفي");
-  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  console.log("🚀 البوت بيشتغل...");
+  
+  // تشغيل المتصفح مع خيارات لتفادي مشاكل الذاكرة في Railway
+  const browser = await puppeteer.launch({ 
+      headless: true, 
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+  });
+  
   const page = await browser.newPage();
   
-  page.setDefaultTimeout(15000);
-
-  try {
-    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
-    await page.waitForSelector('input', { visible: true });
-    
-    const inputs = await page.$$('input[type="text"], input[type="email"], input:not([type])');
-    if (inputs.length >= 2) {
-       await inputs[0].click({ clickCount: 3 });
-       await inputs[0].type(USERNAME);
-       await inputs[1].click({ clickCount: 3 });
-       await inputs[1].type(PASSWORD);
-    } else {
-       // خطة بديلة لو الموقع مش لاقي الحقول
-       await page.evaluate((u, p) => {
-          let userInput = document.querySelector('input[type="text"], input[name="username"], input[name="email"], #username');
-          let passInput = document.querySelector('input[type="password"], input[name="password"], #password');
-          if (userInput && passInput) {
-             userInput.value = u;
-             passInput.value = p;
-             userInput.dispatchEvent(new Event('input', { bubbles: true }));
-             passInput.dispatchEvent(new Event('input', { bubbles: true }));
-          }
-       }, USERNAME, PASSWORD);
-    }
-
-    await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")');
-    await page.waitForTimeout(3000);
-    console.log("✅ تم تسجيل الدخول بنجاح!");
-  } catch (e) {
-    console.log("⚠️ مش قادر أسجل دخول تلقائياً (غالباً في كابتشا)، افتح الـ Web Preview وسجل بنفسك مرة واحدة.");
+  // 1) إذا كان عندك الكوكيز، ضعها هنا عشان يتسجل دخول فورًا
+  if (COOKIE_VALUE) {
+      await page.setCookie({ name: 'PHPSESSID', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+      console.log("✅ تم تحميل الكوكيز، هجرب أدخل اللعبة فورًا");
   }
 
+  try {
+    // 2) حاول فتح السوق مباشرة. لو مش متسجل، هيتحول لصفحة الدخول
+    console.log("⏳ جاري فتح اللعبة...");
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+    
+    // 3) التحقق: لو طلع صفحة تسجيل الدخول، نسجل دخول تلقائي
+    if (page.url().includes('login')) {
+        console.log("⚠️ مش متسجل، هجرب أسجل دخول تلقائي...");
+        await page.waitForSelector('input', { visible: true, timeout: 10000 });
+        
+        await page.evaluate((u, p) => {
+            let userInput = document.querySelector('input[type="text"], input[type="email"], input:not([type])');
+            let passInput = document.querySelector('input[type="password"]');
+            
+            if (userInput && passInput) {
+                userInput.value = u;
+                passInput.value = p;
+                userInput.dispatchEvent(new Event('input', { bubbles: true }));
+                passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                console.log("🔑 كتبت البيانات، هدوس زر الدخول");
+            }
+        }, USERNAME, PASSWORD);
+        
+        await page.click('button[type="submit"], input[type="submit"]').catch(() => {});
+        await page.waitForTimeout(5000); // استنى الصفحة تتحمل
+        console.log("✅ خلصت تسجيل الدخول، متابعة العمل");
+    }
+
+  } catch (e) {
+    console.log("❌ حصلت مشكلة في الدخول (احتمال الموقع مش متاح أو مفيش نت).", e.message);
+  }
+
+  // 4) اللوب الرئيسي للبيع والشراء
   setInterval(async () => {
     try {
+      console.log("🔄 بفحص الحالة...");
       let state = await page.evaluate(() => {
         let body = document.body.innerText;
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
@@ -67,7 +81,6 @@ let targetItem = "Electronics";
 
       if (step === 'buy') {
         if (!page.url().includes('blackmarket')) {
-          console.log("➡️ رايح للسوق الأسود...");
           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.includes('Blackmarket')); if (a) a.click(); });
           await new Promise(r => setTimeout(r, 2000));
           return;
@@ -110,7 +123,6 @@ let targetItem = "Electronics";
 
       if (step === 'travel') {
          if (!page.url().includes('travel')) {
-            console.log("➡️ رايح لصفحة السفر...");
             await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
             await new Promise(r => setTimeout(r, 2000));
             return;
@@ -136,7 +148,7 @@ let targetItem = "Electronics";
       }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت:", e.message);
+      console.log("حصل خطأ مؤقت (غالبًا مشكلة اتصال):", e.message);
     }
-  }, 6000); 
+  }, 8000); // زودت المدة لـ 8 ثواني عشان لا يضغط على الخادم
 })();
