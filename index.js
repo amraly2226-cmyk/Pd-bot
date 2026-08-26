@@ -50,16 +50,29 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     try {
       let state = await page.evaluate(() => {
         let body = document.body.innerText;
-        
-        // دالة قوية جداً لمعرفة المدينة الحالية
         let loc = null;
-        let m = body.match(/Black Market - ([A-Za-z ]+)/i); if (m) loc = m[1].trim();
-        if (!loc) { m = body.match(/You have traveled to ([A-Za-z ]+)!/i); if (m) loc = m[1].trim(); }
-        if (!loc) {
-            let cur = [...document.querySelectorAll('*')].find(e=>e.innerText&&e.innerText.trim()==='CURRENT LOCATION');
-            if(cur){ let p=cur.closest('div').innerText.toUpperCase(); for(let c of ["Cairo","Tokyo","London","Moscow","Rome","Capetown","Sydney","Ottawa","Rio de Janeiro"]) if(p.includes(c.toUpperCase())) loc = c; }
+        
+        // 🔥 الطريقة الجديدة (المضمونة 100%) - البحث عن كلمة "Location"
+        // في الصورة دي، بنفسك اكتشفت إنها فوق على الشمال
+        let elements = [...document.querySelectorAll('*')];
+        let locationLabel = elements.find(e => e.innerText && e.innerText.trim() === 'Location');
+        
+        if (locationLabel) {
+           // نطلع للعنصر الأب اللي فيه الكلمة دي
+           let parent = locationLabel.closest('div') || locationLabel.parentElement;
+           if (parent) {
+               let text = parent.innerText;
+               // نقرأ اسم المدينة اللي بعد كلمة Location
+               let match = text.match(/Location\s*\n?\s*([A-Za-z ]+)/i);
+               if (match) loc = match[1].trim();
+           }
         }
-        if (!loc) { let sm = body.match(/Location\s*\n?\s*(Cairo|Tokyo|London|Moscow|Rome|Capetown|Sydney|Ottawa|Rio de Janeiro)/i); if(sm) loc = sm[1].trim(); }
+        
+        // لو لسه مش لاقي، نجرب الطرق القديمة كخطة بديلة
+        if (!loc) {
+            let m = body.match(/Black Market - ([A-Za-z ]+)/i); if (m) loc = m[1].trim();
+            if (!loc) { m = body.match(/You have traveled to ([A-Za-z ]+)!/i); if (m) loc = m[1].trim(); }
+        }
         
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
         let holdMatch = body.match(/holding (\d+) items/i); 
@@ -76,7 +89,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           }
         }
         
-        // طباعة المدينة في السجل عشان نشوف
         console.log("📡 المدينة المكتشفة:", loc);
         
         return { loc, cd: cd ? cd[1] : null, hold, heldItem };
