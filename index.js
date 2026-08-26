@@ -1,7 +1,8 @@
 const puppeteer = require('puppeteer');
 
-// البيانات من Railway Variables
-const COOKIE = process.env.PD_COOKIE; 
+// ✅ ضع بيانات حسابك هنا (اللي هيسجل بيها دخول تلقائي)
+const USERNAME = 'amr.aly.2226@gmail.com'; 
+const PASSWORD = 'Gun@12345';
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 let step = 'buy'; 
@@ -11,23 +12,54 @@ let targetItem = "Electronics"; // عدلها حسب السلعة
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 البوت شغال في الخلفية...");
+  console.log("🚀 البوت شغال، جاري تسجيل الدخول تلقائياً...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
+  page.setDefaultTimeout(15000);
 
-  // =====================================================================
-  // ✅ (مهم جداً) السطر ده هو اللي بيسجل الدخول بالكوكي، تأكد إنه موجود زي ما هو:
-  await page.setCookie({ name: 'project-dark-session', value: COOKIE, domain: '.project-dark.co.uk' });
-  // =====================================================================
+  try {
+    // 1) التوجه لصفحة تسجيل الدخول
+    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
 
-  await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-  console.log("✅ دخلنا السوق الأسود بـ Cookies");
+    // 2) البحث عن حقول الإدخال (الاسم والباسورد) والكتابة فيها
+    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+    if (inputs.length >= 2) {
+       await inputs[0].click({ clickCount: 3 }); // مسح أي حاجة قديمة
+       await inputs[0].type(USERNAME);
+       
+       await inputs[1].click({ clickCount: 3 });
+       await inputs[1].type(PASSWORD);
+    } else {
+       // خطة بديلة لو الموقع مخفي الحقول بطريقة مختلفة
+       await page.evaluate((u, p) => {
+          let user = document.querySelector('input[name="username"], input[name="email"], input[type="text"]');
+          let pass = document.querySelector('input[name="password"], input[type="password"]');
+          if (user) user.value = u;
+          if (pass) pass.value = p;
+       }, USERNAME, PASSWORD);
+    }
 
-  // اللوب الرئيسي
+    // 3) الضغط على زر الدخول
+    await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")').catch(e => console.log("جاري محاولة الضغط على زر الدخول..."));
+
+    // 4) انتظار تحميل الصفحة بعد الدخول
+    await sleep(5000);
+    console.log("✅ تم تسجيل الدخول بنجاح!");
+
+    // 5) التوجه للسوق مباشرة
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log("✅ دخلنا السوق الأسود");
+
+  } catch (e) {
+    console.log("⚠️ مشكلة في تسجيل الدخول الآلي:", e.message);
+    console.log("🔑 الحل: إذا كان في كابتشا أو طلب إثبات بشري، افتح تبويب Webview من Replit وسجل الدخول بنفسك مرة واحدة فقط، ثم اترك البوت يعمل.");
+  }
+
+  // 6) اللوب الرئيسي (بيع وشراء وسفر)
   while (true) {
     try {
       let state = await page.evaluate(() => {
