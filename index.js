@@ -1,8 +1,8 @@
 const puppeteer = require('puppeteer');
 
-// بنقرأ البيانات من الـ Secrets عشان الأمان
-const USERNAME = process.env.amr.aly@2226@gamilcom;
-const PASSWORD = process.env.Gun@12345;
+// القراءة من الـ Secrets (آمن ومظبوط)
+const USERNAME = process.env.PD_USER;
+const PASSWORD = process.env.PD_PASS;
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 let step = 'buy'; 
@@ -14,52 +14,41 @@ let targetItem = "Electronics";
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
   
-  // مهلة أطول عشان الصفحة تتحمل
   page.setDefaultTimeout(15000);
 
-  // تسجيل الدخول
   try {
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
-    
-    // 🔥 الطريقة الأقوى: ندور على أي خانة إدخال (Input) ظاهرة في الصفحة ونكتب فيها
     await page.waitForSelector('input', { visible: true });
-    const inputs = await page.$$('input[type="text"], input[type="email"], input:not([type])');
     
-    // لو اللعبة فيها خانتين (يوزر وباسورد) هنكتب في الأول والثاني
+    const inputs = await page.$$('input[type="text"], input[type="email"], input:not([type])');
     if (inputs.length >= 2) {
-       await inputs[0].click({ clickCount: 3 }); // تمسح أي حاجة قديمة
+       await inputs[0].click({ clickCount: 3 });
        await inputs[0].type(USERNAME);
-       
        await inputs[1].click({ clickCount: 3 });
        await inputs[1].type(PASSWORD);
     } else {
-       // لو اللعبة بتستخدم type مختلفة، بنجرب طريقة أعم
+       // خطة بديلة لو الموقع مش لاقي الحقول
        await page.evaluate((u, p) => {
           let userInput = document.querySelector('input[type="text"], input[name="username"], input[name="email"], #username');
           let passInput = document.querySelector('input[type="password"], input[name="password"], #password');
           if (userInput && passInput) {
              userInput.value = u;
              passInput.value = p;
-             // نطلق حدث تغيير عشان الموقع يلاحظ
              userInput.dispatchEvent(new Event('input', { bubbles: true }));
              passInput.dispatchEvent(new Event('input', { bubbles: true }));
           }
        }, USERNAME, PASSWORD);
     }
 
-    // الضغط على زر الدخول
     await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")');
     await page.waitForTimeout(3000);
     console.log("✅ تم تسجيل الدخول بنجاح!");
   } catch (e) {
-    console.log("⚠️ فيه مشكلة بالتسجيل التلقائي (غالباً في كابتشا). هنحاول نكمل من غير تسجيل دخول.");
-    // هنا ممكن تروح تشوف الـ Web Preview في Replit وتسجل دخول بإيدك، والكود هيشتغل بعدها
+    console.log("⚠️ مش قادر أسجل دخول تلقائياً (غالباً في كابتشا)، افتح الـ Web Preview وسجل بنفسك مرة واحدة.");
   }
 
-  // لوب البيع والشراء
   setInterval(async () => {
     try {
-      // التحقق من الكولداون
       let state = await page.evaluate(() => {
         let body = document.body.innerText;
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
@@ -76,7 +65,6 @@ let targetItem = "Electronics";
         return;
       }
 
-      // البيع والشراء
       if (step === 'buy') {
         if (!page.url().includes('blackmarket')) {
           console.log("➡️ رايح للسوق الأسود...");
@@ -120,7 +108,6 @@ let targetItem = "Electronics";
         if (state.hold > 0) step = 'travel';
       }
 
-      // السفر
       if (step === 'travel') {
          if (!page.url().includes('travel')) {
             console.log("➡️ رايح لصفحة السفر...");
