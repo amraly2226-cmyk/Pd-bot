@@ -4,20 +4,55 @@ const puppeteer = require('puppeteer');
 // بيانات الدخول (عدلها)
 // =================================================
 const LOGIN = {
-  username: 'amr.aly.2226@gmail.com',
-  password: 'Gun@12345'
+  username: 'your_username_here',
+  password: 'your_password_here'
 };
 
 const CONFIG = {
-  FROM: 'Tokyo',
-  TO: 'Cairo',
-  ITEM: 'Electronics'   // غيرها للسلعة اللي عايزها
+  FROM: 'Tokyo',      // المدينة اللي هتبدأ منها
+  TO: 'Cairo',        // المدينة اللي هتروحها
+  ITEM: 'Alcohol'     // السلعة المطلوبة
 };
 
 // =================================================
 
 let state = { step: 'buy', failCount: 0, running: true };
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// ===== دالة للبحث عن السلعة في الجدول =====
+async function findItemRow(page, itemName) {
+  return await page.evaluate((item) => {
+    const rows = document.querySelectorAll('tr');
+    for (const row of rows) {
+      const text = row.innerText.toLowerCase();
+      if (text.includes(item.toLowerCase()) && text.includes('£')) {
+        return row;
+      }
+    }
+    return null;
+  }, itemName);
+}
+
+// ===== دالة للضغط على Max Buy =====
+async function clickMaxBuy(page, itemName) {
+  return await page.evaluate((item) => {
+    const rows = document.querySelectorAll('tr');
+    for (const row of rows) {
+      if (row.innerText.toLowerCase().includes(item.toLowerCase()) && row.innerText.includes('£')) {
+        // جرب كل الأزرار الممكنة
+        const btns = row.querySelectorAll('button');
+        for (const btn of btns) {
+          const text = btn.innerText.trim().toUpperCase();
+          if (text.includes('MAX BUY') || text.includes('BUY MAX') || text.includes('MAX')) {
+            btn.click();
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }, itemName);
+}
 
 (async () => {
   const browser = await puppeteer.launch({
@@ -79,19 +114,10 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         const cdMatch = bodyText.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
         let cd = cdMatch ? cdMatch[1].trim() : null;
         
-        // هل السلعة موجودة في السوق؟
-        let itemExists = false;
-        for (const row of rows) {
-          if (row.innerText.toLowerCase().includes(CONFIG.ITEM.toLowerCase()) && row.innerText.includes('£')) {
-            itemExists = true;
-            break;
-          }
-        }
-        
-        return { holding, city, heldItem, cd, itemExists, bodyText };
+        return { holding, city, heldItem, cd, bodyText };
       });
       
-      const { holding, heldItem, cd, itemExists } = pageData;
+      const { holding, heldItem, cd, city } = pageData;
       const targetItem = CONFIG.ITEM;
       const targetTo = CONFIG.TO;
       
@@ -141,18 +167,20 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
         if (holding > 0 && (!heldItem || heldItem.toLowerCase() === targetItem.toLowerCase())) {
           console.log(`✅ شايل ${holding} ${targetItem} صح - رايح Travel`);
           state.step = 'travel';
+          state.failCount = 0;
           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
           await delay(2000);
-          state.failCount = 0; // نضبط الفشل
           continue;
         }
         
         // ===== محاولة الشراء =====
-        if (!itemExists) {
-          console.log(`❌ السلعة ${targetItem} مش موجودة في السوق (محاولة ${state.failCount+1}/5)`);
+        // 1. نتأكد إن السلعة موجودة
+        const itemRow = await findItemRow(page, targetItem);
+        if (!itemRow) {
+          console.log(`❌ السلعة ${targetItem} مش موجودة في سوق ${city || 'الحالي'}`);
           state.failCount++;
-          if (state.failCount >= 5) {
-            console.log(`🛑 توقف: السلعة ${targetItem} مش موجودة بعد 5 محاولات. غير السلعة في CONFIG.ITEM`);
+          if (state.failCount >= 3) {
+            console.log(`🛑 توقف: السلعة مش موجودة بعد 3 محاولات. غير السلعة أو المدينة.`);
             state.running = false;
             break;
           }
@@ -160,35 +188,29 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
           continue;
         }
         
+        // 2. نحاول نضغط Max Buy
         console.log(`🛒 بجيب ${targetItem}...`);
-        const bought = await page.evaluate((itemName) => {
-          const rows = document.querySelectorAll('tr');
-          for (const row of rows) {
-            if (row.innerText.toLowerCase().includes(itemName.toLowerCase()) && row.innerText.includes('£')) {
-              const btn = row.querySelector('button:has-text("Max Buy")');
-              if (btn) { btn.click(); return true; }
-            }
-          }
-          return false;
-        }, targetItem);
+        const clicked = await clickMaxBuy(page, targetItem);
         
-        if (bought) {
-          await delay(1500);
-          const confirmBuy = await page.$('button:has-text("BUY MAX")');
-          if (confirmBuy) {
-            await confirmBuy.click();
-            console.log(`✅ اشتريت ${targetItem}`);
-            state.step = 'travel';
-            state.failCount = 0;
-            await delay(2000);
-            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
-          } else {
-            console.log('⚠️ زر BUY MAX مش ظاهر، يمكن السلعة مش قابلة للشراء');
-            state.failCount++;
-            await delay(5000);
-          }
-        } else {
+        if (!clicked) {
           console.log(`⚠️ مش لاقي زر Max Buy للسلعة ${targetItem}`);
+          state.failCount++;
+          await delay(5000);
+          continue;
+        }
+        
+        // 3. نضغط BUY MAX (التأكيد)
+        await delay(1500);
+        const confirmBuy = await page.$('button:has-text("BUY MAX")');
+        if (confirmBuy) {
+          await confirmBuy.click();
+          console.log(`✅ اشتريت ${targetItem}`);
+          state.step = 'travel';
+          state.failCount = 0;
+          await delay(2000);
+          await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+        } else {
+          console.log('⚠️ زر BUY MAX مش ظاهر، يمكن السلعة مش قابلة للشراء');
           state.failCount++;
           await delay(5000);
         }
