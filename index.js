@@ -16,6 +16,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
+
+  // فتح المتصفح بحجم شاشة كمبيوتر عريض عشان تظهر القائمة الجانبية
+  await page.setViewport({ width: 1920, height: 1080 });
+  
   page.setDefaultTimeout(15000);
 
   try {
@@ -52,28 +56,34 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let body = document.body.innerText;
         let loc = null;
         
-        // 🔥 الطريقة الجديدة (المضمونة 100%) - البحث عن كلمة "Location"
-        // في الصورة دي، بنفسك اكتشفت إنها فوق على الشمال
-        let elements = [...document.querySelectorAll('*')];
-        let locationLabel = elements.find(e => e.innerText && e.innerText.trim() === 'Location');
-        
-        if (locationLabel) {
-           // نطلع للعنصر الأب اللي فيه الكلمة دي
-           let parent = locationLabel.closest('div') || locationLabel.parentElement;
-           if (parent) {
-               let text = parent.innerText;
-               // نقرأ اسم المدينة اللي بعد كلمة Location
-               let match = text.match(/Location\s*\n?\s*([A-Za-z ]+)/i);
-               if (match) loc = match[1].trim();
-           }
+        // 🔥 دالة قراءة المدينة الجديدة والمضمونة (بتقرأ القائمة الجانبية)
+        let lines = body.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                for (let j = i + 1; j < lines.length; j++) {
+                    if (lines[j].trim()) {
+                        loc = lines[j].trim();
+                        break;
+                    }
+                }
+                break;
+            }
         }
         
-        // لو لسه مش لاقي، نجرب الطرق القديمة كخطة بديلة
-        if (!loc) {
-            let m = body.match(/Black Market - ([A-Za-z ]+)/i); if (m) loc = m[1].trim();
-            if (!loc) { m = body.match(/You have traveled to ([A-Za-z ]+)!/i); if (m) loc = m[1].trim(); }
+        // تنظيف الاسم
+        if (loc) {
+            let clean = loc.split('\n')[0].trim();
+            if (clean.includes('Cairo')) loc = 'Cairo';
+            else if (clean.includes('Tokyo')) loc = 'Tokyo';
+            else if (clean.includes('London')) loc = 'London';
+            else if (clean.includes('Moscow')) loc = 'Moscow';
+            else if (clean.includes('Rome')) loc = 'Rome';
+            else if (clean.includes('Capetown')) loc = 'Capetown';
+            else if (clean.includes('Sydney')) loc = 'Sydney';
+            else if (clean.includes('Ottawa')) loc = 'Ottawa';
+            else if (clean.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
         }
-        
+
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
         let holdMatch = body.match(/holding (\d+) items/i); 
         let hold = holdMatch ? +holdMatch[1] : 0;
@@ -106,6 +116,122 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
       // ✅ الحالة 1: إنت في كايرو
       if (state.loc === "Cairo") {
+        if (state.heldItem === "Electronics") {
+           console.log("📍 في كايرو... شايل إلكترونيكس، هبيعها الأول");
+           await page.evaluate(() => {
+              let rows = [...document.querySelectorAll('tr')];
+              for (let r of rows) {
+                if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
+                   let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                   if (btn) { btn.click(); break; }
+                }
+              }
+           });
+           await sleep(2000);
+           await page.evaluate(() => {
+              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL');
+              if (btn) btn.click();
+           });
+           console.log("✅ بعت الإلكترونيكس في كايرو");
+           await sleep(3000);
+           continue;
+        }
+
+        if (state.hold === 0) {
+           console.log("📍 في كايرو... جاري شراء Anabolic steroid");
+           await page.evaluate((itemName) => {
+              let rows = [...document.querySelectorAll('tr')];
+              for (let r of rows) {
+                if (r.innerText.includes(itemName) && r.innerText.includes('£')) {
+                  let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy'));
+                  if (mb) { mb.click(); break; }
+                }
+              }
+           }, "Anabolic steroid");
+           await sleep(1000);
+           await page.evaluate(() => {
+              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX');
+              if (btn) btn.click();
+           });
+           console.log("✅ اشتريت الأنابوليك في كايرو");
+           await sleep(3000);
+           continue;
+        }
+        
+        if (state.heldItem === "Anabolic steroid") {
+           console.log("📍 في كايرو... شايل أنابوليك، رايح طوكيو");
+           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
+           await sleep(2000);
+           continue;
+        }
+      }
+
+      // ✅ الحالة 2: إنت في طوكيو
+      else if (state.loc === "Tokyo") {
+        if (state.heldItem === "Anabolic steroid" || state.hold > 0) {
+           console.log("📍 في طوكيو... شايل أنابوليك، هبيعها الأول");
+           await page.evaluate(() => {
+              let rows = [...document.querySelectorAll('tr')];
+              for (let r of rows) {
+                if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
+                   let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                   if (btn) { btn.click(); break; }
+                }
+              }
+           });
+           await sleep(2000);
+           await page.evaluate(() => {
+              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL');
+              if (btn) btn.click();
+           });
+           console.log("✅ بعت الأنابوليك في طوكيو");
+           await sleep(3000);
+           continue;
+        }
+
+        if (state.hold === 0) {
+           console.log("📍 في طوكيو... جاري شراء Electronics");
+           await page.evaluate((itemName) => {
+              let rows = [...document.querySelectorAll('tr')];
+              for (let r of rows) {
+                if (r.innerText.includes(itemName) && r.innerText.includes('£')) {
+                  let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy'));
+                  if (mb) { mb.click(); break; }
+                }
+              }
+           }, "Electronics");
+           await sleep(1000);
+           await page.evaluate(() => {
+              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX');
+              if (btn) btn.click();
+           });
+           console.log("✅ اشتريت الإلكترونيكس في طوكيو");
+           await sleep(3000);
+           continue;
+        }
+
+        if (state.heldItem === "Electronics") {
+           console.log("📍 في طوكيو... شايل إلكترونيكس، رايح كايرو");
+           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
+           await sleep(2000);
+           continue;
+        }
+      }
+      
+      // لو مفيش مدينة اتحددت (أو الكود مش لاقي الـ Location بسبب كابتشا أو مشكلة تحميل)
+      else {
+          console.log("⚠️ مش قادر أحدد المدينة الحالية، بجرب تاني خلال 5 ثواني...");
+          await sleep(5000);
+          continue;
+      }
+
+    } catch (e) {
+      console.log("حصل خطأ مؤقت، هعيد المحاولة بعد 15 ثانية:", e.message);
+      await sleep(15000);
+    }
+    await sleep(10000);
+  }
+})();      if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics") {
            console.log("📍 في كايرو... شايل إلكترونيكس، هبيعها الأول");
            await page.evaluate(() => {
