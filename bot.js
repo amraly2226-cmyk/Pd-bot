@@ -4,8 +4,8 @@ const puppeteer = require('puppeteer');
 // بيانات الدخول (عدلها)
 // =================================================
 const LOGIN = {
-  username: 'your_username_here',
-  password: 'your_password_here'
+  username: 'amr.aly.2226@gmail.com',
+  password: 'Gun@12345'
 };
 
 const CONFIG = {
