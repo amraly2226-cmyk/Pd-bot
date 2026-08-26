@@ -42,7 +42,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      let state = await page.evaluate(() => {
+      // 🔥 هنا عدلت السطر عشان نمرر ITEMS جوه المتصفح
+      let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         
@@ -76,7 +77,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let rows = [...document.querySelectorAll('tr')];
         for (let r of rows) {
           if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
-            for (let it of ITEMS) {
+            // 🔥 عشان كده بنستخدم items اللي متبعته
+            for (let it of items) {
               if (r.innerText.toLowerCase().includes(it.toLowerCase())) { heldItem = it; break; }
             }
             break;
@@ -84,7 +86,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         return { loc, cd: cd ? cd[1] : null, hold, heldItem };
-      });
+      }, ITEMS); // 🔥 هنا بنبعتها
 
       if (state.cd) {
         console.log(`⏳ كولداون: ${state.cd}`);
@@ -121,12 +123,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
            await sleep(3000);
            
-           // 🔥 منطق السفر الجديد (ادخل على بطاقة طوكيو):
            await page.evaluate(() => {
               let elements = [...document.querySelectorAll('div, a, span')];
               let tokyo = elements.find(el => el.innerText.trim() === 'TOKYO' && el.offsetParent !== null && el.children.length === 0);
               if (tokyo) {
-                 // نطلع للعنصر الأب اللي هو البطاقة نفسها
                  let card = tokyo.closest('div');
                  if (card) card.click();
                  else tokyo.click();
@@ -134,14 +134,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            await sleep(2000);
            
-           // الضغط على زر السفر المحدد:
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
               if (btn) btn.click(); 
            });
            await sleep(1500);
            
-           // الضغط على زر التأكيد (TRAVEL):
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL'); 
               if (btn) btn.click(); 
@@ -178,7 +176,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
            await sleep(3000);
            
-           // 🔥 نختار بطاقة Cairo ونسافر
            await page.evaluate(() => {
               let elements = [...document.querySelectorAll('div, a, span')];
               let cairo = elements.find(el => el.innerText.trim() === 'CAIRO' && el.offsetParent !== null && el.children.length === 0);
@@ -207,7 +204,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
       
-      // لو مش لاقي
       else {
           console.log("⚠️ مش لاقي المدينة، بجرب تاني...");
           await sleep(5000);
