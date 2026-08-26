@@ -1,8 +1,8 @@
 const puppeteer = require('puppeteer');
 
 // بنقرأ البيانات من الـ Secrets عشان الأمان
-const USERNAME = process.env.PD_USER;
-const PASSWORD = process.env.PD_PASS;
+const USERNAME = process.env.amr.aly@2226@gamilcom;
+const PASSWORD = process.env.Gun@12345;
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 let step = 'buy'; 
