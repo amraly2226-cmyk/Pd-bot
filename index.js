@@ -101,10 +101,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ أولاً: لو في كولداون في أي صفحة (السوق أو السفر)، انتظر
+      // ✅ كولداون: استنى 15 دقيقة كاملة عشان يقل الضغط ولا ينكشف البوت
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
-        await sleep(60000);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
+        await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
         continue;
       }
 
@@ -142,8 +142,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
+               await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
                continue;
            }
 
@@ -198,8 +198,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 15 دقيقة عشان ما يبوشش البوت...`);
+               await sleep(900000); // 🔥 تم تغييرها من 60000 لـ 900000 (15 دقيقة)
                continue;
            }
 
