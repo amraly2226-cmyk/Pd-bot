@@ -8,23 +8,6 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// دالة لقراءة الكولداون (مثال: 1h 31m 59s)
-function parseCooldown(str) {
-    if (!str) return 0;
-    let h = str.match(/(\d+)\s*h/);
-    let m = str.match(/(\d+)\s*m/);
-    let s = str.match(/(\d+)\s*s/);
-    let seconds = 0;
-    if (h) seconds += +h[1] * 3600;
-    if (m) seconds += +m[1] * 60;
-    if (s) seconds += +s[1];
-    if (seconds === 0) {
-        let n = str.match(/(\d+)/);
-        if (n) seconds = +n[1] * 60;
-    }
-    return seconds;
-}
-
 (async () => {
   console.log("🚀 البوت شغال...");
   
@@ -82,7 +65,7 @@ function parseCooldown(str) {
         else if (loc && loc.includes('Ottawa')) loc = 'Ottawa';
         else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
-        let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
+        let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
 
         let hold = 0;
@@ -98,7 +81,6 @@ function parseCooldown(str) {
                         if (cells.length >= 3) {
                             let youHaveCell = cells[2].innerText;
                             let match = youHaveCell.match(/(\d+)/);
-                            // ⚠️ شرط الأهم: لن يبيع إلا إذا كان يملك العنصر فعلاً (أكبر من 0)
                             if (match && +match[1] > 0) {
                                 heldItem = it;
                                 hold = +match[1];
@@ -119,23 +101,14 @@ function parseCooldown(str) {
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ قراءة الكولداون والانتظار حتى انتهاءه
+      // ✅ أولاً: لو في كولداون في أي صفحة (السوق أو السفر)، انتظر
       if (state.cd) {
-          let waitSeconds = parseCooldown(state.cd);
-          console.log(`⏳ في كولداون (${state.cd}) - مستني ${Math.floor(waitSeconds / 60)} دقيقة...`);
-          let waited = 0;
-          while (waited < waitSeconds) {
-              await sleep(30000);
-              waited += 30;
-              console.log(`⏳ باقي تقريباً ${Math.max(0, Math.floor((waitSeconds - waited) / 60))} دقيقة`);
-          }
-          console.log("✅ الوقت خلص، بنروح لصفحة السفر...");
-          await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
-          await sleep(2000);
-          continue;
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
+        await sleep(60000);
+        continue;
       }
 
-      // ✅ المنطق في كايرو
+      // ✅ كايرو: بيع الإلكترونيكس أو شراء الأنابوليك
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 كايرو - بيع الإلكترونيكس");
@@ -160,6 +133,21 @@ function parseCooldown(str) {
            console.log("📍 كايرو - رايح طوكيو");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
+           
+           // 🔥 قراءة الكولداون من صفحة السفر
+           let travelCd = await page.evaluate(() => {
+               let body = document.body.innerText;
+               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
+               return cdMatch ? cdMatch[1] : null;
+           });
+           
+           if (travelCd) {
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
+               await sleep(60000);
+               continue;
+           }
+
+           // لو مفيش كولداون، اكمل السفر
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -171,12 +159,12 @@ function parseCooldown(str) {
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
            if (verify) console.log("🎉 وصلنا طوكيو!");
-           else { console.log("⚠️ السفر مكملش، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
 
-      // ✅ المنطق في طوكيو
+      // ✅ طوكيو: بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لكايرو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 طوكيو - بيع الأنابوليك سترويدز");
@@ -198,9 +186,24 @@ function parseCooldown(str) {
         }
 
         if (state.heldItem === "Electronics" && state.hold > 0) {
-           console.log("📍 طوكيو - رايح كايرو");
+           console.log("📍 طوكيو - رايح كايرو (سأقرأ الكولداون أولاً)");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
+           
+           // 🔥 قراءة الكولداون من صفحة السفر
+           let travelCd = await page.evaluate(() => {
+               let body = document.body.innerText;
+               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
+               return cdMatch ? cdMatch[1] : null;
+           });
+           
+           if (travelCd) {
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
+               await sleep(60000);
+               continue;
+           }
+
+           // لو مفيش كولداون، اكمل السفر
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -212,7 +215,7 @@ function parseCooldown(str) {
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
            if (verify) console.log("🎉 وصلنا كايرو!");
-           else { console.log("⚠️ السفر مكملش، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
