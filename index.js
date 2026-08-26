@@ -1,73 +1,82 @@
 const puppeteer = require('puppeteer');
 
-// بنقرأ اليوزر والباسورد من الـ Secrets اللي انت عاملها فوق
-const USERNAME = 'amr.aly.2226@gmail.com';
-const PASSWORD = 'Gun@12345';
+// بنقرأ البيانات من الـ Secrets عشان الأمان
+const USERNAME = process.env.PD_USER;
+const PASSWORD = process.env.PD_PASS;
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
-const CITY_IDS = {"Cairo":1,"Tokyo":2,"London":3,"Moscow":4,"Rome":5,"Capetown":6,"Sydney":7,"Ottawa":8,"Rio de Janeiro":9};
-
-let step = 'buy'; // الحالة دلوقتي: buy أو travel
-let targetCity = "Cairo"; // المدينة اللي هيسافر لها (عدلها زي ما انت عايز)
-let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله براحتك)
+let step = 'buy'; 
+let targetCity = "Cairo"; 
+let targetItem = "Electronics"; 
 
 (async () => {
   console.log("🚀 البوت بيشتغل... جاري فتح المتصفح المخفي");
-  
-  // تشغيل متصفح مخفي (Headless) لا يظهر على الشاشة
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
+  
+  // مهلة أطول عشان الصفحة تتحمل
+  page.setDefaultTimeout(15000);
 
-  // أول حاجة: تسجيل الدخول أوتوماتيك
+  // تسجيل الدخول
   try {
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
-    await page.type('input[type="text"], input[name="username"]', USERNAME); // عدل الاسم لو مختلف
-    await page.type('input[type="password"], input[name="password"]', PASSWORD); // عدل الباسورد لو مختلف
-    await page.click('button[type="submit"], input[type="submit"]');
-    await page.waitForNavigation({ waitUntil: 'networkidle2' });
-    console.log("✅ تم تسجيل الدخول بنجاح من غير كوكيز!");
+    
+    // 🔥 الطريقة الأقوى: ندور على أي خانة إدخال (Input) ظاهرة في الصفحة ونكتب فيها
+    await page.waitForSelector('input', { visible: true });
+    const inputs = await page.$$('input[type="text"], input[type="email"], input:not([type])');
+    
+    // لو اللعبة فيها خانتين (يوزر وباسورد) هنكتب في الأول والثاني
+    if (inputs.length >= 2) {
+       await inputs[0].click({ clickCount: 3 }); // تمسح أي حاجة قديمة
+       await inputs[0].type(USERNAME);
+       
+       await inputs[1].click({ clickCount: 3 });
+       await inputs[1].type(PASSWORD);
+    } else {
+       // لو اللعبة بتستخدم type مختلفة، بنجرب طريقة أعم
+       await page.evaluate((u, p) => {
+          let userInput = document.querySelector('input[type="text"], input[name="username"], input[name="email"], #username');
+          let passInput = document.querySelector('input[type="password"], input[name="password"], #password');
+          if (userInput && passInput) {
+             userInput.value = u;
+             passInput.value = p;
+             // نطلق حدث تغيير عشان الموقع يلاحظ
+             userInput.dispatchEvent(new Event('input', { bubbles: true }));
+             passInput.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+       }, USERNAME, PASSWORD);
+    }
+
+    // الضغط على زر الدخول
+    await page.click('button[type="submit"], input[type="submit"], button:has-text("Login")');
+    await page.waitForTimeout(3000);
+    console.log("✅ تم تسجيل الدخول بنجاح!");
   } catch (e) {
-    console.log("⚠️ مش قادر أسجل دخول، هجرب أكمل على أمل إنك متسجل من قبل:", e.message);
+    console.log("⚠️ فيه مشكلة بالتسجيل التلقائي (غالباً في كابتشا). هنحاول نكمل من غير تسجيل دخول.");
+    // هنا ممكن تروح تشوف الـ Web Preview في Replit وتسجل دخول بإيدك، والكود هيشتغل بعدها
   }
 
-  // هنبدأ العمل الأساسي (بيع وشراء وسفر) كل 6 ثواني
+  // لوب البيع والشراء
   setInterval(async () => {
     try {
-      // جاري قراءة حالة اللعبة من داخل المتصفح
-      let state = await page.evaluate((item, city) => {
-        let body = document.body.innerText;
-        let currentCity = null;
-        let hold = 0;
-        let cd = null;
-
-        let cityMatch = body.match(/Black Market - ([A-Za-z ]+)/i); if (cityMatch) currentCity = cityMatch[1].trim();
-        let holdMatch = body.match(/holding (\d+) items/i); if (holdMatch) hold = +holdMatch[1];
-        let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i); if (cdMatch) cd = cdMatch[1].trim();
-
-        return { currentCity, hold, cd, body };
-      }, targetItem, targetCity);
-
       // التحقق من الكولداون
+      let state = await page.evaluate(() => {
+        let body = document.body.innerText;
+        let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
+        let holdMatch = body.match(/holding (\d+) items/i); 
+        return { body, cd: cd ? cd[1] : null, hold: holdMatch ? +holdMatch[1] : 0 };
+      });
+
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd}`);
-        // لو مش في تبويب السفر، نروح له
         if (!page.url().includes('travel')) {
-          await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
-          await new Promise(r => setTimeout(r, 2000));
+           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
+           await new Promise(r => setTimeout(r, 2000));
         }
         return;
       }
 
-      // التحقق من الأزرار المنبثقة اللي محتاجة تأكيد (مثل Confirm)
-      await page.evaluate(() => {
-        let confirmBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'BUY MAX');
-        if (confirmBtn && document.body.innerText.includes('Confirm')) confirmBtn.click();
-        
-        let travelBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL');
-        if (travelBtn && document.body.innerText.includes('Are you sure')) travelBtn.click();
-      });
-
-      // 1) البيع والشراء
+      // البيع والشراء
       if (step === 'buy') {
         if (!page.url().includes('blackmarket')) {
           console.log("➡️ رايح للسوق الأسود...");
@@ -76,11 +85,9 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
           return;
         }
 
-        // شغل منطق البيع والشراء جوه المتصفح
         let actionResult = await page.evaluate((items, targetItem) => {
-          // البحث عن الصنف الحالي المسحوب
-          let heldItem = null;
           let rows = [...document.querySelectorAll('tr')];
+          let heldItem = null;
           for (let r of rows) {
              if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
                 let txt = r.innerText.toLowerCase();
@@ -88,8 +95,6 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
                 break;
              }
           }
-
-          // لو شايل صنف غلط - ابعته
           if (heldItem && heldItem !== targetItem) {
              for (let r of rows) {
                 if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
@@ -98,8 +103,6 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
                 }
              }
           }
-
-          // لو فاضي - اشتري
           if (!heldItem) {
              for (let r of rows) {
                 if (r.innerText.includes(targetItem) && r.innerText.includes('£')) {
@@ -108,24 +111,16 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
                 }
              }
           }
-
           return "في انتظار الصفقة...";
         }, ITEMS, targetItem);
 
         console.log(actionResult);
         await new Promise(r => setTimeout(r, 2000));
 
-        // لو خلص شراء، بدل الحالة لسفر
-        let holdNow = await page.evaluate(() => {
-           let m = document.body.innerText.match(/holding (\d+) items/i); return m ? +m[1] : 0;
-        });
-
-        if (holdNow > 0) {
-           step = 'travel';
-        }
+        if (state.hold > 0) step = 'travel';
       }
 
-      // 2) السفر
+      // السفر
       if (step === 'travel') {
          if (!page.url().includes('travel')) {
             console.log("➡️ رايح لصفحة السفر...");
@@ -133,9 +128,7 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
             await new Promise(r => setTimeout(r, 2000));
             return;
          }
-
          console.log(`✈️ هسافر لـ ${targetCity}...`);
-         // اختيار المدينة في صفحة السفر
          await page.evaluate((city) => {
             let allEls = [...document.querySelectorAll('*')];
             let targetEl = allEls.find(e => e.children.length === 0 && e.innerText.trim().toUpperCase() === city.toUpperCase() && e.offsetParent !== null);
@@ -144,13 +137,12 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
          
          await new Promise(r => setTimeout(r, 1500));
 
-         // الضغط على زر السفر النهائي
          await page.evaluate(() => {
             let tb = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location'));
             if (tb) { tb.click(); setTimeout(() => { let cb = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL'); if (cb) cb.click(); }, 1200); }
          });
 
-         console.log(`✅ وصلت ${targetCity}... رجعنا للسوق عشان نبدأ من جديد`);
+         console.log(`✅ وصلت ${targetCity}... رجعنا للسوق`);
          step = 'buy';
          await new Promise(r => setTimeout(r, 3000));
          await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.includes('Blackmarket')); if (a) a.click(); });
@@ -159,5 +151,5 @@ let targetItem = "Electronics"; // الصنف اللي هيشتريه (عدله 
     } catch (e) {
       console.log("حصل خطأ مؤقت:", e.message);
     }
-  }, 6000); // كل 6 ثواني يتحرك لخطوة جديدة عشان ما يخنقش السيرفر
+  }, 6000); 
 })();
