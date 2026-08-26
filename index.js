@@ -101,18 +101,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ الكولداون: الفحص الدوري والشراء عند الحاجة
+      // ✅ كولداون: فحص دوري مع عد تنازلي يمنع تجمد السيرفر
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - سأتحقق كل 5 دقائق`);
+        console.log(`⏳ في كولداون: ${state.cd} - بدأ الفحص الدوري`);
         for (let i = 0; i < 3; i++) {
-            await sleep(300000); // انتظر 5 دقائق
-
+            // نعمل عد تنازلي 5 مرات (كل مرة دقيقة)
+            for (let j = 5; j > 0; j--) {
+                console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
+                await sleep(60000); // دقيقة واحدة
+            }
+            
             console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
-            // نذهب للسوق الأسود للفحص
             await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
             await sleep(2000);
 
-            // 🔥 فحص المدينة الحالية والسلعة المطلوبة
+            // فحص الحالة والشراء عند الحاجة
             let marketCheck = await page.evaluate((items) => {
                 let body = document.body.innerText;
                 let city = null;
@@ -125,8 +128,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                         break;
                     }
                 }
-                if (city && city.includes('Tokyo')) city = 'Tokyo';
-                else if (city && city.includes('Cairo')) city = 'Cairo';
+                if (city && city.includes('Cairo')) city = 'Cairo';
+                else if (city && city.includes('Tokyo')) city = 'Tokyo';
                 
                 let hold = 0;
                 let rows = [...document.querySelectorAll('tr')];
@@ -146,9 +149,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 return { city, itemName, hold };
             }, ITEMS);
 
-            // 🔥 لو الكمية 0، اشتريها
+            // لو السلعة غير موجودة (0) -> اشتريها
             if (marketCheck.hold === 0) {
-                console.log(`📦 لسه مش شاري ${marketCheck.itemName} في ${marketCheck.city}... هشتريها دلوقتي`);
+                console.log(`📦 السلعة ${marketCheck.itemName} غير موجودة (0) في ${marketCheck.city}... هشتريها`);
                 await page.evaluate((itemName) => {
                     let rows = [...document.querySelectorAll('tr')];
                     for (let r of rows) {
@@ -169,7 +172,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 console.log(`✅ فحصت السوق: شايل ${marketCheck.hold} من ${marketCheck.itemName}`);
             }
 
-            // 🔥 الرجوع لصفحة السفر لمواصلة الانتظار
+            // الرجوع لصفحة السفر وقراءة الوقت الجديد
             await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
             await sleep(2000);
             
@@ -180,7 +183,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             });
             
             if (reCheckCd) {
-                console.log(`⏳ رجعت للسفر، لسه في كولداون (${reCheckCd})`);
+                console.log(`⏳ رجعت للسفر، الكولداون الجديد: ${reCheckCd}`);
             } else {
                 console.log("✅ الكولداون خلص! جاري تجهيز السفر");
                 break;
@@ -222,9 +225,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هبدأ الفحص الدوري`);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - بدأ الفحص الدوري`);
                for (let i = 0; i < 3; i++) {
-                   await sleep(300000);
+                   for (let j = 5; j > 0; j--) {
+                       console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
+                       await sleep(60000);
+                   }
                    console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
                    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
                    await sleep(2000);
@@ -261,7 +267,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                    }, ITEMS);
 
                    if (marketCheck.hold === 0) {
-                       console.log(`📦 لسه مش شاري ${marketCheck.itemName}... هشتريها دلوقتي`);
+                       console.log(`📦 السلعة ${marketCheck.itemName} غير موجودة (0)... هشتريها`);
                        await page.evaluate((itemName) => {
                            let rows = [...document.querySelectorAll('tr')];
                            for (let r of rows) {
@@ -289,7 +295,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                    });
                    
                    if (reCheckCd) {
-                       console.log(`⏳ لسه في كولداون (${reCheckCd})`);
+                       console.log(`⏳ رجعت للسفر، الكولداون الجديد: ${reCheckCd}`);
                    } else {
                        console.log("✅ الكولداون خلص! جاري تجهيز السفر");
                        break;
@@ -347,14 +353,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هبدأ الفحص الدوري`);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - بدأ الفحص الدوري`);
                for (let i = 0; i < 3; i++) {
-                   await sleep(300000);
+                   for (let j = 5; j > 0; j--) {
+                       console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
+                       await sleep(60000);
+                   }
                    console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
                    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
                    await sleep(2000);
                    
-                   // الفحص هنا لطوكيو
                    let marketCheck = await page.evaluate(() => {
                        let body = document.body.innerText;
                        let city = null;
@@ -387,7 +395,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                    });
 
                    if (marketCheck.hold === 0) {
-                       console.log(`📦 لسه مش شاري ${marketCheck.itemName}... هشتريها دلوقتي`);
+                       console.log(`📦 السلعة ${marketCheck.itemName} غير موجودة (0)... هشتريها`);
                        await page.evaluate((itemName) => {
                            let rows = [...document.querySelectorAll('tr')];
                            for (let r of rows) {
@@ -415,7 +423,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                    });
                    
                    if (reCheckCd) {
-                       console.log(`⏳ لسه في كولداون (${reCheckCd})`);
+                       console.log(`⏳ رجعت للسفر، الكولداون الجديد: ${reCheckCd}`);
                    } else {
                        console.log("✅ الكولداون خلص! جاري تجهيز السفر");
                        break;
