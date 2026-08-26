@@ -1,6 +1,6 @@
 {
   "name": "pd-offline-bot",
-  "version": "55.6-offline",
+  "version": "55.6",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
