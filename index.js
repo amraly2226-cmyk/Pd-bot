@@ -1,8 +1,8 @@
 const puppeteer = require('puppeteer');
 
 // بنقرأ اليوزر والباسورد من الـ Secrets اللي انت عاملها فوق
-const USERNAME = process.env.PD_USER;
-const PASSWORD = process.env.PD_PASS;
+const USERNAME = 'amr.aly.2226@gmail.com';
+const PASSWORD = 'Gun@12345';
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 const CITY_IDS = {"Cairo":1,"Tokyo":2,"London":3,"Moscow":4,"Rome":5,"Capetown":6,"Sydney":7,"Ottawa":8,"Rio de Janeiro":9};
