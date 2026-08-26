@@ -10,7 +10,7 @@ const CITIES = {1:"Cairo",2:"Tokyo",3:"London",4:"Moscow",5:"Rome",6:"Capetown",
 const CITY_IDS = {"Cairo":1,"Tokyo":2,"London":3,"Moscow":4,"Rome":5,"Capetown":6,"Sydney":7,"Ottawa":8,"Rio de Janeiro":9};
 // غير البضاعة اللي عايزها هنا - نفس الترتيب بتاع البوت الابيض
 const CONFIG = {
-  "Cairo": { item: "Alcohol", to: "Tokyo" },
+  "Cairo": { item: "Anabolic steroid", to: "Tokyo" },
   "Tokyo": { item: "Electronics", to: "Cairo" },
   // زود باقي المدن لو عايز
 };
