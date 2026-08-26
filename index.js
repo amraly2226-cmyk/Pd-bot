@@ -42,7 +42,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 🔥 هنا عدلت السطر عشان نمرر ITEMS جوه المتصفح
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -70,31 +69,41 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
         let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
-        let holdMatch = body.match(/holding (\d+) items/i); 
-        let hold = holdMatch ? +holdMatch[1] : 0;
-
+        
+        let hold = 0;
         let heldItem = null;
         let rows = [...document.querySelectorAll('tr')];
+
         for (let r of rows) {
-          if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
-            // 🔥 عشان كده بنستخدم items اللي متبعته
-            for (let it of items) {
-              if (r.innerText.toLowerCase().includes(it.toLowerCase())) { heldItem = it; break; }
+            let rText = r.innerText;
+            if (rText.includes('Sell') && !rText.includes('Confirm')) {
+                for (let it of items) {
+                    if (rText.toLowerCase().includes(it.toLowerCase())) {
+                        heldItem = it;
+                        let cells = [...r.querySelectorAll('td')];
+                        if (cells.length >= 3) {
+                            let youHaveCell = cells[2].innerText;
+                            let match = youHaveCell.match(/(\d+)/);
+                            if (match) hold = +match[1];
+                        }
+                        break;
+                    }
+                }
             }
-            break;
-          }
+        }
+
+        if (heldItem === null) {
+            let m = body.match(/holding (\d+) items/i);
+            hold = m ? +m[1] : 0;
         }
         
         return { loc, cd: cd ? cd[1] : null, hold, heldItem };
-      }, ITEMS); // 🔥 هنا بنبعتها
+      }, ITEMS);
 
       if (state.cd) {
         console.log(`⏳ كولداون: ${state.cd}`);
-        if (!page.url().includes('travel')) {
-           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
-           await sleep(2000);
-        }
-        await sleep(10000);
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+        await sleep(3000);
         continue;
       }
 
@@ -119,10 +128,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         if (state.heldItem === "Anabolic steroid") {
-           console.log("📍 كايرو - رايح طوكيو");
-           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
-           await sleep(3000);
+           console.log("📍 كايرو - رايح طوكيو (بالمباشر)");
            
+           // 🔥 التغيير المهم: ننتقل مباشرة لصفحة السفر بدل البحث عن الرابط
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await sleep(2000);
+           
+           // اختيار طوكيو
            await page.evaluate(() => {
               let elements = [...document.querySelectorAll('div, a, span')];
               let tokyo = elements.find(el => el.innerText.trim() === 'TOKYO' && el.offsetParent !== null && el.children.length === 0);
@@ -132,20 +144,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                  else tokyo.click();
               }
            });
-           await sleep(2000);
+           await sleep(1500);
            
+           // الضغط على زر السفر
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
               if (btn) btn.click(); 
            });
-           await sleep(1500);
+           await sleep(1200);
            
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL'); 
               if (btn) btn.click(); 
            });
            
-           console.log("✈️ طلبت السفر لطوكيو...");
+           console.log("✈️ طلبت السفر لطوكيو!");
            await sleep(5000);
            continue;
         }
@@ -172,10 +185,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
 
         if (state.heldItem === "Electronics") {
-           console.log("📍 طوكيو - رايح كايرو");
-           await page.evaluate(() => { let a = [...document.querySelectorAll('a')].find(x => x.innerText.trim() === 'Travel'); if (a) a.click(); });
-           await sleep(3000);
+           console.log("📍 طوكيو - رايح كايرو (بالمباشر)");
            
+           // 🔥 ننتقل مباشرة لصفحة السفر
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await sleep(2000);
+           
+           // اختيار كايرو
            await page.evaluate(() => {
               let elements = [...document.querySelectorAll('div, a, span')];
               let cairo = elements.find(el => el.innerText.trim() === 'CAIRO' && el.offsetParent !== null && el.children.length === 0);
@@ -185,20 +201,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                  else cairo.click();
               }
            });
-           await sleep(2000);
+           await sleep(1500);
            
+           // الضغط على زر السفر
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
               if (btn) btn.click(); 
            });
-           await sleep(1500);
+           await sleep(1200);
            
            await page.evaluate(() => { 
               let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL'); 
               if (btn) btn.click(); 
            });
            
-           console.log("✈️ طلبت السفر لكايرو...");
+           console.log("✈️ طلبت السفر لكايرو!");
            await sleep(5000);
            continue;
         }
