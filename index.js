@@ -101,14 +101,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ كولداون: فحص دوري مع عد تنازلي يمنع تجمد السيرفر
+      // ✅ كولداون: عد تنازلي ذكي (كل 10 ثواني عشان ما يتجمدش)
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - بدأ الفحص الدوري`);
         for (let i = 0; i < 3; i++) {
-            // نعمل عد تنازلي 5 مرات (كل مرة دقيقة)
-            for (let j = 5; j > 0; j--) {
-                console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
-                await sleep(60000); // دقيقة واحدة
+            // 30 مرة × 10 ثواني = 5 دقائق
+            for (let j = 30; j > 0; j--) {
+                console.log(`⏳ باقي ${Math.floor(j / 6)} دقيقة و ${(j % 6) * 10} ثانية على الفحص القادم...`);
+                await sleep(10000); // عشان ما يتجمدش، ننتظر 10 ثواني فقط
             }
             
             console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
@@ -227,9 +227,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            if (travelCd) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - بدأ الفحص الدوري`);
                for (let i = 0; i < 3; i++) {
-                   for (let j = 5; j > 0; j--) {
-                       console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
-                       await sleep(60000);
+                   for (let j = 30; j > 0; j--) {
+                       console.log(`⏳ باقي ${Math.floor(j / 6)} دقيقة و ${(j % 6) * 10} ثانية على الفحص القادم...`);
+                       await sleep(10000);
                    }
                    console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
                    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
@@ -355,9 +355,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            if (travelCd) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - بدأ الفحص الدوري`);
                for (let i = 0; i < 3; i++) {
-                   for (let j = 5; j > 0; j--) {
-                       console.log(`⏳ باقي ${j} دقيقة على الفحص القادم...`);
-                       await sleep(60000);
+                   for (let j = 30; j > 0; j--) {
+                       console.log(`⏳ باقي ${Math.floor(j / 6)} دقيقة و ${(j % 6) * 10} ثانية على الفحص القادم...`);
+                       await sleep(10000);
                    }
                    console.log(`⏳ مرت ${(i + 1) * 5} دقيقة... جاري فحص السوق`);
                    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
