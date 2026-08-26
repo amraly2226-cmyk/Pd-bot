@@ -44,7 +44,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
+        let cooldown = null;
         
+        // اكتشاف المدينة
         let lines = body.split('\n');
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim().toUpperCase() === 'LOCATION') {
@@ -64,8 +66,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         else if (loc && loc.includes('Ottawa')) loc = 'Ottawa';
         else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
-        let cd = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
-        
+        // اكتشاف الكولداون (مهم جداً!)
+        let cdMatch = body.match(/Travel in\s*([0-9hms ]+)/i) || body.match(/You cannot travel for:?\s*([0-9hms ]+)/i);
+        if (cdMatch) cooldown = cdMatch[1];
+
+        // اكتشاف العنصر المحمول
         let hold = 0;
         let heldItem = null;
         let rows = [...document.querySelectorAll('tr')];
@@ -93,13 +98,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             hold = m ? +m[1] : 0;
         }
         
-        return { loc, cd: cd ? cd[1] : null, hold, heldItem };
+        return { loc, cd: cooldown, hold, heldItem };
       }, ITEMS);
 
+      // ⏳ مهما كان، لو في كولداون، ننتظر ولا نعمل أي حاجة!
       if (state.cd) {
-        console.log(`⏳ كولداون: ${state.cd}`);
-        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
-        await sleep(3000);
+        console.log(`⏳ كولداون: ${state.cd} - هينتظر وينام 60 ثانية`);
+        await sleep(60000); 
         continue;
       }
 
@@ -107,8 +112,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics") {
            console.log("📍 كايرو - ببيع الإلكترونيكس");
+           // اضغط على Sell All
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
+           // اضغط على Confirm Sell All
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL'); if (btn) btn.click(); });
            await sleep(3000);
            continue;
@@ -125,58 +132,29 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         if (state.heldItem === "Anabolic steroid") {
            console.log("📍 كايرو - رايح طوكيو");
-           
-           // 1) افتح صفحة السفر
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-
-           // 2) 🔥 لازم يدوس على Grid View الأول عشان يظهر شكل البطاقات
-           await page.evaluate(() => {
-               let elements = [...document.querySelectorAll('a, span, div, button')];
-               let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null);
-               if (grid) grid.click();
-           });
-           await sleep(1500); // استنى يتحول للعرض الشبكي
-
-           // 3) اختيار بطاقة طوكيو
-           await page.evaluate(() => {
-              let cards = [...document.querySelectorAll('div')];
-              let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50);
-              if (target) target.click();
-           });
+           
+           // Grid View
+           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
-
-           // 4) الضغط على زر السفر المحدد
-           await page.evaluate(() => { 
-              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
-              if (btn) btn.click(); 
-           });
+           
+           // اختيار طوكيو
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
-
-           // 5) 🔥 الضغط على زر TRAVEL في النافذة المنبثقة (لو ظهرت)
-           // استخدام waitForSelector لضمان ظهور الزر في النافذة
+           
+           // تأكيد السفر
+           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+           await sleep(1500);
            try {
                await page.waitForSelector('button', { visible: true, timeout: 3000 });
-               await page.evaluate(() => {
-                   let allBtns = [...document.querySelectorAll('button')];
-                   let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
-                   if (travelBtn) travelBtn.click();
-               });
-           } catch (e) {
-               console.log("⚠️ النافذة مفتحتش، مننتظرش التأكيد");
-           }
-           
+               await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+           } catch (e) {}
+
            await sleep(5000);
-           
-           // التحقق من الوصول الفعلي
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
-           if (verify) {
-               console.log("🎉 فعلاً وصلنا طوكيو!");
-               await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-           } else {
-               console.log("⚠️ السفر مكملش، بنرجع للسوق");
-               await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-           }
+           if (verify) console.log("🎉 وصلنا طوكيو!");
+           else { console.log("⚠️ السفر مكملش، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
@@ -184,9 +162,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       // ✅ الحالة 2: في طوكيو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" || state.hold > 0) {
-           console.log("📍 طوكيو - ببيع الأنابوليك");
+           console.log("📍 طوكيو - بيع الأنابوليك");
+           // 🔥 إصلاح البيع هنا (نفس الفكرة بتاعة بيع الإلكترونيكس)
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
+           // الآن اضغط على Confirm Sell All
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'SELL ALL'); if (btn) btn.click(); });
            await sleep(3000);
            continue;
@@ -203,55 +183,29 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         if (state.heldItem === "Electronics") {
            console.log("📍 طوكيو - رايح كايرو");
-           
-           // 1) افتح صفحة السفر
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-
-           // 2) 🔥 يدوس على Grid View الأول
-           await page.evaluate(() => {
-               let elements = [...document.querySelectorAll('a, span, div, button')];
-               let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null);
-               if (grid) grid.click();
-           });
-           await sleep(1500); // استنى يتحول للعرض الشبكي
-
-           // 3) اختيار بطاقة كايرو
-           await page.evaluate(() => {
-              let cards = [...document.querySelectorAll('div')];
-              let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50);
-              if (target) target.click();
-           });
+           
+           // Grid View
+           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
-
-           // 4) الضغط على زر السفر المحدد
-           await page.evaluate(() => { 
-              let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
-              if (btn) btn.click(); 
-           });
+           
+           // اختيار كايرو
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
-
-           // 5) الضغط على زر التأكيد
+           
+           // تأكيد السفر
+           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+           await sleep(1500);
            try {
                await page.waitForSelector('button', { visible: true, timeout: 3000 });
-               await page.evaluate(() => {
-                   let allBtns = [...document.querySelectorAll('button')];
-                   let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
-                   if (travelBtn) travelBtn.click();
-               });
+               await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
            } catch (e) {}
 
            await sleep(5000);
-           
-           // التحقق من الوصول
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
-           if (verify) {
-               console.log("🎉 فعلاً وصلنا كايرو!");
-               await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-           } else {
-               console.log("⚠️ السفر مكملش، بنرجع للسوق");
-               await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-           }
+           if (verify) console.log("🎉 وصلنا كايرو!");
+           else { console.log("⚠️ السفر مكملش، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
