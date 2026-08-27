@@ -8,6 +8,7 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// دالة مساعدة: لو الكولداون "00" أو "0" ترجع 0 (يعني خلص على طول)
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
     let h = str.match(/(\d+)\s*h/);
@@ -54,54 +55,6 @@ function parseCooldownToSeconds(str) {
 
   while (true) {
     try {
-      // ✅ 1) لو إحنا في صفحة السفر والكولداون صفر:
-      if (page.url().includes('travel')) {
-        let travelText = await page.evaluate(() => document.body.innerText);
-        let cd = travelText.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || travelText.match(/Travel in\s*([0-9hms ]+)/i);
-        
-        if (parseCooldownToSeconds(cd ? cd[1] : null) > 0) {
-          console.log(`⏳ في كولداون: ${cd[1]} - هستنى دقيقة`);
-          await sleep(60000);
-          await page.goto('https://www.project-dark.co.uk/travel');
-          continue;
-        }
-
-        let fromCity = travelText.includes('Black Market - Tokyo') ? 'Tokyo' : 'Cairo';
-        let destCity = (fromCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
-
-        console.log(`✈️ ${fromCity} - جاري تجهيز السفر إلى ${destCity}`);
-
-        // (1) اختيار جرايد فيو
-        await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-        await sleep(1500);
-           
-        // (2) اختيار البلد من الكارت
-        await page.evaluate((city) => {
-          let cards = [...document.querySelectorAll('div')];
-          let target = cards.find(el => el.innerText.trim() === city && el.offsetWidth > 150 && el.offsetHeight > 50);
-          if (target) target.click();
-        }, destCity);
-        await sleep(1500);
-
-        // (3) الضغط على Travel to Selected Location
-        await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-        await sleep(1500);
-
-        // (4) انتظار البوباب
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-           
-        // (5) الضغط على TRAVEL جوه البوباب (من غير فحص offsetParent عشان يضمن إنه يدوسها)
-        await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
-        
-        console.log(`✈️ تم الضغط على زر TRAVEL لـ ${destCity}`);
-
-        // 🔥 أهم تعديل: بعد الضغط، استنى وروح للسوق مباشرة، مفيش أي فحص "السفر لم يكتمل" يعلقك هنا
-        await sleep(8000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket');
-        continue;
-      }
-
-      // ✅ 2) كود السوق (بيع وشراء - زي ما هو بدون أي تغيير)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -118,6 +71,13 @@ function parseCooldownToSeconds(str) {
         }
         if (loc && loc.includes('Cairo')) loc = 'Cairo';
         else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
+        else if (loc && loc.includes('London')) loc = 'London';
+        else if (loc && loc.includes('Moscow')) loc = 'Moscow';
+        else if (loc && loc.includes('Rome')) loc = 'Rome';
+        else if (loc && loc.includes('Capetown')) loc = 'Capetown';
+        else if (loc && loc.includes('Sydney')) loc = 'Sydney';
+        else if (loc && loc.includes('Ottawa')) loc = 'Ottawa';
+        else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -155,9 +115,9 @@ function parseCooldownToSeconds(str) {
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // لو الكولداون أكبر من صفر، استنى
+      // ✅ أولاً: لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
       if (parseCooldownToSeconds(state.cd) > 0) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة...`);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
         continue;
       }
@@ -185,7 +145,35 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 كايرو - رايح طوكيو");
-           await page.goto('https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await sleep(2500);
+           
+           // 🔥 قراءة الكولداون من صفحة السفر
+           let travelCd = await page.evaluate(() => {
+               let body = document.body.innerText;
+               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
+               return cdMatch ? cdMatch[1] : null;
+           });
+           
+           if (parseCooldownToSeconds(travelCd) > 0) {
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
+               await sleep(60000);
+               continue;
+           }
+
+           // ⚡ لو مفيش كولداون أو 00: السفر بالطريقة الصحيحة اللي كانت شغالة
+           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
+           await sleep(1500);
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
+           await sleep(1500);
+           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+           await sleep(1500);
+           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
+           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+           await sleep(5000);
+           
+           // ⚡ التعديل الأهم: شيلنا الفحص القديم اللي كان بيرجعك للسوق، وبعد السفر روح للسوق الجديدة مباشرة
+           await page.goto('https://www.project-dark.co.uk/blackmarket');
            continue;
         }
       }
@@ -213,7 +201,34 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 طوكيو - رايح كايرو");
-           await page.goto('https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await sleep(2500);
+           
+           let travelCd = await page.evaluate(() => {
+               let body = document.body.innerText;
+               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
+               return cdMatch ? cdMatch[1] : null;
+           });
+           
+           if (parseCooldownToSeconds(travelCd) > 0) {
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
+               await sleep(60000);
+               continue;
+           }
+
+           // ⚡ السفر بالطريقة الصحيحة
+           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
+           await sleep(1500);
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
+           await sleep(1500);
+           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+           await sleep(1500);
+           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
+           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+           await sleep(5000);
+           
+           // ⚡ التعديل الأهم: شيلنا الفحص القديم اللي كان بيرجعك للسوق
+           await page.goto('https://www.project-dark.co.uk/blackmarket');
            continue;
         }
       }
