@@ -32,6 +32,9 @@ function parseCooldownToSeconds(str) {
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
+  // لتأكيد أي نوافذ منبثقة تلقائياً
+  page.on('dialog', async dialog => { await dialog.accept(); });
+
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
@@ -52,71 +55,70 @@ function parseCooldownToSeconds(str) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
-  // 🔥 متغير لمنع تكرار الشراء بعد أول ضغطة
-  let justBought = false;
-
   while (true) {
     try {
-      // 1) لو إحنا في صفحة السفر
+      // 1) لو إحنا في صفحة السفر: ننفذ السفر فوراً (مع إصلاح معرفة المدينة)
       if (page.url().includes('travel')) {
-        let travelText = await page.evaluate(() => document.body.innerText);
-        let cd = travelText.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || travelText.match(/Travel in\s*([0-9hms ]+)/i);
+        let cd = await page.evaluate(() => {
+            let body = document.body.innerText;
+            let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
+            return cdMatch ? cdMatch[1] : null;
+        });
         
-        if (parseCooldownToSeconds(cd ? cd[1] : null) > 0) {
-          console.log(`⏳ في كولداون: ${cd[1]} - هستنى دقيقة`);
+        // لو الكولداون "00" أو صفر، نكمل
+        if (parseCooldownToSeconds(cd) > 0) {
+          console.log(`⏳ في كولداون: ${cd} - هستنى دقيقة`);
           await sleep(60000);
           await page.goto('https://www.project-dark.co.uk/travel');
           continue;
         }
 
-        let fromCity = travelText.includes('Black Market - Tokyo') ? 'Tokyo' : 'Cairo';
-        let destCity = (fromCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
+        // 🔥 الإصلاح الجذري لقراءة المدينة الحالية من الذاكرة المحفوظة
+        let currentCity = await page.evaluate(() => localStorage.getItem('currentCity'));
+        let destCity = (currentCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
 
-        console.log(`✈️ ${fromCity} - جاري تجهيز السفر إلى ${destCity}`);
+        console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
+        // التحول لوضع Grid View
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-        await sleep(2000);
+        await sleep(1500);
 
+        // النقر على المدينة المطلوبة
         await page.evaluate((city) => {
             let cards = [...document.querySelectorAll('div')];
-            let target = cards.find(el => el.innerText.trim().startsWith(city) && el.offsetWidth > 100 && el.offsetHeight > 50);
+            let target = cards.find(el => el.innerText.trim().startsWith(city) && el.offsetWidth > 150 && el.offsetHeight > 50);
             if (target) target.click();
         }, destCity);
         await sleep(1500);
 
+        // الضغط على Travel to Selected Location
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (b) b.click(); });
         await sleep(1500);
 
-        // 🔥 انتظار أطول للنافذة
+        // انتظار نافذة التأكيد (Are you sure) والضغط على زر TRAVEL
         try {
-            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 });
+            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 });
             await page.evaluate(() => {
                 let allBtns = [...document.querySelectorAll('button')];
                 let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
                 if (travelBtn) travelBtn.click();
             });
-            console.log(`✈️ تم الضغط على TRAVEL لـ ${destCity}`);
-            
-            // 🔥 بعد نجاح السفر، نقفل متغير منع الشراء ونروح للسوق
-            justBought = false;
-            await sleep(5000);
-            await page.goto('https://www.project-dark.co.uk/blackmarket');
-            continue;
-            
+            console.log(`✈️ تم الضغط على زر TRAVEL لـ ${destCity}`);
         } catch (e) {
-            console.log("⚠️ النافذة ما ظهرتش، بنحاول تاني من نفس الصفحة (مش هنرجع للسوق)");
-            await page.goto('https://www.project-dark.co.uk/travel');
-            continue;
+            console.log("⚠️ النافذة ما ظهرتش، محاولة النقر المباشر على الزر");
+            await page.evaluate(() => {
+                let travelBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL');
+                if (travelBtn) travelBtn.click();
+            });
         }
-      }
 
-      // 2) لو إحنا في السوق، والشراء ممنوع (لأنه لسه مخلصش السفر)، نوجهه للسفر
-      if (justBought) {
-        await page.goto('https://www.project-dark.co.uk/travel');
+        await sleep(5000);
+        // بعد السفر نروح للسوق عشان نبيع ونشتري
+        await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // 3) كود السوق (البيع والشراء - لم يتغير نهائياً)
+      // 2) كود السوق (بيع وشراء)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -133,6 +135,9 @@ function parseCooldownToSeconds(str) {
         }
         if (loc && loc.includes('Cairo')) loc = 'Cairo';
         else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
+
+        // 🔥 حفظ المدينة في الذاكرة لاستخدامها في صفحة السفر
+        if (loc) localStorage.setItem('currentCity', loc);
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -173,6 +178,7 @@ function parseCooldownToSeconds(str) {
       if (parseCooldownToSeconds(state.cd) > 0) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة...`);
         await sleep(60000);
+        await page.goto('https://www.project-dark.co.uk/travel');
         continue;
       }
 
@@ -194,9 +200,6 @@ function parseCooldownToSeconds(str) {
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(2000);
-           
-           // 🔥 تأكيد الشراء، نمنع الشراء التاني ونروح للسفر
-           justBought = true;
            await page.goto('https://www.project-dark.co.uk/travel');
            continue;
         }
@@ -226,9 +229,6 @@ function parseCooldownToSeconds(str) {
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(2000);
-           
-           // 🔥 تأكيد الشراء، نمنع الشراء التاني ونروح للسفر
-           justBought = true;
            await page.goto('https://www.project-dark.co.uk/travel');
            continue;
         }
