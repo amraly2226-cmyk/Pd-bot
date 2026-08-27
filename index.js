@@ -70,161 +70,69 @@ function parseCooldownToSeconds(str) {
         }
         if (loc && loc.includes('Cairo')) loc = 'Cairo';
         else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
-        else if (loc && loc.includes('London')) loc = 'London';
-        else if (loc && loc.includes('Moscow')) loc = 'Moscow';
-        else if (loc && loc.includes('Rome')) loc = 'Rome';
-        else if (loc && loc.includes('Capetown')) loc = 'Capetown';
-        else if (loc && loc.includes('Sydney')) loc = 'Sydney';
-        else if (loc && loc.includes('Ottawa')) loc = 'Ottawa';
-        else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
 
-        let hold = 0;
-        let heldItem = null;
-        let rows = [...document.querySelectorAll('tr')];
-
-        for (let r of rows) {
-            let rText = r.innerText;
-            if (rText.includes('Sell') && !rText.includes('Confirm')) {
-                for (let it of items) {
-                    if (rText.toLowerCase().includes(it.toLowerCase())) {
-                        let cells = [...r.querySelectorAll('td')];
-                        if (cells.length >= 3) {
-                            let youHaveCell = cells[2].innerText;
-                            let match = youHaveCell.match(/(\d+)/);
-                            if (match && +match[1] > 0) {
-                                heldItem = it;
-                                hold = +match[1];
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (heldItem === null) {
-            let m = body.match(/holding (\d+) items/i);
-            hold = m ? +m[1] : 0;
-        }
-        
-        return { loc, cd: cooldownStr, hold, heldItem };
+        // 🔥 سأزيل الفحص المعقد لـ "hold" هنا، وسأعتمد على "اشتري وطلع فوراً"
+        return { loc, cd: cooldownStr };
       }, ITEMS);
 
-      // ✅ أولاً: لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
+      // ✅ لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
       if (parseCooldownToSeconds(state.cd) > 0) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة...`);
         await sleep(60000);
         continue;
       }
 
-      // ✅ كايرو: بيع الإلكترونيكس أو شراء الأنابوليك
+      // ✅ كايرو: بيع الإلكترونيكس أو شراء أنابوليك (مش هنرجع للسوق تاني)
       if (state.loc === "Cairo") {
-        if (state.heldItem === "Electronics" && state.hold > 0) {
+        // لو شايل إلكترونيكس، ابيعها
+        if (await page.evaluate(() => document.body.innerText.includes('Electronics') && document.body.innerText.includes('Sell All'))) {
            console.log("📍 كايرو - بيع الإلكترونيكس");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
-           await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
-           await sleep(3000);
+           await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (b) b.click(); });
+           await sleep(2000);
            continue;
         }
-        
-        if (state.hold === 0) {
-           console.log("📍 كايرو - شراء أنابوليك سترويدز");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
-           await sleep(1000);
-           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
-           await sleep(3000);
-           continue;
-        }
-        
-        if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 كايرو - رايح طوكيو");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
-           await sleep(2500);
-           
-           let travelCd = await page.evaluate(() => {
-               let body = document.body.innerText;
-               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
-               return cdMatch ? cdMatch[1] : null;
-           });
-           
-           if (parseCooldownToSeconds(travelCd) > 0) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
 
-           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-           await sleep(1500);
-           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
-           await sleep(1500);
-           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-           await sleep(1500);
-           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
-           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
-           await sleep(5000);
-           
-           await page.goto('https://www.project-dark.co.uk/blackmarket');
-           continue;
-        }
+        // 🔥 الشراء والتوجه للسفر فوراً (بدون أي فحص تاني)
+        console.log("📍 كايرو - شراء أنابوليك، وروح للسفر فوراً");
+        await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
+        await sleep(1000);
+        await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
+        await sleep(2000);
+        
+        console.log("✅ اشتريت! جاري الذهاب للسفر فوراً...");
+        await page.goto('https://www.project-dark.co.uk/travel');
+        continue;
       }
 
-      // ✅ طوكيو: بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لكايرو
+      // ✅ طوكيو: بيع الأنابوليك أو شراء إلكترونيكس (مش هنرجع للسوق تاني)
       else if (state.loc === "Tokyo") {
-        if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 طوكيو - بيع الأنابوليك سترويدز");
-           await page.evaluate(() => { const rows = [...document.querySelectorAll('tr')]; for (let r of rows) { const text = r.innerText; if (text.includes('Anabolic steroid') && text.includes('Sell All') && !text.includes('Confirm')) { const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
+        // لو شايل أنابوليك، ابيعها
+        if (await page.evaluate(() => document.body.innerText.includes('Anabolic steroid') && document.body.innerText.includes('Sell All'))) {
+           console.log("📍 طوكيو - بيع الأنابوليك");
+           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let b = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (b) { b.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
-           await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
-           await sleep(3000);
-           continue;
-        }
-        
-        if (state.hold === 0) {
-           console.log("📍 طوكيو - شراء إلكترونيكس");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
-           await sleep(1000);
-           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
-           await sleep(3000);
+           await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (b) b.click(); });
+           await sleep(2000);
            continue;
         }
 
-        if (state.heldItem === "Electronics" && state.hold > 0) {
-           console.log("📍 طوكيو - رايح كايرو");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
-           await sleep(2500);
-           
-           let travelCd = await page.evaluate(() => {
-               let body = document.body.innerText;
-               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
-               return cdMatch ? cdMatch[1] : null;
-           });
-           
-           if (parseCooldownToSeconds(travelCd) > 0) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
+        // 🔥 الشراء والتوجه للسفر فوراً
+        console.log("📍 طوكيو - شراء إلكترونيكس، وروح للسفر فوراً");
+        await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
+        await sleep(1000);
+        await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
+        await sleep(2000);
 
-           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-           await sleep(1500);
-           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
-           await sleep(1500);
-           await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-           await sleep(1500);
-           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
-           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
-           await sleep(5000);
-           
-           await page.goto('https://www.project-dark.co.uk/blackmarket');
-           continue;
-        }
+        console.log("✅ اشتريت! جاري الذهاب للسفر فوراً...");
+        await page.goto('https://www.project-dark.co.uk/travel');
+        continue;
       }
       
       else {
@@ -237,6 +145,6 @@ function parseCooldownToSeconds(str) {
       console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
       await sleep(15000);
     }
-    await sleep(10000);
+    await sleep(5000);
   }
 })();
