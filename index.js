@@ -8,7 +8,6 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// دالة مساعدة: لو الكولداون "00" أو "0" ترجع 0 (يعني خلص على طول)
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
     let h = str.match(/(\d+)\s*h/);
@@ -148,7 +147,6 @@ function parseCooldownToSeconds(str) {
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
-           // 🔥 قراءة الكولداون من صفحة السفر
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -161,7 +159,6 @@ function parseCooldownToSeconds(str) {
                continue;
            }
 
-           // ⚡ لو مفيش كولداون أو 00: السفر بالطريقة الصحيحة اللي كانت شغالة
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -172,7 +169,6 @@ function parseCooldownToSeconds(str) {
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            
-           // ⚡ التعديل الأهم: شيلنا الفحص القديم اللي كان بيرجعك للسوق، وبعد السفر روح للسوق الجديدة مباشرة
            await page.goto('https://www.project-dark.co.uk/blackmarket');
            continue;
         }
@@ -216,7 +212,6 @@ function parseCooldownToSeconds(str) {
                continue;
            }
 
-           // ⚡ السفر بالطريقة الصحيحة
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -227,7 +222,6 @@ function parseCooldownToSeconds(str) {
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            
-           // ⚡ التعديل الأهم: شيلنا الفحص القديم اللي كان بيرجعك للسوق
            await page.goto('https://www.project-dark.co.uk/blackmarket');
            continue;
         }
