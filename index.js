@@ -97,7 +97,7 @@ function parseCooldownToSeconds(str) {
            continue;
         }
 
-        // 🔥 الشراء، وبعدين دوس على Travel اللي فوق يمين
+        // 🔥 الشراء، وبعدين الانتقال المضمون لصفحة السفر (تعديل السفر فقط)
         console.log("📍 كايرو - شراء أنابوليك، وبعدين دوس على Travel فوق يمين");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
@@ -105,14 +105,16 @@ function parseCooldownToSeconds(str) {
         await sleep(2000);
         
         console.log("✅ اشتريت! بنضغط على Travel في القائمة الجانبية...");
-        // 🔥 الكود الحاسم: نضغط على الرابط Travel الموجود في القائمة الجانبية اليمنى
+        
+        // 🔥 الحل الجذري: البحث عن الرابط الذي يحتوي على كلمة Travel (وليس التطابق التام)
         await page.evaluate(() => {
             const links = [...document.querySelectorAll('a')];
-            const travelLink = links.find(link => link.innerText.trim() === 'Travel' && link.offsetParent !== null);
+            const travelLink = links.find(link => link.innerText.includes('Travel') && link.offsetParent !== null);
             if (travelLink) travelLink.click();
         });
-        await sleep(3000);
-        // لو النقر فشل لأي سبب، ننتقل مباشرة
+        await sleep(2000);
+
+        // 🔥 ضمان مطلق: لو فشل النقر، ننتقل مباشرة لصفحة السفر
         if (!page.url().includes('travel')) {
             await page.goto('https://www.project-dark.co.uk/travel');
         }
@@ -132,7 +134,7 @@ function parseCooldownToSeconds(str) {
            continue;
         }
 
-        // 🔥 الشراء، وبعدين دوس على Travel اللي فوق يمين
+        // 🔥 الشراء، وبعدين الانتقال المضمون لصفحة السفر
         console.log("📍 طوكيو - شراء إلكترونيكس، وبعدين دوس على Travel فوق يمين");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
@@ -140,14 +142,16 @@ function parseCooldownToSeconds(str) {
         await sleep(2000);
 
         console.log("✅ اشتريت! بنضغط على Travel في القائمة الجانبية...");
-        // 🔥 الكود الحاسم: نضغط على الرابط Travel الموجود في القائمة الجانبية اليمنى
+        
+        // 🔥 الحل الجذري: البحث عن الرابط الذي يحتوي على كلمة Travel (وليس التطابق التام)
         await page.evaluate(() => {
             const links = [...document.querySelectorAll('a')];
-            const travelLink = links.find(link => link.innerText.trim() === 'Travel' && link.offsetParent !== null);
+            const travelLink = links.find(link => link.innerText.includes('Travel') && link.offsetParent !== null);
             if (travelLink) travelLink.click();
         });
-        await sleep(3000);
-        // لو النقر فشل لأي سبب، ننتقل مباشرة
+        await sleep(2000);
+
+        // 🔥 ضمان مطلق: لو فشل النقر، ننتقل مباشرة لصفحة السفر
         if (!page.url().includes('travel')) {
             await page.goto('https://www.project-dark.co.uk/travel');
         }
