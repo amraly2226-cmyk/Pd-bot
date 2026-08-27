@@ -24,7 +24,7 @@ function parseCooldownToSeconds(str) {
 (async () => {
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1920, height: 1080 }); // شاشة كبيرة عشان تظهر كل البطاقات
+  await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
   try {
@@ -62,34 +62,31 @@ function parseCooldownToSeconds(str) {
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
         await sleep(2000);
 
-        // 2) النقر على البطاقة نفسها (وليس النص) لجعل الزر يتفعل
+        // 2) اختيار الكارت بتاع البلد
         await page.evaluate((city) => {
-            const allDivs = [...document.querySelectorAll('div')];
-            // البحث عن البطاقة التي تحتوي على كلمة المدينة
-            const cityEl = allDivs.find(el => el.innerText.trim().startsWith(city) && el.offsetWidth > 100 && el.offsetHeight > 50);
-            if (cityEl) {
-                // نضغط على أقرب عنصر أب (البطاقة الحقيقية) باستخدام حدث ماوس حقيقي
-                const box = cityEl.getBoundingClientRect();
-                const card = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-                if (card) card.click();
-            }
+            let cards = [...document.querySelectorAll('div')];
+            let target = cards.find(el => el.innerText.trim().startsWith(city) && el.offsetWidth > 100 && el.offsetHeight > 50);
+            if (target) target.click();
         }, destCity);
-        await sleep(2000);
+        await sleep(1500);
 
-        // 3) ننتظر حتى يتفعل زر "Travel to Selected Location" (لم يعد رمادي)
-        await page.waitForFunction(() => {
-            const b = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location'));
-            return b && !b.disabled;
-        }, { timeout: 5000 }).catch(() => {});
-
-        // 4) الضغط على زر السفر
+        // 3) الضغط على Travel to Selected Location
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (b) b.click(); });
         await sleep(1500);
 
-        // 5) انتظار نافذة التأكيد والضغط على TRAVEL
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 5000 }).catch(() => {});
-        await page.evaluate(() => { let travelBtn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
-        console.log(`✈️ تم الضغط على زر TRAVEL لـ ${destCity}`);
+        // 4) انتظار النافذة المنبثقة والضغط على زر TRAVEL داخلها (عشان يتأكد إنه ظهر)
+        try {
+            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 5000 });
+            await page.evaluate(() => {
+                let allBtns = [...document.querySelectorAll('button')];
+                // البحث عن الزر المسمى TRAVEL الظاهر فقط (اللي جوه النافذة)
+                let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
+                if (travelBtn) travelBtn.click();
+            });
+            console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
+        } catch (e) {
+            console.log("⚠️ النافذة ما ظهرتش في الوقت المتوقع، بنحاول تاني");
+        }
 
         await sleep(5000);
         await page.goto('https://www.project-dark.co.uk/blackmarket');
