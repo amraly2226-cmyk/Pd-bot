@@ -59,7 +59,6 @@ function parseCooldownToSeconds(str) {
         let travelText = await page.evaluate(() => document.body.innerText);
         let cd = travelText.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || travelText.match(/Travel in\s*([0-9hms ]+)/i);
         
-        // لو الكولداون أكبر من صفر، استنى.
         if (parseCooldownToSeconds(cd ? cd[1] : null) > 0) {
           console.log(`⏳ في كولداون: ${cd[1]} - هستنى دقيقة`);
           await sleep(60000);
@@ -67,7 +66,6 @@ function parseCooldownToSeconds(str) {
           continue;
         }
 
-        // هنا الكولداون 00 أو صفر => نفذ السفر فوراً
         let fromCity = travelText.includes('Black Market - Tokyo') ? 'Tokyo' : 'Cairo';
         let destCity = (fromCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
 
@@ -90,31 +88,20 @@ function parseCooldownToSeconds(str) {
         await sleep(1500);
 
         // (4) انتظار البوباب
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
            
-        // (5) الضغط على TRAVEL جوه البوباب
-        await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+        // (5) الضغط على TRAVEL جوه البوباب (من غير فحص offsetParent عشان يضمن إنه يدوسها)
+        await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
         
         console.log(`✈️ تم الضغط على زر TRAVEL لـ ${destCity}`);
-        await sleep(5000);
 
-        // ✅ التحقق: هل السفر نجح؟
-        let travelSuccess = await page.evaluate(() => {
-            // إذا انتقلنا من صفحة travel، يعني السفر نجح
-            return !window.location.href.includes('travel');
-        });
-
-        if (travelSuccess) {
-            console.log("🎉 السفر نجح! بنروح للسوق الجديدة عشان نبيع ونشتري");
-            await page.goto('https://www.project-dark.co.uk/blackmarket');
-        } else {
-            console.log("⚠️ السفر لم يكتمل، مش هنرجع للسوق. هنفضل هنا ونعيد المحاولة");
-            await page.goto('https://www.project-dark.co.uk/travel');
-        }
+        // 🔥 أهم تعديل: بعد الضغط، استنى وروح للسوق مباشرة، مفيش أي فحص "السفر لم يكتمل" يعلقك هنا
+        await sleep(8000);
+        await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // ✅ 2) لو إحنا في السوق والكولداون صفر (نفس المنطق السابق):
+      // ✅ 2) كود السوق (بيع وشراء - زي ما هو بدون أي تغيير)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -168,15 +155,14 @@ function parseCooldownToSeconds(str) {
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // لو الكولداون أكبر من صفر، استنى. لو صفر، اكمل (السوق سيرسلنا للسفر تلقائياً)
+      // لو الكولداون أكبر من صفر، استنى
       if (parseCooldownToSeconds(state.cd) > 0) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة...`);
         await sleep(60000);
-        await page.goto('https://www.project-dark.co.uk/travel');
         continue;
       }
 
-      // ✅ كايرو: البيع والشراء (تم الحفاظ عليها كما هي بدون تعديل)
+      // ✅ كايرو: بيع الإلكترونيكس أو شراء الأنابوليك
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 كايرو - بيع الإلكترونيكس");
@@ -204,7 +190,7 @@ function parseCooldownToSeconds(str) {
         }
       }
 
-      // ✅ طوكيو: البيع والشراء (تم الحفاظ عليها كما هي بدون تعديل)
+      // ✅ طوكيو: بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لكايرو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 طوكيو - بيع الأنابوليك سترويدز");
