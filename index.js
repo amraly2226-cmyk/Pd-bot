@@ -19,9 +19,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
-  // ✅ الإضافة السحرية: تقبل أي نافذة منبثقة (Pop-up) تلقائياً فور ظهورها
-  page.on('dialog', async dialog => { await dialog.accept(); });
-
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
@@ -44,6 +41,62 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
+      // ═══════════════════════════════════════════════════════════════
+      // 1) لو إحنا في صفحة الترافل (نفذ السفر بالطريقة الصح 100%)
+      // ═══════════════════════════════════════════════════════════════
+      if (page.url().includes('travel')) {
+        let currentCity = await page.evaluate(() => {
+            let body = document.body.innerText;
+            let m = body.match(/Location\s*\n\s*(Cairo|Tokyo)/i);
+            if (m) return m[1];
+            if (body.includes('Black Market - Tokyo')) return 'Tokyo';
+            if (body.includes('Black Market - Cairo')) return 'Cairo';
+            return null;
+        });
+
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+
+        let destCity = (currentCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
+        console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
+
+        // 1) اختيار جرايد فيو
+        await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
+        await sleep(1500);
+
+        // 2) اختيار البلد من البطاقة
+        await page.evaluate((city) => {
+            let elements = [...document.querySelectorAll('div, span, a')];
+            let textEl = elements.find(el => el.innerText.trim() === city && el.offsetParent !== null);
+            if (textEl) {
+                let card = textEl.closest('div');
+                if (card && card.offsetWidth > 100) card.click();
+                else textEl.click();
+            }
+        }, destCity);
+        await sleep(1500);
+
+        // 3) الضغط على Travel to Selected Location
+        await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+        
+        // 4) انتظار ظهور البوباب (Are you sure)
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+
+        // ⚡ الخطوة الأهم: البحث عن زر TRAVEL في النافذة والضغط عليه (بدون offsetParent لتفادي أي مشاكل)
+        await page.evaluate(() => {
+            let allBtns = [...document.querySelectorAll('button')];
+            let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+            if (travelBtn) travelBtn.click();
+        });
+        
+        console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
+        await sleep(7000); // انتظار تحميل المدينة الجديدة
+        await page.goto('https://www.project-dark.co.uk/blackmarket');
+        continue;
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 2) لو إحنا في السوق (بيع وشراء)
+      // ═══════════════════════════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -97,7 +150,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ أولاً: لو في كولداون في أي صفحة (السوق أو السفر)، انتظر
+      // ✅ لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
@@ -130,7 +183,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
-           // 🔥 قراءة الكولداون من صفحة السفر
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -143,17 +195,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                continue;
            }
 
-           // لو مفيش كولداون، اكمل السفر (نفس طريقتك بالضبط لكن بمهلة أطول)
+           // السفر بطريقتك، لكن بمهلة أطول للنافذة
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
-           
-           // ✅ تعديل المهلة من 3000 إلى 15000 حتى تظهر النافذة
            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
            if (verify) console.log("🎉 وصلنا طوكيو!");
@@ -188,7 +238,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
-           // 🔥 قراءة الكولداون من صفحة السفر
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -201,17 +250,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                continue;
            }
 
-           // لو مفيش كولداون، اكمل السفر (نفس طريقتك بالضبط لكن بمهلة أطول)
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
-           
-           // ✅ تعديل المهلة من 3000 إلى 15000 حتى تظهر النافذة
            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null); if (travelBtn) travelBtn.click(); });
+           await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
            if (verify) console.log("🎉 وصلنا كايرو!");
