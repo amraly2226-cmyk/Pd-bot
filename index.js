@@ -152,8 +152,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
       // ✅ لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
-        await sleep(60000);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى **10 دقائق** وأعيد المحاولة...`);
+        await sleep(600000); // 🔥 تم تغييرها من 60000 (دقيقة) إلى 600000 (10 دقائق)
         continue;
       }
 
@@ -190,8 +190,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى **10 دقائق**...`);
+               await sleep(600000); // 🔥 تم تغييرها من 60000 (دقيقة) إلى 600000 (10 دقائق)
                continue;
            }
 
@@ -245,8 +245,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى **10 دقائق**...`);
+               await sleep(600000); // 🔥 تم تغييرها من 60000 (دقيقة) إلى 600000 (10 دقائق)
                continue;
            }
 
