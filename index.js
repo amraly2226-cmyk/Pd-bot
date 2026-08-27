@@ -74,26 +74,30 @@ function parseCooldownToSeconds(str) {
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (b) b.click(); });
         await sleep(1500);
 
-        // 4) انتظار النافذة المنبثقة والضغط على زر TRAVEL داخلها (عشان يتأكد إنه ظهر)
+        // 🔥 (التعديل الوحيد هنا): انتظر 15 ثانية كاملة، وجرب النقر المباشر لو فشلت المهلة
         try {
-            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 5000 });
+            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 });
             await page.evaluate(() => {
                 let allBtns = [...document.querySelectorAll('button')];
-                // البحث عن الزر المسمى TRAVEL الظاهر فقط (اللي جوه النافذة)
                 let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
                 if (travelBtn) travelBtn.click();
             });
             console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
         } catch (e) {
-            console.log("⚠️ النافذة ما ظهرتش في الوقت المتوقع، بنحاول تاني");
+            console.log("⚠️ النافذة ما ظهرتش، بجرب النقر المباشر تاني...");
+            await page.evaluate(() => {
+                let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'TRAVEL');
+                if (btn) btn.click();
+            });
         }
+        // 🔥 نهاية التعديل
 
-        await sleep(5000);
+        await sleep(7000);
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // كود السوق
+      // كود السوق (لم يتم تعديله نهائياً)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
