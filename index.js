@@ -32,7 +32,7 @@ function parseCooldownToSeconds(str) {
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
-  // ✅ أضفنا هذا السطر السحري: بيقبل أي نافذة منبثقة (Are you sure) تلقائياً
+  // 🔥 السطر السحري: ده بيمسك أي بوباب أو نافذة تأكيد (Dialog) ويقبلها تلقائياً
   page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
@@ -57,7 +57,9 @@ function parseCooldownToSeconds(str) {
 
   while (true) {
     try {
-      // ✅ لو إحنا في صفحة السفر:
+      // ═══════════════════════════════════════════
+      // 1) لو إحنا في صفحة الترافل
+      // ═══════════════════════════════════════════
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
@@ -73,11 +75,11 @@ function parseCooldownToSeconds(str) {
         let destCity = (currentCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
-        // 1) اختيار جرايد فيو
+        // 2) اختيار جرايد فيو
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
         await sleep(1500);
 
-        // 2) اختيار البلد (بنستخدم أقرب عنصر كبير)
+        // 3) اختيار المدينة
         await page.evaluate((city) => {
             let elements = [...document.querySelectorAll('div, span, a')];
             let textEl = elements.find(el => el.innerText.trim() === city && el.offsetParent !== null);
@@ -88,17 +90,44 @@ function parseCooldownToSeconds(str) {
         }, destCity);
         await sleep(1500);
 
-        // 3) الضغط على Travel to Selected Location
+        // 4) الضغط على Travel to Selected Location
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-        
-        // 4) ✅ بسيط جداً: بسبب الـ Dialog Handler اللي فوق، النافذة هتتقبل تلقائياً!
-        // هنا بننتظر 7 ثواني للتحميل وبنروح للسوق الجديدة
+        await sleep(1500);
+
+        // 5) انتظار ظهور البوباب (سواء كان HTML أو Dialog) والضغط على زر TRAVEL
+        try {
+            // استنى ظهور النص أو الزر، بحد أقصى 10 ثواني
+            await page.waitForFunction(() => {
+                return document.body.innerText.includes('Are you sure') || 
+                       [...document.querySelectorAll('button')].some(b => b.innerText.trim() === 'TRAVEL');
+            }, { timeout: 10000 });
+
+            // دوس على زر TRAVEL
+            await page.evaluate(() => {
+                let allBtns = [...document.querySelectorAll('button')];
+                let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+                if (travelBtn) travelBtn.click();
+            });
+        } catch (e) {
+            console.log("⚠️ البوباب مش ظاهر في المتصفح، بنحاول نوصل للزر مباشرة...");
+            // لو النافذة مش HTML، الـ page.on('dialog') هيقبلها تلقائياً وتتأكد من الضغط على الزر مرة أخرى
+            await page.evaluate(() => {
+                let allBtns = [...document.querySelectorAll('button')];
+                let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+                if (travelBtn) travelBtn.click();
+            });
+        }
+
+        // 6) النجاح! استنى 7 ثواني وروح للسوق الجديدة عشان تبيع وتشتري
+        console.log(`✈️ تم الضغط على زر TRAVEL والتأكيد لـ ${destCity}`);
         await sleep(7000);
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // ✅ لو إحنا في السوق، نفذ البيع والشراء (زي ما هو بالظبط)
+      // ═══════════════════════════════════════════
+      // 2) لو إحنا في السوق (بيع وشراء)
+      // ═══════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -119,7 +148,19 @@ function parseCooldownToSeconds(str) {
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
 
-        return { loc, cd: cooldownStr };
+        let hold = 0;
+        let rows = [...document.querySelectorAll('tr')];
+        for (let r of rows) {
+            if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) {
+                let cells = [...r.querySelectorAll('td')];
+                if (cells.length >= 3) {
+                    let match = cells[2].innerText.match(/(\d+)/);
+                    if (match) hold = +match[1];
+                }
+            }
+        }
+
+        return { loc, cd: cooldownStr, hold };
       }, ITEMS);
 
       if (parseCooldownToSeconds(state.cd) > 0) {
@@ -128,44 +169,40 @@ function parseCooldownToSeconds(str) {
         continue;
       }
 
-      // ✅ كايرو: بيع الإلكترونيكس أو شراء أنابوليك
+      // ✅ كايرو
       if (state.loc === "Cairo") {
-        if (await page.evaluate(() => document.body.innerText.includes('Electronics') && document.body.innerText.includes('Sell All'))) {
-           console.log("📍 كايرو - بيع الإلكترونيكس");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
-           await sleep(2000);
-           await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (b) b.click(); });
-           await sleep(2000);
+        if (state.hold > 0) {
+           console.log(`📍 كايرو - شاري ${state.hold}، رايح طوكيو`);
+           await page.goto('https://project-dark.co.uk/travel');
            continue;
         }
 
-        console.log("📍 كايرو - شراء أنابوليك، وجاري الانتقال للسفر");
+        console.log("📍 كايرو - فاضي، هشتري أنابوليك وبعدين أسافر");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
         await sleep(2000);
 
+        console.log("✅ اشتريت، جاري الانتقال للسفر");
         await page.goto('https://project-dark.co.uk/travel');
         continue;
       }
 
-      // ✅ طوكيو: بيع الأنابوليك أو شراء إلكترونيكس
+      // ✅ طوكيو
       else if (state.loc === "Tokyo") {
-        if (await page.evaluate(() => document.body.innerText.includes('Anabolic steroid') && document.body.innerText.includes('Sell All'))) {
-           console.log("📍 طوكيو - بيع الأنابوليك");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let b = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (b) { b.click(); break; } } } });
-           await sleep(2000);
-           await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (b) b.click(); });
-           await sleep(2000);
+        if (state.hold > 0) {
+           console.log(`📍 طوكيو - شاري ${state.hold}، رايح كايرو`);
+           await page.goto('https://project-dark.co.uk/travel');
            continue;
         }
 
-        console.log("📍 طوكيو - شراء إلكترونيكس، وجاري الانتقال للسفر");
+        console.log("📍 طوكيو - فاضي، هشتري إلكترونيكس وبعدين أسافر");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
         await sleep(2000);
 
+        console.log("✅ اشتريت، جاري الانتقال للسفر");
         await page.goto('https://project-dark.co.uk/travel');
         continue;
       }
