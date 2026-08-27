@@ -97,27 +97,16 @@ function parseCooldownToSeconds(str) {
            continue;
         }
 
-        // 🔥 الشراء، وبعدين الانتقال المضمون لصفحة السفر (تعديل السفر فقط)
-        console.log("📍 كايرو - شراء أنابوليك، وبعدين دوس على Travel فوق يمين");
+        // 🔥 الشراء، وبعدين الانتقال المباشر للسفر (حل الحلقة المفرغة نهائياً)
+        console.log("📍 كايرو - شراء أنابوليك، وبعدين انتقال مباشر للسفر");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
         await sleep(2000);
         
-        console.log("✅ اشتريت! بنضغط على Travel في القائمة الجانبية...");
-        
-        // 🔥 الحل الجذري: البحث عن الرابط الذي يحتوي على كلمة Travel (وليس التطابق التام)
-        await page.evaluate(() => {
-            const links = [...document.querySelectorAll('a')];
-            const travelLink = links.find(link => link.innerText.includes('Travel') && link.offsetParent !== null);
-            if (travelLink) travelLink.click();
-        });
-        await sleep(2000);
-
-        // 🔥 ضمان مطلق: لو فشل النقر، ننتقل مباشرة لصفحة السفر
-        if (!page.url().includes('travel')) {
-            await page.goto('https://www.project-dark.co.uk/travel');
-        }
+        console.log("✅ اشتريت! جاري الانتقال لصفحة السفر فوراً...");
+        // ⚡ الطريقة المضمونة: فتح الرابط مباشرة (بدون نقر)
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
         continue;
       }
 
@@ -134,27 +123,16 @@ function parseCooldownToSeconds(str) {
            continue;
         }
 
-        // 🔥 الشراء، وبعدين الانتقال المضمون لصفحة السفر
-        console.log("📍 طوكيو - شراء إلكترونيكس، وبعدين دوس على Travel فوق يمين");
+        // 🔥 الشراء، وبعدين الانتقال المباشر للسفر
+        console.log("📍 طوكيو - شراء إلكترونيكس، وبعدين انتقال مباشر للسفر");
         await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
         await sleep(1000);
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (b) b.click(); });
         await sleep(2000);
 
-        console.log("✅ اشتريت! بنضغط على Travel في القائمة الجانبية...");
-        
-        // 🔥 الحل الجذري: البحث عن الرابط الذي يحتوي على كلمة Travel (وليس التطابق التام)
-        await page.evaluate(() => {
-            const links = [...document.querySelectorAll('a')];
-            const travelLink = links.find(link => link.innerText.includes('Travel') && link.offsetParent !== null);
-            if (travelLink) travelLink.click();
-        });
-        await sleep(2000);
-
-        // 🔥 ضمان مطلق: لو فشل النقر، ننتقل مباشرة لصفحة السفر
-        if (!page.url().includes('travel')) {
-            await page.goto('https://www.project-dark.co.uk/travel');
-        }
+        console.log("✅ اشتريت! جاري الانتقال لصفحة السفر فوراً...");
+        // ⚡ الطريقة المضمونة: فتح الرابط مباشرة (بدون نقر)
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
         continue;
       }
       
