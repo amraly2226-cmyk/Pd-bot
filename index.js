@@ -31,71 +31,69 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 1) كود صفحة السفر (منفصل ويضمن النجاح)
+      // 1) كود صفحة السفر
       if (page.url().includes('travel')) {
         let travelText = await page.evaluate(() => document.body.innerText);
         let cd = travelText.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || travelText.match(/Travel in\s*([0-9hms ]+)/i);
 
-        // لو في كولداون: انتظر 60 ثانية وارجع لصفحة السفر
         if (cd) {
-          console.log(`⏳ كولداون في السفر: ${cd[1]} - هستنى 60 ثانية وأعيد المحاولة`);
+          console.log(`⏳ في كولداون: ${cd[1]} - هستنى 60 ثانية`);
           await sleep(60000);
           await page.goto('https://www.project-dark.co.uk/travel');
           continue;
         }
 
-        // لو مفيش كولداون: ابدأ السفر
         let fromCity = travelText.includes('Black Market - Tokyo') ? 'Tokyo' : 'Cairo';
         let destCity = (fromCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
 
         console.log(`✈️ ${fromCity} - جاري تجهيز السفر إلى ${destCity}`);
 
-        // دوس Grid View
+        // 1) دوس على Grid View
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-        await sleep(1000);
+        await sleep(1500);
 
-        // دوس على المدينة
+        // 2) اختر البلد من الكارت
         await page.evaluate((city) => {
           let cards = [...document.querySelectorAll('div')];
           let target = cards.find(el => el.innerText.trim() === city && el.offsetWidth > 150 && el.offsetHeight > 50);
           if (target) target.click();
         }, destCity);
-        await sleep(1000);
+        await sleep(1500);
 
-        // دوس على زر السفر الأول
+        // 3) دوس على زر "Travel to Selected Location"
         await page.evaluate(() => { let b = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (b) b.click(); });
-        await sleep(1000);
+        await sleep(1500);
 
-        // 🔥 الإصلاح الجديد: انتظر ظهور نافذة التأكيد واضغط على TRAVEL بدقة
+        // 4) 🔥 انتظار ظهور نافذة "Are you sure" بدقة، وبعدها دوس على TRAVEL
         try {
-          await page.waitForSelector('button', { visible: true, timeout: 5000 });
+          await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 5000 });
           await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL' && b.offsetParent !== null);
             if (travelBtn) travelBtn.click();
           });
-          console.log(`✈️ ضغطت على TRAVEL لـ ${destCity}`);
+          console.log(`✈️ تم الضغط على TRAVEL في نافذة التأكيد لـ ${destCity}`);
         } catch (e) {
-          console.log(`⚠️ نافذة التأكيد لم تظهر، جاري إعادة المحاولة...`);
+          console.log("⚠️ نافذة التأكيد لم تظهر، إعادة تحميل صفحة السفر");
           await page.goto('https://www.project-dark.co.uk/travel');
           continue;
         }
 
         await sleep(5000);
 
-        // 🔥 التحقق: هل وصلنا فعلاً؟
+        // 5) 🔥 فحص النجاح: لو السفر نجح، اللعبة بتوديك لصفحة السوق مباشرة
         let isSuccess = await page.evaluate((city) => document.body.innerText.includes('Black Market - ' + city), destCity);
         if (isSuccess) {
-          console.log(`🎉 وصلنا ${destCity}! جاري الذهاب للسوق`);
+          console.log(`🎉 وصلنا ${destCity}!`);
           await page.goto('https://www.project-dark.co.uk/blackmarket');
         } else {
-          console.log("⚠️ السفر لم يكتمل، البقاء في صفحة السفر وإعادة المحاولة");
+          console.log("⚠️ لسه ما وصلناش، نعيد المحاولة من صفحة السفر");
           await page.goto('https://www.project-dark.co.uk/travel');
         }
         continue;
       }
 
-      // 2) كود السوق (الشراء والبيع)
+      // 2) كود السوق (البيع والشراء)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -130,7 +128,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, hold, heldItem };
       }, ITEMS);
 
-      // 3) منطق كايرو
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log(`📍 كايرو - بيع ${state.hold} إلكترونيكس`);
@@ -159,7 +156,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
 
-      // 4) منطق طوكيو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 طوكيو - بيع الأنابوليك");
