@@ -8,6 +8,24 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// 🔥 دالة جديدة بتفحص الوقت: لو 00 أو صفر تخطى فوراً
+function parseCooldownToSeconds(str) {
+    if (!str) return 0;
+    let h = str.match(/(\d+)\s*h/);
+    let m = str.match(/(\d+)\s*m/);
+    let s = str.match(/(\d+)\s*s/);
+    let seconds = 0;
+    if (h) seconds += parseInt(h[1]) * 3600;
+    if (m) seconds += parseInt(m[1]) * 60;
+    if (s) seconds += parseInt(s[1]);
+    // لو النص أرقام فقط (زي 15) نعتبرها دقائق
+    if (seconds === 0) {
+        let n = str.match(/(\d+)/);
+        if (n && parseInt(n[1]) > 0) seconds = parseInt(n[1]) * 60; 
+    }
+    return seconds;
+}
+
 (async () => {
   console.log("🚀 البوت شغال...");
   
@@ -101,11 +119,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ أولاً: لو في كولداون في أي صفحة (السوق أو السفر)، انتظر
-      if (state.cd) {
+      // 🔥 التعديل الجديد: نحسب الثواني، لو أكبر من 0 انتظر، لو 00 كمّل فوراً
+      let cdSeconds = parseCooldownToSeconds(state.cd);
+      if (cdSeconds > 0) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
         continue;
+      } else {
+        console.log("✅ الكولداون خلص (00) - جاري متابعة العملية...");
       }
 
       // ✅ كايرو: بيع الإلكترونيكس أو شراء الأنابوليك
@@ -134,17 +155,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
-           // 🔥 قراءة الكولداون من صفحة السفر
+           // 🔥 نفس الفحص هنا في صفحة السفر
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
            
-           if (travelCd) {
+           let travelCdSeconds = parseCooldownToSeconds(travelCd);
+           if (travelCdSeconds > 0) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
                await sleep(60000);
                continue;
+           } else {
+               console.log("✅ كولداون السفر خلص، جاري السفر...");
            }
 
            // لو مفيش كولداون، اكمل السفر
@@ -190,17 +214,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
-           // 🔥 قراءة الكولداون من صفحة السفر
+           // 🔥 نفس الفحص هنا في صفحة السفر
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
            
-           if (travelCd) {
+           let travelCdSeconds = parseCooldownToSeconds(travelCd);
+           if (travelCdSeconds > 0) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
                await sleep(60000);
                continue;
+           } else {
+               console.log("✅ كولداون السفر خلص، جاري السفر...");
            }
 
            // لو مفيش كولداون، اكمل السفر
