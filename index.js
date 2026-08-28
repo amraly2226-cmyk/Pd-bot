@@ -41,7 +41,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 1) لو إحنا في صفحة السفر (نفس الطريقة الأصلية بالظبط)
+      // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
@@ -52,19 +52,19 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             return null;
         });
 
-        // لو مش عارفين فين، نوجهه لكايرو
+        // ✅ التصحيح النهائي للمنطق
         let destCity;
-        if (currentCity === 'Tokyo') {
-            destCity = 'Cairo';
+        if (currentCity === 'Cairo') {
+            destCity = 'Tokyo'; // لو في كايرو، يروح طوكيو
         } else {
-            destCity = 'Tokyo';
+            destCity = 'Cairo'; // لو في طوكيو أو سيدني أو أي مكان، يرجع كايرو
         }
 
         console.log(`✈️ ${currentCity || "غير معروفة"} - جاري تجهيز السفر إلى ${destCity}`);
 
         // 1) اختيار جرايد فيو
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
-        await sleep(2000);
+        await sleep(1500);
 
         // 2) اختيار البلد من البطاقة
         await page.evaluate((city) => {
@@ -76,15 +76,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 else textEl.click();
             }
         }, destCity);
-        await sleep(2000);
+        await sleep(1500);
 
         // 3) الضغط على Travel to Selected Location
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        // 4) ⏳ انتظار طويل لضمان ظهور النافذة (10 ثواني) زي ما كان شغال
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
+        // 4) انتظار ظهور البوباب
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
 
-        // 5) البحث عن زر TRAVEL في النافذة والضغط عليه
+        // 5) الضغط على زر TRAVEL في النافذة
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
@@ -92,12 +92,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
 
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
-        await sleep(9000); // استنى وقت كافي للتحميل
+        await sleep(7000);
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // 2) لو إحنا في السوق
+      // 2) كود السوق
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -114,13 +114,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         if (loc && loc.includes('Cairo')) loc = 'Cairo';
         else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
-        else if (loc && loc.includes('Sydney')) loc = 'Sydney';
-        else if (loc && loc.includes('London')) loc = 'London';
-        else if (loc && loc.includes('Moscow')) loc = 'Moscow';
-        else if (loc && loc.includes('Rome')) loc = 'Rome';
-        else if (loc && loc.includes('Capetown')) loc = 'Capetown';
-        else if (loc && loc.includes('Ottawa')) loc = 'Ottawa';
-        else if (loc && loc.includes('Rio de Janeiro')) loc = 'Rio de Janeiro';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -164,7 +157,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // ✅ لو في أي مدينة تانية غير كايرو وطوكيو: اذهب للسفر لترجع كايرو
+      // لو في أي مدينة تانية (مثل سيدني) غير معروفة في السوق، يروح للسفر
       if (state.loc && state.loc !== 'Cairo' && state.loc !== 'Tokyo') {
         console.log("📍 انت في مدينة تانية، جاري الذهاب لصفحة السفر للعودة لكايرو");
         await page.goto('https://www.project-dark.co.uk/travel');
