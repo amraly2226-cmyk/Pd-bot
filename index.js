@@ -19,48 +19,44 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
-  // 1) محاولة الدخول بالكوكيز أولاً
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(5000);
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        // (سينتقل لتسجيل الدخول)
-        console.log("⚠️ مفيش كوكيز، هستخدم تسجيل الدخول");
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
+        const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+        if (inputs.length >= 2) {
+           await inputs[0].type(USERNAME);
+           await inputs[1].type(PASSWORD);
+        }
+        await page.click('button[type="submit"]').catch(() => {});
+        await sleep(5000);
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        console.log("✅ دخلنا بالدخول المباشر");
     }
   } catch (e) {
-    console.log("⚠️ مشكلة في الدخول بالكوكيز:", e.message);
-  }
-
-  // 2) فحص فوري: هل أنا في صفحة اللوجين؟
-  let isLoginPage = await page.evaluate(() => {
-      return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
-  }).catch(() => true);
-
-  if (isLoginPage) {
-    console.log("⚠️ لقيت صفحة اللوجين، هسجل دخول باليوزر والباسورد...");
-    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(3000);
-    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-    if (inputs.length >= 2) {
-       await inputs[0].type(USERNAME);
-       await inputs[1].type(PASSWORD);
-    }
-    await page.click('button[type="submit"]').catch(() => {});
-    console.log("⏳ مستني التحقق الأمني 15 ثانية...");
-    await sleep(15000);
-    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(5000);
-    console.log("✅ دخلنا بالدخول المباشر!");
-  } else {
-    console.log("✅ الجلسة شغالة من الكوكيز!");
+    console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
   while (true) {
     try {
-      console.log("🔄 بفحص اللوكيشن...");
+      // 🔥 الحل الحاسم: ننتظر ظهور المدينة بأي شكل، ولو الصفحة علقت نعيد تحميلها فوراً
+      try {
+        await page.waitForFunction(() => {
+          let text = document.body.innerText;
+          return text.includes('Washington') || text.includes('St. Louis');
+        }, { timeout: 15000 });
+      } catch (e) {
+        // لو الصفحة لم تظهر خلال 15 ثانية، نعيد تحميلها ونجرب من جديد
+        console.log("⚠️ مفيش مدينة ظهرت، جاري إعادة تحميل الصفحة...");
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(5000);
+        continue;
+      }
+
       let currentCity = await page.evaluate(() => {
           let text = document.body.innerText;
           if (text.includes('Washington')) return 'Washington';
@@ -69,7 +65,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       });
 
       if (!currentCity) {
-        console.log("⏳ اللوكيشن مش ظاهر، بنستنى 5 ثواني...");
+        console.log("⏳ لسه مستني تحميل اللوكيشن، جاري إعادة تحميل الصفحة...");
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
         await sleep(5000);
         continue;
       }
