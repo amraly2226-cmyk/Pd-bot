@@ -9,7 +9,7 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 (async () => {
-  console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
+  console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -47,16 +47,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            let m = body.match(/Location\s*\n\s*(Chicago|St. Louis)/i);
+            let m = body.match(/Location\s*\n\s*(Washington|St. Louis)/i);
             if (m) return m[1];
-            if (body.includes('Black Market - Chicago')) return 'Chicago';
+            if (body.includes('Black Market - Washington')) return 'Washington';
             if (body.includes('Black Market - St. Louis')) return 'St. Louis';
             return null;
         });
 
         if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
 
-        let destCity = (currentCity === 'St. Louis') ? 'Chicago' : 'St. Louis';
+        let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
         // 1) اختيار جرايد فيو
@@ -111,7 +111,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 break;
             }
         }
-        if (loc && loc.includes('Chicago')) loc = 'Chicago';
+        if (loc && loc.includes('Washington')) loc = 'Washington';
         else if (loc && loc.includes('St. Louis')) loc = 'St. Louis';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -157,10 +157,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // ✅ شيكاغو: بيع الإلكترونيكس أو شراء الـ Human Beings
-      if (state.loc === "Chicago") {
+      // ✅ واشنطن: بيع Endangered exotic animals أو شراء Human Beings
+      if (state.loc === "Washington") {
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
-           console.log("📍 شيكاغو - بيع Endangered exotic animals");
+           console.log("📍 واشنطن - بيع Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
@@ -170,7 +170,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         if (state.hold === 0) {
-           console.log("📍 شيكاغو - شراء Human Beings");
+           console.log("📍 واشنطن - شراء Human Beings");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
@@ -179,7 +179,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
-           console.log("📍 شيكاغو - رايح سانت لويس");
+           console.log("📍 واشنطن - رايح سانت لويس");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
@@ -211,7 +211,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
 
-      // ✅ سانت لويس: بيع الـ Human Beings أو شراء الـ Endangered exotic animals
+      // ✅ سانت لويس: بيع Human Beings أو شراء Endangered exotic animals
       else if (state.loc === "St. Louis") {
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 سانت لويس - بيع Human Beings");
@@ -233,7 +233,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
-           console.log("📍 سانت لويس - رايح شيكاغو");
+           console.log("📍 سانت لويس - رايح واشنطن");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
@@ -251,15 +251,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
-           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CHICAGO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'WASHINGTON' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
-           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Chicago'));
-           if (verify) console.log("🎉 وصلنا شيكاغو!");
+           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Washington'));
+           if (verify) console.log("🎉 وصلنا واشنطن!");
            else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
