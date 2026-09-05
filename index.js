@@ -45,16 +45,37 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       // 1) لو إحنا في صفحة الترافل (نفذ السفر بالطريقة الصح 100%)
       // ═══════════════════════════════════════════════════════════════
       if (page.url().includes('travel')) {
+        // استخراج المدينة من كلمة "Location" كما تظهر في الصورة
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            let m = body.match(/Location\s*\n\s*(St\.?\s*Louis|Washington)/i);
-            if (m) return m[1];
-            if (body.includes('Black Market - Washington')) return 'Washington';
-            if (body.includes('Black Market - St. Louis') || body.includes('Black Market - St Louis')) return 'St. Louis';
-            return null;
+            let lines = body.split('\n');
+            let city = null;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                    for (let j = i + 1; j < lines.length; j++) {
+                        let line = lines[j].trim();
+                        if (line && !line.includes('Stamina') && !line.includes('Tokens') && !line.includes(':')) {
+                            city = line;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            // إذا لم نجد، نبحث في النص الكامل
+            if (!city) {
+                let lowerBody = body.toLowerCase();
+                if (lowerBody.includes('washington')) city = 'Washington';
+                else if (lowerBody.includes('st. louis') || lowerBody.includes('st louis')) city = 'St. Louis';
+            }
+            return city;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { 
+            console.log("⚠️ مش عارف المدينة في صفحة السفر، هروح للسوق");
+            await page.goto('https://project-dark.co.uk/blackmarket'); 
+            continue; 
+        }
 
         let destCity = (currentCity === 'Washington') ? 'St. Louis' : 'Washington';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -102,17 +123,26 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let loc = null;
         let cooldownStr = null;
         
+        // استخراج المدينة من كلمة "Location" كما تظهر في الصورة
         let lines = body.split('\n');
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim().toUpperCase() === 'LOCATION') {
                 for (let j = i + 1; j < lines.length; j++) {
-                    if (lines[j].trim()) { loc = lines[j].trim(); break; }
+                    let line = lines[j].trim();
+                    if (line && !line.includes('Stamina') && !line.includes('Tokens') && !line.includes(':')) {
+                        loc = line;
+                        break;
+                    }
                 }
                 break;
             }
         }
-        if (loc && loc.includes('St. Louis')) loc = 'St. Louis';
-        else if (loc && loc.includes('Washington')) loc = 'Washington';
+        // إذا لم نجد، نبحث في النص الكامل
+        if (!loc) {
+            let lowerBody = body.toLowerCase();
+            if (lowerBody.includes('washington')) loc = 'Washington';
+            else if (lowerBody.includes('st. louis') || lowerBody.includes('st louis')) loc = 'St. Louis';
+        }
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
