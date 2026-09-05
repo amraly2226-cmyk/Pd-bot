@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer-core');
 
-// ✅ حط الكوكيز بتاعتك هنا
 const COOKIE_VALUE = "eyJpdiI6IjFhYVQwdkticVk4dUhheTZlYml5YkE9PSIsInZhbHVlIjoiMWdCdW1peXpzd0lqRjFtVUxWQktrOENXeUlCVGZxTS9BL0JHdVRzWE94OGQ3Wk9Zd0lKeU4rR21WU1c1YmZmeTc2cXdPT0M2MDB4Vk5wcjVveWhQcjVIU1ZBeVVzbEN5cEdHcDNkclV3N0ZmcG1rK3ppczUxOE5PNmd2bk0vNVAiLCJtYWMiOiJjYWQxOGFiM2JiMjZmNmI5NWI1MGViYTUxNmY5YTg2MTE2ZjAxYmJhMzhkOTY4ODM3ODJmNTVmYTY2MjM3NWE0IiwidGFnIjoiIn0%3D";
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
@@ -26,14 +25,21 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
   
-  // ✅ على Termux: هذا سطر المتصفح. (لو بتشغل على Railway شيل السطر ده)
+  // ✅ الأوامر السحرية لأندرويد: no-zygote و single-process (عشان المتصفح ما يتجمدش)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    protocolTimeout: 0,
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox', 
+      '--disable-dev-shm-usage', 
+      '--disable-gpu',
+      '--no-zygote', 
+      '--single-process'
+    ] 
   });
 
-  // ✅ على Railway: شيل executablePath اللي فوق وغيّر puppeteer-core إلى puppeteer
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
@@ -60,7 +66,6 @@ function parseCooldownToSeconds(str) {
 
         if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
-        // عكس المدن: لو في شيكاغو يروح سانت لويس، والعكس
         let destCity = (currentCity === 'St. Louis' || currentCity === 'St Louis') ? 'Chicago' : 'St. Louis';
 
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
