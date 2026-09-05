@@ -23,6 +23,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(7000);
         console.log("✅ دخلنا بالكوكيز");
     } else {
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -35,6 +36,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(7000);
         console.log("✅ دخلنا بالدخول المباشر");
     }
   } catch (e) {
@@ -43,20 +45,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 🔥 الحل الحاسم: ننتظر ظهور المدينة بأي شكل، ولو الصفحة علقت نعيد تحميلها فوراً
-      try {
-        await page.waitForFunction(() => {
-          let text = document.body.innerText;
-          return text.includes('Washington') || text.includes('St. Louis');
-        }, { timeout: 15000 });
-      } catch (e) {
-        // لو الصفحة لم تظهر خلال 15 ثانية، نعيد تحميلها ونجرب من جديد
-        console.log("⚠️ مفيش مدينة ظهرت، جاري إعادة تحميل الصفحة...");
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(5000);
-        continue;
-      }
-
+      // 🔥 الحل النهائي للقراءة: البحث المباشر عن اسم المدينة في أي مكان بالصفحة
       let currentCity = await page.evaluate(() => {
           let text = document.body.innerText;
           if (text.includes('Washington')) return 'Washington';
@@ -65,13 +54,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       });
 
       if (!currentCity) {
-        console.log("⏳ لسه مستني تحميل اللوكيشن، جاري إعادة تحميل الصفحة...");
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        // لو مش ظاهر، نرجّع الصفحة عنوة ونستنى 5 ثواني
+        console.log("⚠️ اللوكيشن مش ظاهر، جاري إعادة تحميل الصفحة...");
+        await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
         await sleep(5000);
         continue;
       }
 
-      // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
