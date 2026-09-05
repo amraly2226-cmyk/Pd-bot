@@ -38,10 +38,11 @@ function parseCooldownToSeconds(str) {
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // ✅ إرجاع الطريقة الأصلية: networkidle2
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -49,7 +50,7 @@ function parseCooldownToSeconds(str) {
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -59,8 +60,6 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        await sleep(2000); // انتظار بسيط لتحميل الصفحة
-
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
@@ -87,8 +86,15 @@ function parseCooldownToSeconds(str) {
         }, destCity);
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
-        await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
+        
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        
+        await page.evaluate(() => {
+            let allBtns = [...document.querySelectorAll('button')];
+            let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+            if (travelBtn) travelBtn.click();
+        });
+        
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket');
@@ -96,8 +102,6 @@ function parseCooldownToSeconds(str) {
       }
 
       // 2) لو إحنا في السوق
-      await sleep(2000); // انتظار بسيط لتحميل الصفحة
-
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
