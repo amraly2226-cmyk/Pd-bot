@@ -25,25 +25,25 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 بوت التداول شغال (واشنطن ↔ سانت لويس)...");
 
-  // ✅ بدون --single-process عشان ذاكرة الموبايل تريح
+  // ✅ نفس إعدادات المتصفح الناجحة من بوت الأسهم (بدون single-process)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 0,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
-  // ✅ قبول أي نوافذ تأكيد (Confirm) تلقائياً
+  // ✅ قبول أي نوافذ تأكيد تلقائياً
   page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(5000);
+    await sleep(3000);
     console.log("✅ دخلنا بالكوكيز");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -51,12 +51,8 @@ function parseCooldownToSeconds(str) {
 
   while (true) {
     try {
-      // ✅ رسالة توضيحية عشان نعرف إنه شغال
-      console.log("🔄 بلف على الصفحة...");
-
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        await sleep(3000);
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
@@ -95,12 +91,11 @@ function parseCooldownToSeconds(str) {
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(5000);
+        await sleep(3000);
         continue;
       }
 
       // 2) لو إحنا في السوق
-      await sleep(2000);
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
