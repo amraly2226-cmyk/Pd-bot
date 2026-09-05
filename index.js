@@ -8,6 +8,30 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// حماية: أي عملية تتجاوز 15 ثانية هتتوقف وتكمل
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+    ]);
+}
+
+function parseCooldownToSeconds(str) {
+    if (!str) return 0;
+    let h = str.match(/(\d+)\s*h/);
+    let m = str.match(/(\d+)\s*m/);
+    let s = str.match(/(\d+)\s*s/);
+    let seconds = 0;
+    if (h) seconds += parseInt(h[1]) * 3600;
+    if (m) seconds += parseInt(m[1]) * 60;
+    if (s) seconds += parseInt(s[1]);
+    if (seconds === 0) {
+        let n = str.match(/(\d+)/);
+        if (n && parseInt(n[1]) > 0) seconds = parseInt(n[1]) * 60; 
+    }
+    return seconds;
+}
+
 (async () => {
   console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
@@ -17,15 +41,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(60000);
+  
+  // قبول أي نوافذ منبثقة تلقائياً
+  page.on('dialog', async dialog => { await dialog.accept(); });
 
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        // ✅ تغيير حاسم: استخدام domcontentloaded بدلاً من networkidle2 (يحمي من التجمد)
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -33,7 +62,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -41,18 +70,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 🔥 حل مشكلة صفحة Cloaking: لو عالقين فيها، نطلع منها فوراً
-      if (page.url().includes('cloak') || page.url().includes('cloaking')) {
-        console.log("⚠️ لقيت البوت في صفحة Cloaking، بنقله للسوق...");
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-        await sleep(2000);
-        continue;
-      }
-
-      // 1) لو إحنا في صفحة الترافل
+      // ✅ إعادة توجيه للسوق بشكل آمن (مش هيتجمد)
       if (page.url().includes('travel')) {
-        // 🔥 الطريقة المضمونة: البحث عن السطرين المتتاليين (LOCATION ثم المدينة)
-        let currentCity = await page.evaluate(() => {
+        let currentCity = await withTimeout(page.evaluate(() => {
             let body = document.body.innerText;
             let lines = body.split('\n');
             for (let i = 0; i < lines.length; i++) {
@@ -67,9 +87,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 }
             }
             return null;
-        });
+        }), 15000);
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' }); continue; }
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -88,26 +108,27 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
             if (travelBtn) travelBtn.click();
         });
         
-        console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
+        console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(3000);
         continue;
       }
 
       // 2) لو إحنا في السوق (بيع وشراء)
-      let state = await page.evaluate((items) => {
+      let state = await withTimeout(page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
 
-        // 🔥 نفس الطريقة المضمونة للبحث عن المدينة
+        // قراءة المدينة من سطر LOCATION
         let lines = body.split('\n');
         for (let i = 0; i < lines.length; i++) {
             if (lines[i].trim().toUpperCase() === 'LOCATION') {
@@ -157,12 +178,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         return { loc, cd: cooldownStr, hold, heldItem };
-      }, ITEMS);
+      }, ITEMS), 15000);
 
       // ✅ لو في كولداون حقيقي، انتظر
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
-        await sleep(60000);
+        let waitSeconds = parseCooldownToSeconds(state.cd);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة...`);
+        await sleep(waitSeconds * 1000);
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+        await sleep(2000);
         continue;
       }
 
@@ -189,7 +213,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -199,8 +223,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               let waitSeconds = parseCooldownToSeconds(travelCd);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة...`);
+               await sleep(waitSeconds * 1000);
+               await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+               await sleep(2000);
                continue;
            }
 
@@ -210,12 +237,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
-           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - St. Louis'));
            if (verify) console.log("🎉 وصلنا سانت لويس!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }); }
            continue;
         }
       }
@@ -243,7 +270,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -253,8 +280,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            });
            
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
+               let waitSeconds = parseCooldownToSeconds(travelCd);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة...`);
+               await sleep(waitSeconds * 1000);
+               await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+               await sleep(2000);
                continue;
            }
 
@@ -264,18 +294,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
-           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+           await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Washington'));
            if (verify) console.log("🎉 وصلنا واشنطن!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }); }
            continue;
         }
       }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
+      console.log("حصل خطأ أو تجمد، معيد المحاولة:", e.message);
       await sleep(15000);
     }
     await sleep(10000);
