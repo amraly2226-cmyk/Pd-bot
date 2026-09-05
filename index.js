@@ -17,7 +17,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   
-  // تقليد متصفح حقيقي عشان نتخطى الحماية
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
@@ -26,23 +25,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         
-        // 🔥 الرجوع للرابط الأساسي اللي كان شغال
+        // ✅ أول حاجة بيعملها: يفتح صفحة البلاك ماركت فوراً
+        console.log("🚀 فتح البلاك ماركت مباشرة...");
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         
         const pageUrl = page.url();
-        // لو رجعنا لصفحة تسجيل الدخول يبقى الكوكيز باظت
         if (pageUrl.includes('login')) {
-            console.log("❌ فشل: الكوكيز منتهية أو غلط! الموقع رجعنا لصفحة تسجيل الدخول.");
-            console.log("الحل: ادخل على اللعبة في المتصفح، خذ كوكيز جديدة من `project-dark-session` وحطها في PD_COOKIE.");
+            console.log("❌ فشل: الكوكيز منتهية! الموقع رجعنا لصفحة تسجيل الدخول.");
+            console.log("الحل: ادخل اللعبة في المتصفح، خذ كوكيز جديدة من `project-dark-session` وضعها في PD_COOKIE في Railway.");
             await browser.close();
             return;
-        } else if (pageUrl.includes('Page not') || pageUrl.includes('404')) {
-             console.log("❌ الموقع بيرجع 404. غالباً الكوكيز باظت. جددها وحاول تاني.");
-             await browser.close();
-             return;
         }
-        console.log("✅ دخلنا بالكوكيز ووصلنا للصفحة:", pageUrl);
+        console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", pageUrl);
     } else {
+        // لو مفيش كوكيز، بيسجل دخول عادي وبعدها يروح للبلاك ماركت
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
@@ -51,9 +47,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-        console.log("✅ دخلنا بالحساب ووصلنا للصفحة:", page.url());
+        console.log("✅ دخلنا بالحساب ووصلنا للبلاك ماركت:", page.url());
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -61,6 +56,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     return;
   }
 
+  // من هنا يبدأ يقرأ المدينة ويشتغل على طول
   while (true) {
     try {
       let state = await page.evaluate((items) => {
