@@ -1,11 +1,16 @@
 {
   "name": "pd-bot",
   "version": "1.0.0",
+  "description": "Bot for Project: Dark",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "npx puppeteer browsers install chrome"
   },
   "dependencies": {
     "puppeteer": "^23.0.0"
-  }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
