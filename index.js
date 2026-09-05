@@ -25,7 +25,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال (دعم الدولار والمدن الجديدة)...");
+  console.log("🚀 البوت شغال...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -38,10 +38,12 @@ function parseCooldownToSeconds(str) {
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        // ✅ حل مشكلة الوقوف: استخدام domcontentloaded بدلاً من networkidle2
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000); // نستنى الجداول تظهر
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -49,7 +51,8 @@ function parseCooldownToSeconds(str) {
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -61,7 +64,6 @@ function parseCooldownToSeconds(str) {
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            // دعم كل المدن الجديدة
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
             if (body.includes('ST LOUIS') || body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
             return null;
@@ -97,7 +99,9 @@ function parseCooldownToSeconds(str) {
         
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await page.goto('https://www.project-dark.co.uk/blackmarket');
+        // ✅ استخدام domcontentloaded بدلاً من networkidle2
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
         continue;
       }
 
@@ -151,7 +155,9 @@ function parseCooldownToSeconds(str) {
         let waitSeconds = parseCooldownToSeconds(state.cd);
         console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
         await sleep(waitSeconds * 1000);
-        await page.goto('https://www.project-dark.co.uk/travel');
+        // ✅ استخدام domcontentloaded بدلاً من networkidle2
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
         continue;
       }
 
@@ -169,7 +175,6 @@ function parseCooldownToSeconds(str) {
         
         if (state.hold === 0) {
            console.log("📍 واشنطن - شراء Human Beings");
-           // 🔥 التعديل الأهم: التغيير من £ إلى $
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
@@ -179,7 +184,9 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           await page.goto('https://www.project-dark.co.uk/travel');
+           // ✅ استخدام domcontentloaded بدلاً من networkidle2
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
+           await sleep(3000);
            continue;
         }
       }
@@ -198,7 +205,6 @@ function parseCooldownToSeconds(str) {
         
         if (state.hold === 0) {
            console.log("📍 سانت لويس - شراء Endangered exotic animals");
-           // 🔥 التعديل الأهم: التغيير من £ إلى $
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
@@ -208,7 +214,9 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           await page.goto('https://www.project-dark.co.uk/travel');
+           // ✅ استخدام domcontentloaded بدلاً من networkidle2
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
+           await sleep(3000);
            continue;
         }
       }
