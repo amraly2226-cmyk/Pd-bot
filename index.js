@@ -43,16 +43,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     try {
       // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
+        // ✅ قراءة المدينة بالطريقة الجديدة (البحث المباشر عن الاسم)
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            let m = body.match(/Location\s*\n\s*(Washington|St. Louis)/i);
-            if (m) return m[1];
-            if (body.includes('Black Market - Washington')) return 'Washington';
-            if (body.includes('Black Market - St. Louis')) return 'St. Louis';
+            if (body.includes('Washington') || body.includes('WASHINGTON')) return 'Washington';
+            if (body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
             return null;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' }); continue; }
 
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -79,8 +78,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
-        await sleep(7000); 
-        await page.goto('https://www.project-dark.co.uk/blackmarket');
+        await sleep(7000);
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
         continue;
       }
 
@@ -90,17 +89,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let loc = null;
         let cooldownStr = null;
         
-        let lines = body.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                for (let j = i + 1; j < lines.length; j++) {
-                    if (lines[j].trim()) { loc = lines[j].trim(); break; }
-                }
-                break;
-            }
-        }
-        if (loc && loc.includes('Washington')) loc = 'Washington';
-        else if (loc && loc.includes('St. Louis')) loc = 'St. Louis';
+        // ✅ قراءة المدينة بالطريقة الجديدة (بدون split سطور)
+        if (body.includes('Black Market - Washington')) loc = 'Washington';
+        else if (body.includes('Black Market - St. Louis')) loc = 'St. Louis';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
