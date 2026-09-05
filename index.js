@@ -19,19 +19,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   
-  // تقليد متصفح حقيقي 100%
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
   try {
-    // 🔥 الدخول بالكوكيز والذهاب مباشرة للبلاك ماركت (زي ما طلبت بالظبط)
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+        
+        // ✅ الرابط الصح هو blackmarket زي ما طلبت
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", page.url());
     } else {
-        // لو مفيش كوكيز (نادراً ما تحصل)، بيسجل دخول باليوزر والباسورد
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
@@ -46,7 +45,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
-  // هنا يبدأ الكود بتاعك بالظبط (القراءة من البلاك ماركت)
+  // هنا يبدأ يقرأ اللوكيشن من فوق ويفضل شغال في نفس الصفحة
   while (true) {
     try {
       // ═══════════════════════════════════════════════════════════════
@@ -93,15 +92,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
         await sleep(7000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket');
+        await page.goto('https://www.project-dark.co.uk/blackmarket'); // الرجوع لنفس صفحة البلاك ماركت
         continue;
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 2) لو إحنا في السوق (بيع وشراء وقراءة اللوكيشن من فوق)
+      // 2) قراءة المدينة من فوق يسار (PLAYER INFO -> LOCATION)
       // ═══════════════════════════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
+        
+        // لو اللعبة مقفولة
+        if (body.includes('Game Closed')) {
+            return { loc: "GAME_CLOSED", cd: null, hold: 0, heldItem: null };
+        }
+
         let loc = null;
         let cooldownStr = null;
         
@@ -116,6 +121,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         if (loc && loc.includes('Cairo')) loc = 'Cairo';
         else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
+        else if (loc && loc.includes('Washington')) loc = 'Washington';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -153,12 +159,23 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
+      // لو مقفولة استنى
+      if (state.loc === "GAME_CLOSED") {
+          console.log("🌙 اللعبة مقفولة حالياً، هستنى 5 دقايق وأحاول تاني...");
+          await sleep(300000);
+          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }).catch(() => {});
+          continue;
+      }
+
+      console.log("📍 المدينة الحالية من فوق يسار:", state.loc);
+      
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
         continue;
       }
 
+      // باقي عمليات البيع والشراء (نفس كودك بالظبط)
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 كايرو - بيع الإلكترونيكس");
@@ -256,7 +273,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       }
       
       else {
-          console.log("⚠️ مش لاقي المدينة، بجرب تاني...");
+          console.log("📍 لسه مش لاقي بيانات اللاعب، بجرب تاني...");
           await sleep(5000);
           continue;
       }
