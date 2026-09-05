@@ -8,6 +8,23 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ✅ دالة جديدة: بتقرأ الوقت المتبقي من الكولداون بالثواني
+function parseCooldownToSeconds(str) {
+    if (!str) return 0;
+    let h = str.match(/(\d+)\s*h/);
+    let m = str.match(/(\d+)\s*m/);
+    let s = str.match(/(\d+)\s*s/);
+    let seconds = 0;
+    if (h) seconds += parseInt(h[1]) * 3600;
+    if (m) seconds += parseInt(m[1]) * 60;
+    if (s) seconds += parseInt(s[1]);
+    if (seconds === 0) {
+        let n = str.match(/(\d+)/);
+        if (n && parseInt(n[1]) > 0) seconds = parseInt(n[1]) * 60; 
+    }
+    return seconds;
+}
+
 (async () => {
   console.log("🚀 البوت شغال...");
   
@@ -81,7 +98,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         // 4) انتظار ظهور البوباب (Are you sure)
         await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
 
-        // ⚡ الخطوة الأهم: البحث عن زر TRAVEL في النافذة والضغط عليه (بدون offsetParent لتفادي أي مشاكل)
+        // ⚡ الخطوة الأهم: البحث عن زر TRAVEL في النافذة والضغط عليه
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
@@ -89,7 +106,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
-        await sleep(7000); // انتظار تحميل المدينة الجديدة
+        await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
@@ -150,10 +167,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ التعديل الوحيد هنا (كل 5 دقايق بدل دقيقة)
+      // ✅ التعديل الجديد: يقرا الوقت المتبقي وينام بالظبط، وبعدين يروح فوراً للسفر
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى 5 دقايق وأعيد المحاولة...`);
-        await sleep(300000);
+        let waitSeconds = parseCooldownToSeconds(state.cd);
+        console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
+        await sleep(waitSeconds * 1000); // ينام بالوقت المتبقي بالثواني بالضبط
+        await page.goto('https://www.project-dark.co.uk/travel'); // يروح فوراً لصفحة السفر
         continue;
       }
 
@@ -189,10 +208,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                return cdMatch ? cdMatch[1] : null;
            });
            
-           // ✅ التعديل الوحيد هنا (كل 5 دقايق بدل دقيقة)
+           // ✅ التعديل الجديد هنا
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 5 دقايق...`);
-               await sleep(300000);
+               let waitSeconds = parseCooldownToSeconds(travelCd);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
+               await sleep(waitSeconds * 1000);
+               await page.goto('https://www.project-dark.co.uk/travel');
                continue;
            }
 
@@ -245,10 +266,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                return cdMatch ? cdMatch[1] : null;
            });
            
-           // ✅ التعديل الوحيد هنا (كل 5 دقايق بدل دقيقة)
+           // ✅ التعديل الجديد هنا
            if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى 5 دقايق...`);
-               await sleep(300000);
+               let waitSeconds = parseCooldownToSeconds(travelCd);
+               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
+               await sleep(waitSeconds * 1000);
+               await page.goto('https://www.project-dark.co.uk/travel');
                continue;
            }
 
