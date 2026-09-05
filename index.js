@@ -41,9 +41,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // ═══════════════════════════════════════════════════════════════
-      // 1) لو إحنا في صفحة الترافل (نفذ السفر بالطريقة الصح 100%)
-      // ═══════════════════════════════════════════════════════════════
+      // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
@@ -59,11 +57,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
-        // 1) اختيار جرايد فيو
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
         await sleep(1500);
-
-        // 2) اختيار البلد من البطاقة
         await page.evaluate((city) => {
             let elements = [...document.querySelectorAll('div, span, a')];
             let textEl = elements.find(el => el.innerText.trim() === city && el.offsetParent !== null);
@@ -74,14 +69,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             }
         }, destCity);
         await sleep(1500);
-
-        // 3) الضغط على Travel to Selected Location
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        // 4) انتظار ظهور البوباب (Are you sure)
         await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-
-        // ⚡ الخطوة الأهم: البحث عن زر TRAVEL في النافذة والضغط عليه (بدون offsetParent لتفادي أي مشاكل)
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
@@ -89,14 +79,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
-        await sleep(7000); // انتظار تحميل المدينة الجديدة
+        await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // ═══════════════════════════════════════════════════════════════
       // 2) لو إحنا في السوق (بيع وشراء)
-      // ═══════════════════════════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -150,7 +138,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ لو في كولداون حقيقي (أكبر من 00)، انتظر. لو 00 كمّل فوراً
+      // ✅ لو في كولداون حقيقي، انتظر
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
