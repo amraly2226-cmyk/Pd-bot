@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer');
 
-// قراءة البيانات من متغيرات Railway (اللي عاملها في الصورة)
 const USERNAME = process.env.PD_USER;
 const PASSWORD = process.env.PD_PASS;
 const COOKIE_VALUE = process.env.PD_COOKIE || "";
@@ -18,14 +17,24 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(60000); // زودنا الوقت عشان النت البطيء
+  page.setDefaultTimeout(60000);
 
-  // (1) نفس طريقة الدخول اللي انت بعت بيها بالظبط
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-        console.log("✅ دخلنا بالكوكيز");
+        
+        // 🔥 التعديل الأهم: نروح لصفحة "black" (اللي فيها معلومات اللاعب والـ Location) مش blackmarket
+        await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2', timeout: 60000 });
+        
+        // فحص بسيط: لو الصفحة رجعتنا للوجين يبقى الكوكيز باظت
+        const pageUrl = page.url();
+        if (pageUrl.includes('login')) {
+            console.log("❌ فشل: الكوكيز منتهية أو غلط! الموقع رجعنا لصفحة تسجيل الدخول.");
+            console.log("الحل: ادخل على اللعبة، خذ كوكيز جديدة، وحطها في PD_COOKIE.");
+            await browser.close();
+            return;
+        }
+        console.log("✅ دخلنا بالكوكيز ووصلنا للصفحة:", pageUrl);
     } else {
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
@@ -35,13 +44,17 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        
+        // 🔥 بعد تسجيل الدخول نروح لنفس صفحة "black"
+        await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log("✅ دخلنا بالحساب ووصلنا للصفحة:", page.url());
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
+    await browser.close();
+    return;
   }
 
-  // (2) الحل الجذري لمشكلة "مش لاقي المدينة"
   while (true) {
     try {
       let state = await page.evaluate((items) => {
@@ -58,9 +71,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 break;
             }
         }
-        
-        // 🔥 التعديل هنا: شيلنا القائمة البيضاء، بقى يقرأ أي مدينة مهما كان اسمها أو اتغيرت (زي Washington أو Cairo أو أي حاجة)
-        // (لو مش لاقي كلمة Location، هيسيبها فاضية ويحاول تاني)
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -98,14 +108,22 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ أولاً: لو في كولداون في أي صفحة، انتظر
+      // 🔥 التعديل: لو "غير معروفة" اطبع لنا اللينك عشان نشوف هو واقف فين
+      if (!state.loc) {
+        console.log("📍 مش لاقي Location. الرابط الحالي:", page.url());
+        console.log("👀 أول 200 حرف من الصفحة:", (await page.content()).substring(0, 200));
+        await sleep(15000);
+        continue;
+      } else {
+        console.log("📍 المدينة الحالية:", state.loc);
+      }
+
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
         continue;
       }
 
-      // ✅ كايرو: بيع الإلكترونيكس أو شراء الأنابوليك
       if (state.loc === "Cairo") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 كايرو - بيع الإلكترونيكس");
@@ -130,7 +148,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            console.log("📍 كايرو - رايح طوكيو");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -154,12 +171,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
            if (verify) console.log("🎉 وصلنا طوكيو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
 
-      // ✅ طوكيو: بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لكايرو
       else if (state.loc === "Tokyo") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 طوكيو - بيع الأنابوليك سترويدز");
@@ -184,7 +200,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            console.log("📍 طوكيو - رايح كايرو");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -208,14 +223,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
            if (verify) console.log("🎉 وصلنا كايرو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
       
-      // (3) بقى بيقرأ أي مدينة تانية تلقائياً بدل ما يقول مش لاقي
       else {
-          console.log("📍 المدينة الحالية هي:", state.loc || "غير معروفة", " - بستنى خطوة تانية...");
+          console.log("⚠️ مدينة غير معروفة:", state.loc);
           await sleep(5000);
           continue;
       }
