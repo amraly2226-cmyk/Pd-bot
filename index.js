@@ -25,7 +25,6 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 بوت التداول شغال (واشنطن ↔ سانت لويس)...");
 
-  // 🔥 الحل السحري: إضافة أوامر الموبايل لضمان تشغيل المتصفح
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
@@ -36,15 +35,7 @@ function parseCooldownToSeconds(str) {
       '--disable-dev-shm-usage', 
       '--disable-gpu',
       '--no-zygote', 
-      '--single-process',
-      '--disable-accelerated-2d-canvas',
-      '--disable-component-update',
-      '--disable-default-apps',
-      '--disable-features=Translate,BackForwardCache',
-      '--disable-ipc-flooding-protection',
-      '--disable-renderer-backgrounding',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-background-timer-throttling'
+      '--single-process'
     ] 
   });
 
@@ -57,6 +48,12 @@ function parseCooldownToSeconds(str) {
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(3000);
     console.log("✅ دخلنا بالكوكيز");
+    
+    // ⏳ إضافة: الانتظار حتى تظهر الجداول والأزرار، وطباعة توضيحية
+    console.log("⏳ بنستنى تحميل الجداول...");
+    await page.waitForSelector('tr', { timeout: 15000 }).catch(() => {});
+    console.log("✅ الجداول ظهرت، بنبدأ الشغل");
+    
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
@@ -65,6 +62,8 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
+        console.log("✈️ في صفحة السفر، بنجيب المدن...");
+        await sleep(2000);
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
