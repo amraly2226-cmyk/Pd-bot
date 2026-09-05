@@ -22,57 +22,66 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
-  try {
-    // 1. فتح صفحة تسجيل الدخول
-    console.log("⏳ فتح صفحة تسجيل الدخول...");
-    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+  // حلقة إعادة المحاولة لو اللوجين فشل أو رجع تاني
+  let loggedIn = false;
+  while (!loggedIn) {
+    try {
+      // 1. فتح صفحة اللوجين
+      console.log("⏳ فتح صفحة تسجيل الدخول...");
+      await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // 2. الاستعداد للتحقق (10 ثواني)
-    console.log("⏳ استنى 10 ثواني عشان التحقق (Verification)...");
-    await sleep(10000);
+      // 2. استنى 10 ثواني للتحقق (Verification)
+      console.log("⏳ استنى 10 ثواني عشان التحقق (Verification)...");
+      await sleep(10000);
 
-    // 3. كتابة اليوزر نيم والباسورد
-    const emailInput = await page.$('input[type="email"], input[name="email"]');
-    if (emailInput) {
-        await emailInput.click();
-        await emailInput.type(USERNAME, { delay: 50 });
+      // 3. كتابة اليوزر والباسورد (مع منع تدمير السياق)
+      try {
+        const emailInput = await page.$('input[type="email"], input[name="email"]');
+        if (emailInput) { await emailInput.click(); await emailInput.type(USERNAME, { delay: 50 }); }
+        
+        const passInput = await page.$('input[type="password"]');
+        if (passInput) { await passInput.click(); await passInput.type(PASSWORD, { delay: 50 }); }
+      } catch (e) {}
+
+      // 4. الضغط على زر اللوجين
+      console.log("🔑 الضغط على زر تسجيل الدخول...");
+      await page.evaluate(() => {
+          const btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'LOGIN');
+          if (btn) btn.click();
+      }).catch(() => {});
+
+      // 5. استنى 5 ثواني عشان الداش بورد تفتح
+      console.log("⏳ استنى 5 ثواني عشان الدخول...");
+      await sleep(5000);
+
+      // 6. التوجه المباشر لصفحة الداش بورد (زي ما طلبت)
+      console.log("🚀 الذهاب للداش بورد...");
+      await page.goto('https://www.project-dark.co.uk/dashboard', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+
+      // 7. التوجه فوراً للبلاك ماركت
+      console.log("🚀 الذهاب للبلاك ماركت على طول...");
+      await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+
+      // فحص: لو رجعنا للوجين، نعيد المحاولة
+      if (page.url().includes('login') || page.url().includes('dashboard')) {
+          console.log("⚠️ لسه واقف على الداش أو اللوجين، جاري محاولة أخيرة للبلاك ماركت...");
+          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
+      }
+
+      console.log("✅ الصفحة الحالية:", page.url());
+      
+      // لو دخلنا فعلًا مش في اللوجين، نكسر الحلقة
+      if (!page.url().includes('login')) {
+          loggedIn = true;
+      } else {
+          console.log("❌ مفيش دخول! اللعبة غالباً مقفولة أو الموقع رافض الاتصال. هجرب من الأول بعد 30 ثانية...");
+          await sleep(30000);
+      }
+
+    } catch (e) {
+      console.log("❌ مشكلة في الدخول:", e.message);
+      await sleep(30000);
     }
-    
-    const passInput = await page.$('input[type="password"]');
-    if (passInput) {
-        await passInput.click();
-        await passInput.type(PASSWORD, { delay: 50 });
-    }
-
-    // 4. الضغط على زر تسجيل الدخول
-    console.log("🔑 الضغط على زر تسجيل الدخول...");
-    await page.click('button[type="submit"]').catch(() => {});
-    await page.evaluate(() => {
-        const btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'LOGIN');
-        if (btn) btn.click();
-    });
-
-    // 5. انتظار 5 ثواني فقط (بدل ما ننتظر تغيير الرابط لأنه مش بيحصل)
-    console.log("⏳ جاري الانتظار 5 ثواني لتأكيد الدخول...");
-    await sleep(5000);
-
-    // 6. التوجه المباشر للبلاك ماركت فوراً (زي ما طلبت بالظبط)
-    console.log("🚀 الانتقال المباشر لصفحة البلاك ماركت...");
-    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-
-    // لو لسه مأخدناكش للبلاك ماركت، جربنا مرة تانية
-    if (page.url().includes('login')) {
-         console.log("⚠️ لسه واقف على اللوجين، جاري محاولة أخيرة بالانتقال المباشر...");
-         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    }
-
-    console.log("✅ الصفحة الحالية:", page.url());
-
-  } catch (e) {
-    console.log("❌ مشكلة في الدخول:", e.message);
-    console.log("👀 اللينك الحالي:", page.url());
-    await browser.close();
-    return;
   }
 
   // من هنا يبدأ يقرأ المدينة ويشتغل (نفس اللوجيك السابق)
@@ -143,8 +152,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // (ضع هنا كود البيع والشراء الخاص بك، وهو موجود في نسختك القديمة)
-      // مثال بسيط:
+      // (لصق كود البيع والشراء القديم هنا لو مش موجود في النسخة اللي انت نازلها)
       console.log("📍 الحالة الحالية:", state.loc, "| معايا:", state.hold, "| العنصر:", state.heldItem);
 
     } catch (e) {
