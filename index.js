@@ -25,7 +25,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
+  console.log("🚀 البوت شغال (دعم الدولار والمدن الجديدة)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -38,7 +38,6 @@ function parseCooldownToSeconds(str) {
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        // ✅ إرجاع الطريقة الأصلية: networkidle2
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز");
     } else {
@@ -62,6 +61,7 @@ function parseCooldownToSeconds(str) {
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
+            // دعم كل المدن الجديدة
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
             if (body.includes('ST LOUIS') || body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
             return null;
@@ -169,7 +169,8 @@ function parseCooldownToSeconds(str) {
         
         if (state.hold === 0) {
            console.log("📍 واشنطن - شراء Human Beings");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
+           // 🔥 التعديل الأهم: التغيير من £ إلى $
+           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(3000);
@@ -197,7 +198,8 @@ function parseCooldownToSeconds(str) {
         
         if (state.hold === 0) {
            console.log("📍 سانت لويس - شراء Endangered exotic animals");
-           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
+           // 🔥 التعديل الأهم: التغيير من £ إلى $
+           await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(3000);
