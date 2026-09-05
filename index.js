@@ -1,11 +1,18 @@
 const puppeteer = require('puppeteer-core');
 
-// ✅ الكوكي بتاعك (من متصفح كيوي)
 const COOKIE_VALUE = "eyJpdiI6IjFhYVQwdkticVk4dUhheTZlYml5YkE9PSIsInZhbHVlIjoiMWdCdW1peXpzd0lqRjFtVUxWQktrOENXeUlCVGZxTS9BL0JHdVRzWE94OGQ3Wk9Zd0lKeU4rR21WU1c1YmZmeTc2cXdPT0M2MDB4Vk5wcjVveWhQcjVIU1ZBeVVzbEN5cEdHcDNkclV3N0ZmcG1rK3ppczUxOE5PNmd2bk0vNVAiLCJtYWMiOiJjYWQxOGFiM2JiMjZmNmI5NWI1MGViYTUxNmY5YTg2MTE2ZjAxYmJhMzhkOTY4ODM3ODJmNTVmYTY2MjM3NWE0IiwidGFnIjoiIn0%3D";
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// حماية من التجمد: إذا استغرقت العملية أكثر من 20 ثانية، قم بإلغائها وإعادة المحاولة
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+    ]);
+}
 
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
@@ -26,23 +33,23 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
 
-  // ✅ إعدادات المتصفح الناجحة للموبايل (مثل بوت الأسهم)
+  // إعداد آمن ضد التجمد (120 ثانية بدلاً من 0)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 0,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'] 
+    protocolTimeout: 120000,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(60000);
 
   try {
-    // ✅ الدخول المباشر بالكوكيز (بدون فتح صفحة اللوجين)
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(3000);
+    await page.waitForSelector('tr', { timeout: 30000 }); // ننتظر ظهور الجدول
+    await sleep(2000);
     console.log("✅ دخلنا بالكوكيز");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -52,12 +59,12 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        let currentCity = await page.evaluate(() => {
+        let currentCity = await withTimeout(page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('CHICAGO') || body.includes('Chicago')) return 'Chicago';
             if (body.includes('ST LOUIS') || body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
             return null;
-        });
+        }), 20000);
 
         if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
@@ -79,7 +86,7 @@ function parseCooldownToSeconds(str) {
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
         
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
@@ -90,12 +97,12 @@ function parseCooldownToSeconds(str) {
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(3000);
+        await sleep(2000);
         continue;
       }
 
-      // 2) لو إحنا في السوق (بيع وشراء)
-      let state = await page.evaluate((items) => {
+      // 2) لو إحنا في السوق (بيع وشراء) - محمية من التجمد
+      let state = await withTimeout(page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
@@ -137,7 +144,7 @@ function parseCooldownToSeconds(str) {
         }
         
         return { loc, cd: cooldownStr, hold, heldItem };
-      }, ITEMS);
+      }, ITEMS), 20000);
 
       // قراءة الكولداون
       if (state.cd) {
@@ -208,8 +215,8 @@ function parseCooldownToSeconds(str) {
       }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
-      await sleep(15000);
+      console.log("حصل خطأ مؤقت أو تجمد، معيد المحاولة:", e.message);
+      await sleep(5000);
     }
     await sleep(10000);
   }
