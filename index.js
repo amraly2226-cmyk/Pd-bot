@@ -6,21 +6,6 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// 🔥 دالة السفر الآمنة: تمنع التجمد لو الموقع علق، وبتعيد المحاولة
-async function safeGoto(page, url) {
-    for (let i = 0; i < 3; i++) {
-        try {
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await sleep(3000);
-            return true;
-        } catch (e) {
-            console.log(`⚠️ محاولة فتح الصفحة ${i + 1} فشلت، إعادة المحاولة...`);
-            await sleep(3000);
-        }
-    }
-    return false;
-}
-
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
     let h = str.match(/(\d+)\s*h/);
@@ -40,22 +25,25 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
 
-  // إعدادات آمنة للموبايل (بدون تجميد)
+  // ✅ إعدادات مظبوطة وآمنة للموبايل (شيلنا --single-process نهائياً)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 0, // لا مهلة نهائياً
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'] 
+    protocolTimeout: 120000, // 120 ثانية (دقيقتين) عشان ما يتجمدش
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
+  page.setDefaultNavigationTimeout(60000);
 
   try {
+    // ✅ الحل السحري: نفتح صفحة فارغة، نحط الكوكي فيها، وبعدين ندخل اللعبة
+    await page.goto('about:blank');
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    // استخدام الدالة الآمنة بدلاً من go العادي
-    await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(3000);
     console.log("✅ دخلنا بالكوكيز");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -72,7 +60,7 @@ function parseCooldownToSeconds(str) {
             return null;
         });
 
-        if (!currentCity) { await safeGoto(page, 'https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
         let destCity = (currentCity === 'St. Louis' || currentCity === 'St Louis') ? 'Chicago' : 'St. Louis';
 
@@ -102,7 +90,8 @@ function parseCooldownToSeconds(str) {
         
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(3000);
         continue;
       }
 
@@ -156,7 +145,8 @@ function parseCooldownToSeconds(str) {
         let waitSeconds = parseCooldownToSeconds(state.cd);
         console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
         await sleep(waitSeconds * 1000);
-        await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+        await sleep(2000);
         continue;
       }
 
@@ -183,7 +173,8 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 شيكاغو - رايح سانت لويس");
-           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+           await sleep(2000);
            continue;
         }
       }
@@ -211,14 +202,15 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح شيكاغو");
-           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+           await sleep(2000);
            continue;
         }
       }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت أو تجمد، معيد المحاولة:", e.message);
-      await sleep(5000);
+      console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
+      await sleep(15000);
     }
     await sleep(10000);
   }
