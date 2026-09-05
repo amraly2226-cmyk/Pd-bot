@@ -25,11 +25,11 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
 
-  // ✅ الإعدادات الصحيحة للتيرموكس (بدون أوامر التجمد)
+  // 🔥 إزالة protocolTimeout: 0 (الذي كان يجمّد العملية)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 0,
+    protocolTimeout: 60000, // 60 ثانية كحد أقصى لفتح المتصفح
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
@@ -92,7 +92,7 @@ function parseCooldownToSeconds(str) {
         continue;
       }
 
-      // 2) لو إحنا في السوق (بيع وشراء)
+      // 2) لو إحنا في السوق
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -153,7 +153,6 @@ function parseCooldownToSeconds(str) {
            console.log("📍 شيكاغو - بيع Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
-           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
