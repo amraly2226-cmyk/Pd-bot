@@ -25,45 +25,38 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 بوت التداول شغال (واشنطن ↔ سانت لويس)...");
 
+  // ✅ بدون --single-process عشان ذاكرة الموبايل تريح
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 0,
-    args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox', 
-      '--disable-dev-shm-usage', 
-      '--disable-gpu',
-      '--no-zygote', 
-      '--single-process'
-    ] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
+  // ✅ قبول أي نوافذ تأكيد (Confirm) تلقائياً
+  page.on('dialog', async dialog => { await dialog.accept(); });
+
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(3000);
+    await sleep(5000);
     console.log("✅ دخلنا بالكوكيز");
-    
-    // ⏳ إضافة: الانتظار حتى تظهر الجداول والأزرار، وطباعة توضيحية
-    console.log("⏳ بنستنى تحميل الجداول...");
-    await page.waitForSelector('tr', { timeout: 15000 }).catch(() => {});
-    console.log("✅ الجداول ظهرت، بنبدأ الشغل");
-    
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
   while (true) {
     try {
+      // ✅ رسالة توضيحية عشان نعرف إنه شغال
+      console.log("🔄 بلف على الصفحة...");
+
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        console.log("✈️ في صفحة السفر، بنجيب المدن...");
-        await sleep(2000);
+        await sleep(3000);
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
@@ -102,11 +95,12 @@ function parseCooldownToSeconds(str) {
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(3000);
+        await sleep(5000);
         continue;
       }
 
       // 2) لو إحنا في السوق
+      await sleep(2000);
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -167,7 +161,6 @@ function parseCooldownToSeconds(str) {
            console.log("📍 واشنطن - بيع Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
-           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
@@ -196,7 +189,6 @@ function parseCooldownToSeconds(str) {
            console.log("📍 سانت لويس - بيع Human Beings");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
-           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
