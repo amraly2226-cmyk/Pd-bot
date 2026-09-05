@@ -11,26 +11,19 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 (async () => {
   console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
-  // تشغيل المتصفح
   const browser = await puppeteer.launch({ 
     headless: true, 
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(30000); // زيادة المهلة لتصبح أطول
+  page.setDefaultTimeout(30000);
 
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        
-        // 🔥 سر الحل: استخدام domcontentloaded بدلاً من networkidle2 (يمنع تجمد المتصفح)
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        
-        // ⏳ استنى ظهور عنصر "body" عشان نضمن إن الصفحة اتحملت
-        await page.waitForSelector('body', { timeout: 15000 });
         await sleep(3000);
-        
         console.log("✅ دخلنا بالكوكيز");
     } else {
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -43,37 +36,36 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await page.waitForSelector('body', { timeout: 15000 });
-        await sleep(3000);
         console.log("✅ دخلنا بالدخول المباشر");
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
-  // بدأ الحلقة
   while (true) {
     try {
-      console.log("🔄 بفحص اللوكيشن...");
-      
-      // لو إحنا في صفحة الترافل
+      // 🔥 الحل الجذري: البحث عن اسم المدينة مباشرة في أي مكان بالصفحة (أقوى من قراءة الأسطر)
+      let currentCity = await page.evaluate(() => {
+          let text = document.body.innerText;
+          if (text.includes('Black Market - Washington') || text.includes('Washington')) return 'Washington';
+          if (text.includes('Black Market - St. Louis') || text.includes('St. Louis')) return 'St. Louis';
+          return null;
+      });
+
+      // لو مش لاقي مدينة، روح للسوق أو الطوارئ
+      if (!currentCity) {
+        if (page.url().includes('cloak')) {
+          await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+          await sleep(2000);
+          continue;
+        }
+        await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(2000);
+        continue;
+      }
+
+      // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
-        let currentCity = await page.evaluate(() => {
-            let body = document.body.innerText;
-            let lines = body.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                    let city = lines[i + 1] ? lines[i + 1].trim() : '';
-                    if (city.includes('Washington')) return 'Washington';
-                    if (city.includes('St. Louis')) return 'St. Louis';
-                    return null;
-                }
-            }
-            return null;
-        });
-
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
-
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
@@ -90,14 +82,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }, destCity);
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-        
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
             if (travelBtn) travelBtn.click();
         });
-        
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
@@ -105,21 +95,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // بفحص السوق
+      // 2) قراءة السوق (بيع وشراء)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
 
-        let lines = body.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                let city = lines[i + 1] ? lines[i + 1].trim() : '';
-                if (city.includes('Washington')) loc = 'Washington';
-                else if (city.includes('St. Louis')) loc = 'St. Louis';
-                break;
-            }
-        }
+        // 🔥 نفس الحل الجذري للبحث عن المدينة
+        if (body.includes('Washington')) loc = 'Washington';
+        else if (body.includes('St. Louis')) loc = 'St. Louis';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -159,7 +143,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // ✅ واشنطن: بيع Endangered exotic animals أو شراء Human Beings
+      // ✅ واشنطن
       if (state.loc === "Washington") {
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 واشنطن - بيع Endangered exotic animals");
@@ -170,7 +154,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
-        
         if (state.hold === 0) {
            console.log("📍 واشنطن - شراء Human Beings");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
@@ -179,23 +162,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
-        
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           
-           let travelCd = await page.evaluate(() => {
-               let body = document.body.innerText;
-               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
-               return cdMatch ? cdMatch[1] : null;
-           });
-           
-           if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
+           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
+           if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
@@ -213,7 +185,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
 
-      // ✅ سانت لويس: بيع Human Beings أو شراء Endangered exotic animals
+      // ✅ سانت لويس
       else if (state.loc === "St. Louis") {
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 سانت لويس - بيع Human Beings");
@@ -224,7 +196,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
-        
         if (state.hold === 0) {
            console.log("📍 سانت لويس - شراء Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('$')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
@@ -233,23 +204,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
-
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           
-           let travelCd = await page.evaluate(() => {
-               let body = document.body.innerText;
-               let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
-               return cdMatch ? cdMatch[1] : null;
-           });
-           
-           if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
+           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
+           if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
