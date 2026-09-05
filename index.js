@@ -18,7 +18,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   
-  // محاكاة متصفح حقيقي 100%
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
@@ -28,39 +27,46 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     console.log("⏳ فتح صفحة تسجيل الدخول...");
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // 2. الانتظار 10 ثواني عشان الـ Cloudflare Verification يخلص
+    // 2. الاستعداد للتحقق (10 ثواني)
     console.log("⏳ استنى 10 ثواني عشان التحقق (Verification)...");
     await sleep(10000);
 
-    // 3. كتابة اليوزر نيم (Email)
+    // 3. كتابة اليوزر نيم والباسورد
     const emailInput = await page.$('input[type="email"], input[name="email"]');
-    if (!emailInput) throw new Error("مش لاقي خانة الإيميل");
-    await emailInput.click();
-    await emailInput.type(USERNAME, { delay: 50 }); // تأخير بسيط عشان يبان كأنه إنسان
-
-    // 4. كتابة الباسورد
+    if (emailInput) {
+        await emailInput.click();
+        await emailInput.type(USERNAME, { delay: 50 });
+    }
+    
     const passInput = await page.$('input[type="password"]');
-    if (!passInput) throw new Error("مش لاقي خانة الباسورد");
-    await passInput.click();
-    await passInput.type(PASSWORD, { delay: 50 });
+    if (passInput) {
+        await passInput.click();
+        await passInput.type(PASSWORD, { delay: 50 });
+    }
 
-    // 5. الضغط على زر اللوجين
+    // 4. الضغط على زر تسجيل الدخول
     console.log("🔑 الضغط على زر تسجيل الدخول...");
     await page.click('button[type="submit"]').catch(() => {});
-    // في حالة لو الزر اسمه LOGIN مش type submit
     await page.evaluate(() => {
         const btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim().toUpperCase() === 'LOGIN');
         if (btn) btn.click();
     });
 
-    // 6. انتظار تسجيل الدخول
-    await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {});
-    await sleep(3000); // مهلة أمان
-    console.log("✅ تم تسجيل الدخول. الصفحة الحالية:", page.url());
+    // 5. انتظار 5 ثواني فقط (بدل ما ننتظر تغيير الرابط لأنه مش بيحصل)
+    console.log("⏳ جاري الانتظار 5 ثواني لتأكيد الدخول...");
+    await sleep(5000);
 
-    // 7. دخول البلاك ماركت فوراً زي ما طلبت
+    // 6. التوجه المباشر للبلاك ماركت فوراً (زي ما طلبت بالظبط)
+    console.log("🚀 الانتقال المباشر لصفحة البلاك ماركت...");
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-    console.log("✅ دخلنا البلاك ماركت:", page.url());
+
+    // لو لسه مأخدناكش للبلاك ماركت، جربنا مرة تانية
+    if (page.url().includes('login')) {
+         console.log("⚠️ لسه واقف على اللوجين، جاري محاولة أخيرة بالانتقال المباشر...");
+         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    }
+
+    console.log("✅ الصفحة الحالية:", page.url());
 
   } catch (e) {
     console.log("❌ مشكلة في الدخول:", e.message);
@@ -69,7 +75,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     return;
   }
 
-  // من هنا يبدأ يقرأ المدينة ويشتغل (نفس الكود القديم)
+  // من هنا يبدأ يقرأ المدينة ويشتغل (نفس اللوجيك السابق)
   while (true) {
     try {
       let state = await page.evaluate((items) => {
@@ -137,14 +143,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // (نفس كود البيع والشراء السابق بالظبط - انسخه هنا أو استخدم اللوجيك الموجود مسبقاً)
-      // بما إن الكود ده هو نفسه الصفحة، فقط نسخ الباقي.
-      
-      // مثال مبسط للجزء ده (لو حابب تحطه)
+      // (ضع هنا كود البيع والشراء الخاص بك، وهو موجود في نسختك القديمة)
+      // مثال بسيط:
       console.log("📍 الحالة الحالية:", state.loc, "| معايا:", state.hold, "| العنصر:", state.heldItem);
-
-      // ضع كامل أوامر البيع والشراء التي كانت موجودة في كودك السابق هنا
-      // (سأترك المساحة لك لتلصقها كما هي من الملف السابق لضمان عدم وجود أخطاء)
 
     } catch (e) {
       console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
