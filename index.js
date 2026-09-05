@@ -20,37 +20,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(15000);
 
   try {
-    // 1) نحاول الدخول بالكوكيز
-    await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-    await sleep(3000);
-    console.log("✅ دخلنا بالكوكيز، بنفحص الصفحة...");
-
-    // 2) فحص ذكي: هل الموقع رجعلنا لصفحة اللوجين؟
-    let isLoginPage = await page.evaluate(() => {
-        return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
-    });
-
-    if (isLoginPage) {
-        console.log("⚠️ الكوكيز مرفوضة، هسجل دخول باليوزر والباسورد...");
-        
-        // ننتظر 15 ثانية عشان التحقق الأمني
-        await sleep(15000);
-        
+    if (COOKIE_VALUE) {
+        await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log("✅ دخلنا بالكوكيز");
+    } else {
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
            await inputs[1].type(PASSWORD);
         }
         await page.click('button[type="submit"]').catch(() => {});
-        await sleep(8000); // انتظار التحقق والدخول
-
-        // التوجه للسوق بعد الدخول
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         await sleep(5000);
-        console.log("✅ دخلنا بالدخول المباشر!");
-    } else {
-        console.log("✅ الجلسة سليمة من الكوكيز!");
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -58,12 +41,31 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
+      // 🔥 حل مشكلة صفحة Cloaking: لو عالقين فيها، نطلع منها فوراً
+      if (page.url().includes('cloak') || page.url().includes('cloaking')) {
+        console.log("⚠️ لقيت البوت في صفحة Cloaking، بنقله للسوق...");
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+        await sleep(2000);
+        continue;
+      }
+
       // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
+        // 🔥 الطريقة المضمونة: البحث عن السطرين المتتاليين (LOCATION ثم المدينة)
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            if (body.includes('Washington') || body.includes('WASHINGTON')) return 'Washington';
-            if (body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
+            let lines = body.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                    for (let j = i + 1; j < lines.length; j++) {
+                        if (lines[j].trim()) { 
+                            let city = lines[j].trim();
+                            if (city.includes('Washington')) return 'Washington';
+                            if (city.includes('St. Louis')) return 'St. Louis';
+                        }
+                    }
+                }
+            }
             return null;
         });
 
@@ -99,14 +101,27 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // 2) لو إحنا في السوق
+      // 2) لو إحنا في السوق (بيع وشراء)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
-        
-        if (body.includes('Washington') || body.includes('Black Market - Washington')) loc = 'Washington';
-        else if (body.includes('St. Louis') || body.includes('Black Market - St. Louis')) loc = 'St. Louis';
+
+        // 🔥 نفس الطريقة المضمونة للبحث عن المدينة
+        let lines = body.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                for (let j = i + 1; j < lines.length; j++) {
+                    if (lines[j].trim()) {
+                        let city = lines[j].trim();
+                        if (city.includes('Washington')) loc = 'Washington';
+                        else if (city.includes('St. Louis')) loc = 'St. Louis';
+                        break;
+                    }
+                }
+                break;
+            }
+        }
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -143,29 +158,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
-
-      // ✅ لو المدينة فاضية أو مش معروفة، إعادة توجيه وتسجيل دخول
-      if (!state.loc) {
-        console.log("⚠️ مش لاقي المدينة، جاري فحص صفحة اللوجين...");
-        let isLogin = await page.evaluate(() => !!document.querySelector('input[type="password"]'));
-        if (isLogin) {
-           await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
-           await sleep(15000);
-           const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-           if (inputs.length >= 2) {
-              await inputs[0].type(USERNAME);
-              await inputs[1].type(PASSWORD);
-           }
-           await page.click('button[type="submit"]').catch(() => {});
-           await sleep(8000);
-           await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
-           await sleep(3000);
-           continue;
-        }
-        await page.reload({ waitUntil: 'networkidle2' });
-        await sleep(3000);
-        continue;
-      }
 
       // ✅ لو في كولداون حقيقي، انتظر
       if (state.cd) {
