@@ -7,45 +7,42 @@ const puppeteer = require('puppeteer');
   });
   const page = await browser.newPage();
 
-  // قراءة البيانات من متغيرات البيئة (التي أضفناها في Railway)
-  const USERNAME = process.env.USERNAME;
-  const PASSWORD = process.env.PASSWORD;
+  // قراءة البيانات من الأسماء اللي في Railway عندك
+  const USERNAME = process.env.PD_USER;
+  const PASSWORD = process.env.PD_PASS;
 
   if (!USERNAME || !PASSWORD) {
-    console.log('❌ تأكد من وضع USERNAME و PASSWORD في Variables في الإعدادات');
+    console.log('❌ لسه في مشكلة في الـ Variables! متأكد إن قيم PD_USER و PD_PASS موجودة؟');
     await browser.close();
     return;
   }
 
-  try {
-    // 1. الذهاب لصفحة تسجيل الدخول
-    await page.goto('https://project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
-    console.log('📄 فتح صفحة تسجيل الدخول');
+  console.log('✅ تم قراءة المتغيرات بنجاح.');
 
-    // 2. إدخال البيانات (قد تحتاج لتغيير أسماء الحقول لو الموقع اتغير)
-    // أمثلة للحقول: input[name="username"] أو #login-username
+  try {
+    // 1. فتح صفحة تسجيل الدخول
+    await page.goto('https://project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+    
+    // 2. إدخال البيانات
     await page.waitForSelector('input[type="text"], input[name="username"], input[name="email"]', { timeout: 10000 });
     await page.type('input[type="text"], input[name="username"], input[name="email"]', USERNAME);
     
     await page.waitForSelector('input[type="password"]', { timeout: 10000 });
     await page.type('input[type="password"]', PASSWORD);
 
-    // الضغط على زر الدخول (أمثلة: button[type="submit"], #login-btn)
+    // 3. الضغط على زر الدخول
     await page.click('button[type="submit"], input[type="submit"]');
     console.log('🔑 تم الضغط على زر تسجيل الدخول');
 
-    // 3. انتظار الانتقال للصفحة الرئيسية أو اللعبة
+    // 4. انتظار الانتقال وفتح صفحة السوق الأسود
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
-    console.log('📄 الصفحة الحالية بعد الدخول:', page.url());
-
-    // 4. الذهاب لصفحة السوق الأسود
     await page.goto('https://project-dark.co.uk/black', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // 5. استنى كلمة Location تظهر (مدة 60 ثانية)
+    // 5. استنى كلمة Location
     await page.waitForFunction(() => document.body.innerText.includes('Location'), { timeout: 60000 });
     console.log('✅ تم العثور على كلمة Location');
 
-    // 6. اقرأ المدينة واطبعها
+    // 6. اقرأ المدينة
     const المدينة = await page.evaluate(() => {
         const elements = document.querySelectorAll('*');
         for (let el of elements) {
@@ -60,8 +57,7 @@ const puppeteer = require('puppeteer');
 
   } catch (error) {
     console.error('❌ حصل خطأ:', error.message);
-    // إذا فشل، نطبع محتوى الصفحة لمعرفة السبب (هل هي صفحة كابتشا؟ هل هي صفحة تحقق Cloudflare؟)
-    console.log('🔍 محتوى الصفحة الحالية لتشخيص المشكلة:');
+    console.log('🔍 محتوى الصفحة الحالية:');
     console.log(await page.content());
   } finally {
     await browser.close();
