@@ -43,7 +43,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     try {
       // 1) لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
-        // ✅ قراءة المدينة بالطريقة الجديدة (البحث المباشر عن الاسم)
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('Washington') || body.includes('WASHINGTON')) return 'Washington';
@@ -78,7 +77,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
-        await sleep(7000);
+        await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
         continue;
       }
@@ -89,9 +88,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let loc = null;
         let cooldownStr = null;
         
-        // ✅ قراءة المدينة بالطريقة الجديدة (بدون split سطور)
-        if (body.includes('Black Market - Washington')) loc = 'Washington';
-        else if (body.includes('Black Market - St. Louis')) loc = 'St. Louis';
+        // ✅ قراءة المدينة بشكل مرن جداً
+        if (body.includes('Washington') || body.includes('Black Market - Washington')) loc = 'Washington';
+        else if (body.includes('St. Louis') || body.includes('Black Market - St. Louis')) loc = 'St. Louis';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -128,6 +127,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
+
+      // ✅ لو مفيش مدينة معروفة، اعمل تحديث وارجع جرب
+      if (!state.loc) {
+        console.log("⚠️ مش لاقي المدينة، جاري تحديث الصفحة لإعادة المحاولة...");
+        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
+        await sleep(3000);
+        continue;
+      }
 
       // ✅ لو في كولداون حقيقي، انتظر
       if (state.cd) {
@@ -242,12 +249,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
-      }
-      
-      else {
-          console.log("⚠️ مش لاقي المدينة، بجرب تاني...");
-          await sleep(5000);
-          continue;
       }
 
     } catch (e) {
