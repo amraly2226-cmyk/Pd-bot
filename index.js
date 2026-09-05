@@ -8,6 +8,21 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// 🔥 دالة السفر الآمنة: تمنع التجمد نهائياً
+async function safeGoto(page, url, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await sleep(2000);
+            return true; // نجحت
+        } catch (e) {
+            console.log(`⚠️ محاولة فتح ${url} فشلت، إعادة المحاولة ${i + 1}/3...`);
+            await sleep(3000);
+        }
+    }
+    return false; // فشلت كل المحاولات
+}
+
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
     let h = str.match(/(\d+)\s*h/);
@@ -25,7 +40,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال...");
+  console.log("🚀 البوت شغال (النسخة المضادة للتجمد)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -33,17 +48,15 @@ function parseCooldownToSeconds(str) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(30000);
 
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        // ✅ حل مشكلة الوقوف: استخدام domcontentloaded بدلاً من networkidle2
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000); // نستنى الجداول تظهر
+        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await safeGoto(page, 'https://www.project-dark.co.uk/login');
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -51,8 +64,7 @@ function parseCooldownToSeconds(str) {
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000);
+        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -69,7 +81,7 @@ function parseCooldownToSeconds(str) {
             return null;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await safeGoto(page, 'https://project-dark.co.uk/travel'); continue; }
 
         let destCity = (currentCity === 'St. Louis' || currentCity === 'St Louis') ? 'Washington' : 'St. Louis';
 
@@ -99,9 +111,7 @@ function parseCooldownToSeconds(str) {
         
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        // ✅ استخدام domcontentloaded بدلاً من networkidle2
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000);
+        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
@@ -155,9 +165,7 @@ function parseCooldownToSeconds(str) {
         let waitSeconds = parseCooldownToSeconds(state.cd);
         console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
         await sleep(waitSeconds * 1000);
-        // ✅ استخدام domcontentloaded بدلاً من networkidle2
-        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000);
+        await safeGoto(page, 'https://www.project-dark.co.uk/travel');
         continue;
       }
 
@@ -184,9 +192,7 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           // ✅ استخدام domcontentloaded بدلاً من networkidle2
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
-           await sleep(3000);
+           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
            continue;
         }
       }
@@ -214,9 +220,7 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           // ✅ استخدام domcontentloaded بدلاً من networkidle2
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded', timeout: 60000 });
-           await sleep(3000);
+           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
            continue;
         }
       }
