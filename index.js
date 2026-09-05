@@ -20,20 +20,37 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(15000);
 
   try {
-    if (COOKIE_VALUE) {
-        await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-        console.log("✅ دخلنا بالكوكيز");
-    } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+    // 1) نحاول الدخول بالكوكيز
+    await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+    await sleep(3000);
+    console.log("✅ دخلنا بالكوكيز، بنفحص الصفحة...");
+
+    // 2) فحص ذكي: هل الموقع رجعلنا لصفحة اللوجين؟
+    let isLoginPage = await page.evaluate(() => {
+        return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
+    });
+
+    if (isLoginPage) {
+        console.log("⚠️ الكوكيز مرفوضة، هسجل دخول باليوزر والباسورد...");
+        
+        // ننتظر 15 ثانية عشان التحقق الأمني
+        await sleep(15000);
+        
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
            await inputs[1].type(PASSWORD);
         }
         await page.click('button[type="submit"]').catch(() => {});
-        await sleep(5000);
+        await sleep(8000); // انتظار التحقق والدخول
+
+        // التوجه للسوق بعد الدخول
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        await sleep(5000);
+        console.log("✅ دخلنا بالدخول المباشر!");
+    } else {
+        console.log("✅ الجلسة سليمة من الكوكيز!");
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -82,13 +99,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // 2) لو إحنا في السوق (بيع وشراء)
+      // 2) لو إحنا في السوق
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
         
-        // ✅ قراءة المدينة بشكل مرن جداً
         if (body.includes('Washington') || body.includes('Black Market - Washington')) loc = 'Washington';
         else if (body.includes('St. Louis') || body.includes('Black Market - St. Louis')) loc = 'St. Louis';
 
@@ -128,10 +144,25 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ لو مفيش مدينة معروفة، اعمل تحديث وارجع جرب
+      // ✅ لو المدينة فاضية أو مش معروفة، إعادة توجيه وتسجيل دخول
       if (!state.loc) {
-        console.log("⚠️ مش لاقي المدينة، جاري تحديث الصفحة لإعادة المحاولة...");
-        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
+        console.log("⚠️ مش لاقي المدينة، جاري فحص صفحة اللوجين...");
+        let isLogin = await page.evaluate(() => !!document.querySelector('input[type="password"]'));
+        if (isLogin) {
+           await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2' });
+           await sleep(15000);
+           const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+           if (inputs.length >= 2) {
+              await inputs[0].type(USERNAME);
+              await inputs[1].type(PASSWORD);
+           }
+           await page.click('button[type="submit"]').catch(() => {});
+           await sleep(8000);
+           await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+           await sleep(3000);
+           continue;
+        }
+        await page.reload({ waitUntil: 'networkidle2' });
         await sleep(3000);
         continue;
       }
