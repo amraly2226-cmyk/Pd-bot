@@ -1,6 +1,5 @@
 const puppeteer = require('puppeteer-core');
 
-// ✅ الكوكيز بتاعتك (اللي بعتها)
 const COOKIE_VALUE = "eyJpdiI6IjFhYVQwdkticVk4dUhheTZlYml5YkE9PSIsInZhbHVlIjoiMWdCdW1peXpzd0lqRjFtVUxWQktrOENXeUlCVGZxTS9BL0JHdVRzWE94OGQ3Wk9Zd0lKeU4rR21WU1c1YmZmeTc2cXdPT0M2MDB4Vk5wcjVveWhQcjVIU1ZBeVVzbEN5cEdHcDNkclV3N0ZmcG1rK3ppczUxOE5PNmd2bk0vNVAiLCJtYWMiOiJjYWQxOGFiM2JiMjZmNmI5NWI1MGViYTUxNmY5YTg2MTE2ZjAxYmJhMzhkOTY4ODM3ODJmNTVmYTY2MjM3NWE0IiwidGFnIjoiIn0%3D";
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
@@ -26,19 +25,34 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 بوت التداول شغال (واشنطن ↔ سانت لويس)...");
 
-  // ✅ إعداد المتصفح ليعمل على تيرموكس
+  // 🔥 الحل السحري: إضافة أوامر الموبايل لضمان تشغيل المتصفح
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 0,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    args: [
+      '--no-sandbox', 
+      '--disable-setuid-sandbox', 
+      '--disable-dev-shm-usage', 
+      '--disable-gpu',
+      '--no-zygote', 
+      '--single-process',
+      '--disable-accelerated-2d-canvas',
+      '--disable-component-update',
+      '--disable-default-apps',
+      '--disable-features=Translate,BackForwardCache',
+      '--disable-ipc-flooding-protection',
+      '--disable-renderer-backgrounding',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-background-timer-throttling'
+    ] 
   });
+
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
   try {
-    // ✅ الدخول بالكوكيز مباشرة
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(3000);
