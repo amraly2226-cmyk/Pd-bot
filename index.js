@@ -8,14 +8,6 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// حماية ضد تجمد المتصفح
-function withTimeout(promise, ms) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
-    ]);
-}
-
 (async () => {
   console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
@@ -27,85 +19,58 @@ function withTimeout(promise, ms) {
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
+  // 1) محاولة الدخول بالكوكيز أولاً
   try {
-    // 🔥 الخطوة الجديدة: فحص فوري هل نحن في صفحة تسجيل الدخول؟
-    console.log("🔄 جاري فحص حالة الدخول...");
-    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await sleep(2000);
-
-    let isLoginPage = await withTimeout(page.evaluate(() => {
-        return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
-    }), 12000).catch(() => true);
-
-    if (isLoginPage) {
-        console.log("⚠️ الكوكيز القديمة باطلة! هسجل دخول باليوزر والباسورد الجديد...");
-        
-        // 📌 مسح الكوكيز القديمة التي تسبب المشكلة
-        await page.deleteCookie('project-dark-session');
-        await sleep(1000);
-
-        // الانتقال لصفحة اللوجين والتسجيل
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000);
-
-        const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-        if (inputs.length >= 2) {
-           await inputs[0].type(USERNAME);
-           await inputs[1].type(PASSWORD);
-        }
-        await page.click('button[type="submit"]').catch(() => {});
-        
-        // ⏳ انتظار التحقق الأمني (15 ثانية)
-        console.log("⏳ بنستنى التحقق الأمني 15 ثانية...");
-        await sleep(15000);
-        
-        // العودة للسوق
+    if (COOKIE_VALUE) {
+        await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-        await sleep(3000);
-        console.log("✅ تم تسجيل الدخول باليوزر والباسورد!");
+        await sleep(5000);
+        console.log("✅ دخلنا بالكوكيز");
     } else {
-        console.log("✅ الكوكيز سليمة! دخلنا مباشرة للسوق");
+        // (سينتقل لتسجيل الدخول)
+        console.log("⚠️ مفيش كوكيز، هستخدم تسجيل الدخول");
     }
   } catch (e) {
-    console.log("⚠️ مشكلة في الدخول:", e.message);
+    console.log("⚠️ مشكلة في الدخول بالكوكيز:", e.message);
+  }
+
+  // 2) فحص فوري: هل أنا في صفحة اللوجين؟
+  let isLoginPage = await page.evaluate(() => {
+      return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
+  }).catch(() => true);
+
+  if (isLoginPage) {
+    console.log("⚠️ لقيت صفحة اللوجين، هسجل دخول باليوزر والباسورد...");
+    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(3000);
+    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+    if (inputs.length >= 2) {
+       await inputs[0].type(USERNAME);
+       await inputs[1].type(PASSWORD);
+    }
+    await page.click('button[type="submit"]').catch(() => {});
+    console.log("⏳ مستني التحقق الأمني 15 ثانية...");
+    await sleep(15000);
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(5000);
+    console.log("✅ دخلنا بالدخول المباشر!");
+  } else {
+    console.log("✅ الجلسة شغالة من الكوكيز!");
   }
 
   while (true) {
     try {
-      console.log("🔄 أدخلنا حلقة اللعب، جاري فحص اللوكيشن...");
-
-      // 🔥 البحث عن المدينة مع الحماية من التجمد
-      let currentCity = await withTimeout(page.evaluate(() => {
+      console.log("🔄 بفحص اللوكيشن...");
+      let currentCity = await page.evaluate(() => {
           let text = document.body.innerText;
           if (text.includes('Washington')) return 'Washington';
           if (text.includes('St. Louis')) return 'St. Louis';
           return null;
-      }), 12000);
+      });
 
       if (!currentCity) {
-        // لو مفيش مدينة، اتأكد إحنا فين (هل رجعنا للوجين تاني؟)
-        let isLoginAgain = await withTimeout(page.evaluate(() => {
-            return window.location.href.includes('login') || !!document.querySelector('input[type="password"]');
-        }), 12000).catch(() => true);
-
-        if (isLoginAgain) {
-            console.log("⚠️ تم طردنا للوجين تاني! هعيد تسجيل الدخول...");
-            await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded' });
-            await sleep(3000);
-            const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-            if (inputs.length >= 2) {
-               await inputs[0].type(USERNAME);
-               await inputs[1].type(PASSWORD);
-            }
-            await page.click('button[type="submit"]').catch(() => {});
-            await sleep(15000);
-            await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-            await sleep(3000);
-        } else {
-            console.log("⚠️ اللوكيشن مش ظاهر، جاري إعادة تحميل الصفحة...");
-            await page.reload({ waitUntil: 'domcontentloaded' });
-            await sleep(3000);
-        }
+        console.log("⏳ اللوكيشن مش ظاهر، بنستنى 5 ثواني...");
+        await sleep(5000);
         continue;
       }
 
@@ -141,7 +106,7 @@ function withTimeout(promise, ms) {
       }
 
       // 2) قراءة السوق (بيع وشراء)
-      let state = await withTimeout(page.evaluate((items) => {
+      let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
@@ -179,7 +144,7 @@ function withTimeout(promise, ms) {
 
         if (heldItem === null) { let m = body.match(/holding (\d+) items/i); hold = m ? +m[1] : 0; }
         return { loc, cd: cooldownStr, hold, heldItem };
-      }, ITEMS), 12000);
+      }, ITEMS);
 
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
@@ -210,7 +175,7 @@ function withTimeout(promise, ms) {
            console.log("📍 واشنطن - رايح سانت لويس");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           let travelCd = await withTimeout(page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; }), 12000);
+           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
            if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
@@ -252,7 +217,7 @@ function withTimeout(promise, ms) {
            console.log("📍 سانت لويس - رايح واشنطن");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           let travelCd = await withTimeout(page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; }), 12000);
+           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
            if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
