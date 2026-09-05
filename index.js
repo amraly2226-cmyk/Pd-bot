@@ -8,19 +8,37 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// 🔥 دالة السفر الآمنة: تمنع التجمد نهائياً
+// 🔥 حاجز ضد التجمد: أي مهمة تتجاوز الوقت هتتوقف وتكمل
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timed Out")), ms))
+    ]);
+}
+
 async function safeGoto(page, url, retries = 3) {
     for (let i = 0; i < retries; i++) {
         try {
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await withTimeout(page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 }), 25000);
             await sleep(2000);
-            return true; // نجحت
+            return true;
         } catch (e) {
             console.log(`⚠️ محاولة فتح ${url} فشلت، إعادة المحاولة ${i + 1}/3...`);
             await sleep(3000);
         }
     }
-    return false; // فشلت كل المحاولات
+    return false;
+}
+
+async function safeEvaluate(page, func, arg, timeout = 15000) {
+    try {
+        return await withTimeout(page.evaluate(func, arg), timeout);
+    } catch (e) {
+        console.log("⚠️ قراءة الصفحة علقت، جاري إعادة تحميلها...");
+        await page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+        await sleep(2000);
+        return { loc: null, cd: null, hold: 0, heldItem: null }; // رجع قيمة فارغة عشان الدورة تبدأ من جديد
+    }
 }
 
 function parseCooldownToSeconds(str) {
@@ -40,7 +58,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال (النسخة المضادة للتجمد)...");
+  console.log("🚀 البوت شغال (النسخة الصامدة)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -74,7 +92,7 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        let currentCity = await page.evaluate(() => {
+        let currentCity = await safeEvaluate(page, () => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
             if (body.includes('ST LOUIS') || body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
@@ -101,7 +119,7 @@ function parseCooldownToSeconds(str) {
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        await withTimeout(page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }), 10000).catch(() => {});
         
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
@@ -115,8 +133,10 @@ function parseCooldownToSeconds(str) {
         continue;
       }
 
-      // 2) لو إحنا في السوق
-      let state = await page.evaluate((items) => {
+      // 2) لو إحنا في السوق (قراءة بسيطة مع حماية التجمد)
+      await page.waitForFunction(() => document.body.innerText.includes('Black Market'), { timeout: 10000 }).catch(() => {});
+
+      let state = await safeEvaluate(page, (items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
@@ -175,7 +195,7 @@ function parseCooldownToSeconds(str) {
            console.log("📍 واشنطن - بيع Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
-           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
+           await withTimeout(page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }), 5000).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
@@ -203,7 +223,7 @@ function parseCooldownToSeconds(str) {
            console.log("📍 سانت لويس - بيع Human Beings");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Human beings') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
-           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
+           await withTimeout(page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }), 5000).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
@@ -224,10 +244,16 @@ function parseCooldownToSeconds(str) {
            continue;
         }
       }
+      
+      else {
+          console.log("⚠️ مش لاقي الصفحة، جاري إعادة المحاولة...");
+          await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
+          continue;
+      }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
-      await sleep(15000);
+      console.log("⚠️ حصل خطأ مؤقت، معيد المحاولة:", e.message);
+      await sleep(5000);
     }
     await sleep(10000);
   }
