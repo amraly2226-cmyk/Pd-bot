@@ -8,6 +8,14 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// 🔥 حماية ضد تجمد المتصفح: أي عملية تتجاوز 12 ثانية تُلغى
+function withTimeout(promise, ms) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
+    ]);
+}
+
 (async () => {
   console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
@@ -17,7 +25,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(30000);
+  page.setDefaultTimeout(60000);
 
   try {
     if (COOKIE_VALUE) {
@@ -44,23 +52,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   while (true) {
     try {
-      // 🔥 الحل الجذري: البحث عن اسم المدينة مباشرة في أي مكان بالصفحة (أقوى من قراءة الأسطر)
-      let currentCity = await page.evaluate(() => {
-          let text = document.body.innerText;
-          if (text.includes('Black Market - Washington') || text.includes('Washington')) return 'Washington';
-          if (text.includes('Black Market - St. Louis') || text.includes('St. Louis')) return 'St. Louis';
-          return null;
-      });
+      console.log("🔄 أدخلنا حلقة اللعب، جاري فحص اللوكيشن...");
 
-      // لو مش لاقي مدينة، روح للسوق أو الطوارئ
+      // 🔥 قراءة المدينة مع حماية من التجمد
+      let currentCity = await withTimeout(page.evaluate(() => {
+          let text = document.body.innerText;
+          if (text.includes('Washington')) return 'Washington';
+          if (text.includes('St. Louis')) return 'St. Louis';
+          return null;
+      }), 12000);
+
       if (!currentCity) {
-        if (page.url().includes('cloak')) {
-          await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-          await sleep(2000);
-          continue;
-        }
-        await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(2000);
+        console.log("⚠️ اللوكيشن مش ظاهر، جاري إعادة تحميل الصفحة...");
+        await withTimeout(page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }), 12000).catch(() => {});
+        await sleep(3000);
         continue;
       }
 
@@ -96,12 +101,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       }
 
       // 2) قراءة السوق (بيع وشراء)
-      let state = await page.evaluate((items) => {
+      let state = await withTimeout(page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
 
-        // 🔥 نفس الحل الجذري للبحث عن المدينة
         if (body.includes('Washington')) loc = 'Washington';
         else if (body.includes('St. Louis')) loc = 'St. Louis';
 
@@ -135,7 +139,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         if (heldItem === null) { let m = body.match(/holding (\d+) items/i); hold = m ? +m[1] : 0; }
         return { loc, cd: cooldownStr, hold, heldItem };
-      }, ITEMS);
+      }, ITEMS), 12000);
 
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
@@ -166,7 +170,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            console.log("📍 واشنطن - رايح سانت لويس");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
+           let travelCd = await withTimeout(page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; }), 12000);
            if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
@@ -208,7 +212,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            console.log("📍 سانت لويس - رايح واشنطن");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
-           let travelCd = await page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; });
+           let travelCd = await withTimeout(page.evaluate(() => { let body = document.body.innerText; let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i); return cdMatch ? cdMatch[1] : null; }), 12000);
            if (travelCd) { console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`); await sleep(60000); continue; }
 
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
@@ -228,8 +232,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       }
 
     } catch (e) {
-      console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
-      await sleep(15000);
+      console.log("⚠️ حصل خطأ أو تجمد، معيد المحاولة:", e.message);
+      // إعادة تحميل الصفحة إذا حدث تجمد
+      await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }).catch(() => {});
+      await sleep(5000);
     }
     await sleep(10000);
   }
