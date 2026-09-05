@@ -16,6 +16,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
+  
+  // تقليد متصفح حقيقي عشان نتخطى الحماية
+  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(60000);
 
@@ -23,16 +26,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         
-        // 🔥 التعديل الأهم: نروح لصفحة "black" (اللي فيها معلومات اللاعب والـ Location) مش blackmarket
-        await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2', timeout: 60000 });
+        // 🔥 الرجوع للرابط الأساسي اللي كان شغال
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         
-        // فحص بسيط: لو الصفحة رجعتنا للوجين يبقى الكوكيز باظت
         const pageUrl = page.url();
+        // لو رجعنا لصفحة تسجيل الدخول يبقى الكوكيز باظت
         if (pageUrl.includes('login')) {
             console.log("❌ فشل: الكوكيز منتهية أو غلط! الموقع رجعنا لصفحة تسجيل الدخول.");
-            console.log("الحل: ادخل على اللعبة، خذ كوكيز جديدة، وحطها في PD_COOKIE.");
+            console.log("الحل: ادخل على اللعبة في المتصفح، خذ كوكيز جديدة من `project-dark-session` وحطها في PD_COOKIE.");
             await browser.close();
             return;
+        } else if (pageUrl.includes('Page not') || pageUrl.includes('404')) {
+             console.log("❌ الموقع بيرجع 404. غالباً الكوكيز باظت. جددها وحاول تاني.");
+             await browser.close();
+             return;
         }
         console.log("✅ دخلنا بالكوكيز ووصلنا للصفحة:", pageUrl);
     } else {
@@ -45,8 +52,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
         
-        // 🔥 بعد تسجيل الدخول نروح لنفس صفحة "black"
-        await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالحساب ووصلنا للصفحة:", page.url());
     }
   } catch (e) {
@@ -108,11 +114,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // 🔥 التعديل: لو "غير معروفة" اطبع لنا اللينك عشان نشوف هو واقف فين
       if (!state.loc) {
         console.log("📍 مش لاقي Location. الرابط الحالي:", page.url());
-        console.log("👀 أول 200 حرف من الصفحة:", (await page.content()).substring(0, 200));
-        await sleep(15000);
+        await sleep(10000);
         continue;
       } else {
         console.log("📍 المدينة الحالية:", state.loc);
@@ -171,7 +175,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
            if (verify) console.log("🎉 وصلنا طوكيو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
@@ -223,7 +227,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
            if (verify) console.log("🎉 وصلنا كايرو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/black', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
