@@ -2,25 +2,10 @@ const puppeteer = require('puppeteer');
 
 const USERNAME = 'amr.aly.2226@gmail.com'; 
 const PASSWORD = 'Gun@12345';
-// ✅ تم وضع الكوكي الجديد مباشرة في الكود لحل مشكلة التوقف
-const COOKIE_VALUE = "eyJpdiI6IjFhYVQwdkticVk4dUhheTZlYml5YkE9PSIsInZhbHVlIjoiMWdCdW1peXpzd0lqRjFtVUxWQktrOENXeUlCVGZxTS9BL0JHdVRzWE94OGQ3Wk9Zd0lKeU4rR21WU1c1YmZmeTc2cXdPT0M2MDB4Vk5wcjVveWhQcjVIU1ZBeVVzbEN5cEdHcDNkclV3N0ZmcG1rK3ppczUxOE5PNmd2bk0vNVAiLCJtYWMiOiJjYWQxOGFiM2JiMjZmNmI5NWI1MGViYTUxNmY5YTg2MTE2ZjAxYmJhMzhkOTY4ODM3ODJmNTVmYTY2MjM3NWE0IiwidGFnIjoiIn0%3D";
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// 🔥 دالة مضمونة لتجنب التعليق عند تحميل الصفحة
-async function safeGoto(page, url) {
-    try {
-        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await sleep(2000);
-        return true;
-    } catch (e) {
-        console.log(`⚠️ مشكلة في فتح: ${url}، جاري إعادة المحاولة...`);
-        await sleep(3000);
-        return false;
-    }
-}
 
 function parseCooldownToSeconds(str) {
     if (!str) return 0;
@@ -39,7 +24,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
+  console.log("🚀 البوت شغال (تسجيل دخول مباشر - واشنطن ↔ سانت لويس)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -47,24 +32,21 @@ function parseCooldownToSeconds(str) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(30000);
+  page.setDefaultTimeout(15000);
 
   try {
-    if (COOKIE_VALUE) {
-        await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
-        console.log("✅ دخلنا بالكوكيز");
-    } else {
-        await safeGoto(page, 'https://www.project-dark.co.uk/login');
-        const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-        if (inputs.length >= 2) {
-           await inputs[0].type(USERNAME);
-           await inputs[1].type(PASSWORD);
-        }
-        await page.click('button[type="submit"]').catch(() => {});
-        await sleep(5000);
-        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
+    // تسجيل الدخول المباشر
+    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(3000);
+    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+    if (inputs.length >= 2) {
+       await inputs[0].type(USERNAME);
+       await inputs[1].type(PASSWORD);
     }
+    await page.click('button[type="submit"]').catch(() => {});
+    await sleep(5000);
+    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log("✅ دخلنا بالدخول المباشر!");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
@@ -80,7 +62,7 @@ function parseCooldownToSeconds(str) {
             return null;
         });
 
-        if (!currentCity) { await safeGoto(page, 'https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
         let destCity = (currentCity === 'St. Louis' || currentCity === 'St Louis') ? 'Washington' : 'St. Louis';
 
@@ -110,7 +92,8 @@ function parseCooldownToSeconds(str) {
         
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(2000);
         continue;
       }
 
@@ -164,7 +147,8 @@ function parseCooldownToSeconds(str) {
         let waitSeconds = parseCooldownToSeconds(state.cd);
         console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
         await sleep(waitSeconds * 1000);
-        await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+        await sleep(2000);
         continue;
       }
 
@@ -191,7 +175,8 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+           await sleep(2000);
            continue;
         }
       }
@@ -219,20 +204,15 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
+           await sleep(2000);
            continue;
         }
-      }
-      
-      else {
-          console.log("⚠️ مش لاقي الصفحة، جاري إعادة المحاولة...");
-          await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
-          continue;
       }
 
     } catch (e) {
       console.log("حصل خطأ مؤقت، معيد المحاولة:", e.message);
-      await sleep(5000);
+      await sleep(15000);
     }
     await sleep(10000);
   }
