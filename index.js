@@ -24,7 +24,7 @@ function parseCooldownToSeconds(str) {
 }
 
 (async () => {
-  console.log("🚀 البوت شغال (تسجيل دخول مباشر - واشنطن ↔ سانت لويس)...");
+  console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
   const browser = await puppeteer.launch({ 
     headless: true, 
@@ -35,7 +35,6 @@ function parseCooldownToSeconds(str) {
   page.setDefaultTimeout(15000);
 
   try {
-    // تسجيل الدخول المباشر
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(3000);
     const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
@@ -45,7 +44,11 @@ function parseCooldownToSeconds(str) {
     }
     await page.click('button[type="submit"]').catch(() => {});
     await sleep(5000);
+
+    // ⏳ ننتظر ظهور الجداول في صفحة السوق قبل ما نبدأ (مهم جداً للتجربة المجانية)
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForSelector('tr', { timeout: 30000 }).catch(() => {});
+    await sleep(2000);
     console.log("✅ دخلنا بالدخول المباشر!");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -55,6 +58,7 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
+        await sleep(2000); // استنى الصفحة تتحدث
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('WASHINGTON') || body.includes('Washington')) return 'Washington';
@@ -93,11 +97,13 @@ function parseCooldownToSeconds(str) {
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('tr', { timeout: 30000 }).catch(() => {});
         await sleep(2000);
         continue;
       }
 
       // 2) لو إحنا في السوق
+      await page.waitForSelector('tr', { timeout: 30000 }).catch(() => {});
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
