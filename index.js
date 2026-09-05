@@ -11,24 +11,30 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 (async () => {
   console.log("🚀 البوت شغال (واشنطن ↔ سانت لويس)...");
   
+  // تشغيل المتصفح
   const browser = await puppeteer.launch({ 
     headless: true, 
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(30000); // زيادة المهلة لتصبح أطول
 
   try {
-    // ✅ طريقة الدخول بالكوكيز (زي ما كان شغال تمام)
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-        // ⏳ استنى 5 ثواني عشان الصفحة والقائمة الجانبية تتحمل بالكامل
-        await sleep(5000);
+        
+        // 🔥 سر الحل: استخدام domcontentloaded بدلاً من networkidle2 (يمنع تجمد المتصفح)
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        
+        // ⏳ استنى ظهور عنصر "body" عشان نضمن إن الصفحة اتحملت
+        await page.waitForSelector('body', { timeout: 15000 });
+        await sleep(3000);
+        
         console.log("✅ دخلنا بالكوكيز");
     } else {
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await sleep(3000);
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -36,17 +42,22 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForSelector('body', { timeout: 15000 });
+        await sleep(3000);
+        console.log("✅ دخلنا بالدخول المباشر");
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
+  // بدأ الحلقة
   while (true) {
     try {
-      // 1) لو إحنا في صفحة الترافل (نفس الخطوات القديمة)
+      console.log("🔄 بفحص اللوكيشن...");
+      
+      // لو إحنا في صفحة الترافل
       if (page.url().includes('travel')) {
-        // ✅ هنا بس اللي اتعدل: يبص على سطر LOCATION فوق على الشمال ويقرأ اللي تحته
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             let lines = body.split('\n');
@@ -61,7 +72,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             return null;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' }); continue; }
+        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
 
         let destCity = (currentCity === 'St. Louis') ? 'Washington' : 'St. Louis';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -87,14 +98,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             if (travelBtn) travelBtn.click();
         });
         
-        console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
+        console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' });
+        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
+        await sleep(3000);
         continue;
       }
 
-      // 2) لو إحنا في السوق (بيع وشراء)
-      // ✅ نفس الطريقة: اقرأ LOCATION فوق على الشمال
+      // بفحص السوق
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -138,15 +149,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             }
         }
 
-        if (heldItem === null) {
-            let m = body.match(/holding (\d+) items/i);
-            hold = m ? +m[1] : 0;
-        }
-        
+        if (heldItem === null) { let m = body.match(/holding (\d+) items/i); hold = m ? +m[1] : 0; }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ لو في كولداون حقيقي، انتظر دقيقة
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
@@ -176,7 +182,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -202,7 +208,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - St. Louis'));
            if (verify) console.log("🎉 وصلنا سانت لويس!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }); }
            continue;
         }
       }
@@ -230,7 +236,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -256,7 +262,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Washington'));
            if (verify) console.log("🎉 وصلنا واشنطن!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' }); }
            continue;
         }
       }
