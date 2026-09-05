@@ -24,20 +24,13 @@ function parseCooldownToSeconds(str) {
 
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
-  
-  // ✅ الأوامر السحرية لأندرويد: no-zygote و single-process (عشان المتصفح ما يتجمدش)
+
+  // ✅ الإعدادات الصحيحة للتيرموكس (بدون أوامر التجمد)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
     protocolTimeout: 0,
-    args: [
-      '--no-sandbox', 
-      '--disable-setuid-sandbox', 
-      '--disable-dev-shm-usage', 
-      '--disable-gpu',
-      '--no-zygote', 
-      '--single-process'
-    ] 
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
   const page = await browser.newPage();
@@ -154,7 +147,7 @@ function parseCooldownToSeconds(str) {
         continue;
       }
 
-      // ✅ شيكاغو (يشتري Human Beings ويبيع Endangered exotic animals)
+      // ✅ شيكاغو: شراء Human Beings وبيع Endangered exotic animals
       if (state.loc === "Chicago") {
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 شيكاغو - بيع Endangered exotic animals");
@@ -183,7 +176,7 @@ function parseCooldownToSeconds(str) {
         }
       }
 
-      // ✅ سانت لويس (يشتري Endangered exotic animals ويبيع Human Beings)
+      // ✅ سانت لويس: شراء Endangered exotic animals وبيع Human Beings
       else if (state.loc === "St. Louis") {
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 سانت لويس - بيع Human Beings");
