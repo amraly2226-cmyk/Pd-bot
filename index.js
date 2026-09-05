@@ -6,12 +6,19 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// حماية من التجمد: إذا استغرقت العملية أكثر من 20 ثانية، قم بإلغائها وإعادة المحاولة
-function withTimeout(promise, ms) {
-    return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), ms))
-    ]);
+// 🔥 دالة السفر الآمنة: تمنع التجمد لو الموقع علق، وبتعيد المحاولة
+async function safeGoto(page, url) {
+    for (let i = 0; i < 3; i++) {
+        try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await sleep(3000);
+            return true;
+        } catch (e) {
+            console.log(`⚠️ محاولة فتح الصفحة ${i + 1} فشلت، إعادة المحاولة...`);
+            await sleep(3000);
+        }
+    }
+    return false;
 }
 
 function parseCooldownToSeconds(str) {
@@ -33,12 +40,12 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
 
-  // إعداد آمن ضد التجمد (120 ثانية بدلاً من 0)
+  // إعدادات آمنة للموبايل (بدون تجميد)
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 120000,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
+    protocolTimeout: 0, // لا مهلة نهائياً
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--no-zygote', '--single-process'] 
   });
 
   const page = await browser.newPage();
@@ -47,9 +54,8 @@ function parseCooldownToSeconds(str) {
 
   try {
     await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-    await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForSelector('tr', { timeout: 30000 }); // ننتظر ظهور الجدول
-    await sleep(2000);
+    // استخدام الدالة الآمنة بدلاً من go العادي
+    await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
     console.log("✅ دخلنا بالكوكيز");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -59,14 +65,14 @@ function parseCooldownToSeconds(str) {
     try {
       // 1) لو إحنا في صفحة السفر
       if (page.url().includes('travel')) {
-        let currentCity = await withTimeout(page.evaluate(() => {
+        let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             if (body.includes('CHICAGO') || body.includes('Chicago')) return 'Chicago';
             if (body.includes('ST LOUIS') || body.includes('St. Louis') || body.includes('St Louis')) return 'St. Louis';
             return null;
-        }), 20000);
+        });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' }); await sleep(2000); continue; }
+        if (!currentCity) { await safeGoto(page, 'https://project-dark.co.uk/travel'); continue; }
 
         let destCity = (currentCity === 'St. Louis' || currentCity === 'St Louis') ? 'Chicago' : 'St. Louis';
 
@@ -86,7 +92,7 @@ function parseCooldownToSeconds(str) {
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
         
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
@@ -96,13 +102,12 @@ function parseCooldownToSeconds(str) {
         
         console.log(`✈️ تم الضغط على زر السفر إلى ${destCity}`);
         await sleep(7000); 
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded' });
-        await sleep(2000);
+        await safeGoto(page, 'https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
-      // 2) لو إحنا في السوق (بيع وشراء) - محمية من التجمد
-      let state = await withTimeout(page.evaluate((items) => {
+      // 2) لو إحنا في السوق (بيع وشراء)
+      let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
         let cooldownStr = null;
@@ -144,15 +149,14 @@ function parseCooldownToSeconds(str) {
         }
         
         return { loc, cd: cooldownStr, hold, heldItem };
-      }, ITEMS), 20000);
+      }, ITEMS);
 
       // قراءة الكولداون
       if (state.cd) {
         let waitSeconds = parseCooldownToSeconds(state.cd);
         console.log(`⏳ في كولداون: ${state.cd} - هستنى ${Math.floor(waitSeconds / 60)} دقيقة و ${waitSeconds % 60} ثانية...`);
         await sleep(waitSeconds * 1000);
-        await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
-        await sleep(2000);
+        await safeGoto(page, 'https://www.project-dark.co.uk/travel');
         continue;
       }
 
@@ -179,8 +183,7 @@ function parseCooldownToSeconds(str) {
         
         if (state.heldItem === "Human beings" && state.hold > 0) {
            console.log("📍 شيكاغو - رايح سانت لويس");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
-           await sleep(2000);
+           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
            continue;
         }
       }
@@ -208,8 +211,7 @@ function parseCooldownToSeconds(str) {
 
         if (state.heldItem === "Endangered exotic animals" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح شيكاغو");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'domcontentloaded' });
-           await sleep(2000);
+           await safeGoto(page, 'https://www.project-dark.co.uk/travel');
            continue;
         }
       }
