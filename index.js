@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer');
 
-// ===== إعدادات تليجرام (تم التعديل ببياناتك) =====
+// ===== إعدادات تليجرام (بتاعتك) =====
 const TELEGRAM_BOT_TOKEN = '8976364574:AExVRNcJgLrGKrwWavI3gLfBk6C-RDAirM';
 const TELEGRAM_CHAT_ID = '7310333338';
 
@@ -84,7 +84,7 @@ async function travelTo(page, destination) {
 
 async function sellItem(page, itemName) {
   try {
-    const sellBtn = await page.waitForXPath(`//tr[contains(., '${itemName}')]//button[contains(text(), 'Sell All')]`, { timeout: 10000 });
+    const sellBtn = await page.waitForXPath(`//tr[contains(., '${itemName}')]//button[contains(text(), 'Sell All')]`, { timeout: 15000 });
     await sellBtn.click();
     const confirmBtn = await page.waitForXPath("//button[contains(text(), 'SELL ALL')]", { timeout: 5000 });
     await confirmBtn.click();
@@ -102,7 +102,7 @@ async function sellItem(page, itemName) {
 
 async function buyItem(page, itemName) {
   try {
-    const maxBuyBtn = await page.waitForXPath(`//tr[contains(., '${itemName}')]//button[contains(text(), 'Max Buy')]`, { timeout: 10000 });
+    const maxBuyBtn = await page.waitForXPath(`//tr[contains(., '${itemName}')]//button[contains(text(), 'Max Buy')]`, { timeout: 15000 });
     await maxBuyBtn.click();
     await sleep(500);
     const buyBtn = await page.waitForXPath("//button[contains(text(), 'BUY MAX')]", { timeout: 5000 });
@@ -182,12 +182,14 @@ async function getState(page) {
   });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 });
-  page.setDefaultTimeout(20000);
+  page.setDefaultTimeout(30000);
 
-  // ===== التقاط رسائل الكونسول وإرسال الأخطاء =====
   page.on('console', msg => {
     const type = msg.type();
     const text = msg.text();
+    if (text.includes('font-size:0') || text.includes('transparent') || text.includes('JSHandle@')) {
+      return;
+    }
     console.log(`📢 [Console] ${type.toUpperCase()}: ${text}`);
     if (type === 'error' || type === 'warning') {
       sendTelegram(`⚠️ [${type.toUpperCase()}] ${text}`);
@@ -237,9 +239,16 @@ async function getState(page) {
 
   let retryCount = 0;
   const MAX_RETRIES = 5;
+  let loopCounter = 0;
 
   while (true) {
     try {
+      loopCounter++;
+      if (loopCounter % 10 === 0) {
+        const state = await getState(page);
+        await sendTelegram(`📊 تقرير دوري: المدينة=${state.location}, الكولداون="${state.cooldown}", يحمل=${state.holdCount}`);
+      }
+
       const currentUrl = page.url();
       if (!currentUrl.includes('blackmarket') && !currentUrl.includes('travel')) {
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle0', timeout: 30000 });
@@ -276,7 +285,6 @@ async function getState(page) {
         }
       }
 
-      // ===== سانت لويس =====
       if (state.location === 'St. Louis') {
         if (state.heldItem === 'Electronics' && state.holdCount > 0) {
           await sellItem(page, 'Electronics');
@@ -297,7 +305,6 @@ async function getState(page) {
         continue;
       }
 
-      // ===== واشنطن =====
       if (state.location === 'Washington') {
         if (state.heldItem === 'Anabolic steroid' && state.holdCount > 0) {
           await sellItem(page, 'Anabolic steroid');
