@@ -1,6 +1,7 @@
 const puppeteer = require('puppeteer-core');
 
-const COOKIE_VALUE = "eyJpdiI6IjFhYVQwdkticVk4dUhheTZlYml5YkE9PSIsInZhbHVlIjoiMWdCdW1peXpzd0lqRjFtVUxWQktrOENXeUlCVGZxTS9BL0JHdVRzWE94OGQ3Wk9Zd0lKeU4rR21WU1c1YmZmeTc2cXdPT0M2MDB4Vk5wcjVveWhQcjVIU1ZBeVVzbEN5cEdHcDNkclV3N0ZmcG1rK3ppczUxOE5PNmd2bk0vNVAiLCJtYWMiOiJjYWQxOGFiM2JiMjZmNmI5NWI1MGViYTUxNmY5YTg2MTE2ZjAxYmJhMzhkOTY4ODM3ODJmNTVmYTY2MjM3NWE0IiwidGFnIjoiIn0%3D";
+const USERNAME = 'amr.aly.2226@gmail.com'; 
+const PASSWORD = 'Gun@12345'; 
 
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 
@@ -25,23 +26,32 @@ function parseCooldownToSeconds(str) {
 (async () => {
   console.log("🚀 البوت شغال (شيكاغو ↔ سانت لويس)...");
 
-  // 🔥 إزالة protocolTimeout: 0 (الذي كان يجمّد العملية)
+  // زيادة المهلة للأمان، وإزالة أي تجميد
   const browser = await puppeteer.launch({ 
     headless: true,
     executablePath: '/data/data/com.termux/files/usr/bin/chromium-browser',
-    protocolTimeout: 60000, // 60 ثانية كحد أقصى لفتح المتصفح
+    protocolTimeout: 600000, // انتظار 10 دقائق قبل ما يعتبر فشل
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
 
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 }); 
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(60000);
 
   try {
-    await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+    // ✅ تسجيل الدخول المباشر (مفيش كوكيز خالص عشان يشتغل)
+    await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await sleep(3000);
+    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+    if (inputs.length >= 2) {
+       await inputs[0].type(USERNAME);
+       await inputs[1].type(PASSWORD);
+    }
+    await page.click('button[type="submit"]').catch(() => {});
+    await sleep(5000);
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await sleep(3000);
-    console.log("✅ دخلنا بالكوكيز");
+    console.log("✅ دخلنا بالدخول المباشر!");
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
@@ -77,7 +87,7 @@ function parseCooldownToSeconds(str) {
         await sleep(1500);
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
-        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+        await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 10000 }).catch(() => {});
         
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
@@ -92,7 +102,7 @@ function parseCooldownToSeconds(str) {
         continue;
       }
 
-      // 2) لو إحنا في السوق
+      // 2) لو إحنا في السوق (بيع وشراء)
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         let loc = null;
@@ -153,6 +163,7 @@ function parseCooldownToSeconds(str) {
            console.log("📍 شيكاغو - بيع Endangered exotic animals");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Endangered exotic animals') && r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
+           await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
            await page.evaluate(() => { const allBtns = [...document.querySelectorAll('button')]; const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); if (confirmBtn) confirmBtn.click(); });
            await sleep(3000);
            continue;
