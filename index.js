@@ -26,6 +26,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
+        
+        // 🔥 التعديل الجديد: أول حاجة نروح لصفحة اللوجين
+        console.log("🚀 الذهاب لصفحة تسجيل الدخول بالكوكيز...");
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+
+        // ⏳ استنى 10 ثواني
+        console.log("⏳ استنى 10 ثواني قبل الضغط على زر الرجوع...");
+        await sleep(10000);
+
+        // 🧭 الضغط على زر الرجوع (Back)
+        console.log("🧭 الضغط على زر الرجوع (Back)...");
+        await page.goBack().catch(() => {});
+        await sleep(2000);
+
+        // ✅ وبعد كده التوجه للبلاك ماركت
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", page.url());
     } else {
@@ -37,14 +52,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         
-        // 🔥 التعديل الجديد: استنى 10 ثواني بعد تسجيل الدخول
+        // 🔥 نفس الفكرة هنا بالظبط
         console.log("⏳ تم تسجيل الدخول، استنى 10 ثواني...");
         await sleep(10000);
-        
-        // 🔥 التعديل الجديد: الضغط على زر الرجوع (Back) في المتصفح
         console.log("🧭 الضغط على زر الرجوع (Back)...");
         await page.goBack().catch(() => {});
-        await sleep(2000); // استنى ثانيتين عشان الصفحة تثبت
+        await sleep(2000);
 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
