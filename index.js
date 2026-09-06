@@ -22,24 +22,35 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        
-        // 1) تسجيل الدخول بالكوكيز
         console.log("✅ دخلنا بالكوكيز (تم تسجيل الدخول)");
 
-        // 2) استنى 10 ثواني
-        console.log("⏳ استنى 10 ثواني...");
-        await sleep(10000);
+        // 🔥 الحل الجديد: حلقة إعادة المحاولة للدخول للداش بورد
+        let dashboardSuccess = false;
+        while (!dashboardSuccess) {
+            console.log("🚀 جاري الذهاب إلى الرابط: https://project-dark.co.uk/dashboard");
+            await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 }).catch(() => {});
 
-        // 3) اذهب للداش بورد
-        console.log("🚀 جاري الذهاب إلى الرابط: https://project-dark.co.uk/dashboard");
-        await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
-
-        // 4) هل عرفت تدخل عاليو أر إل؟
-        if (page.url().includes('dashboard')) {
-            console.log("✅ عرفت أدخل على رابط الداش بورد بنجاح! (الحالي: " + page.url() + ")");
-        } else {
-            console.log("❌ مش عارف أدخل على الداش بورد. اتوجهت لـ: " + page.url());
-            console.log("(غالباً الكوكيز منتهية أو اللعبة مقفولة)");
+            // فحص: هل الصفحة هي اللوجين؟
+            if (page.url().includes('login')) {
+                console.log("⚠️ الصفحة الحالية هي: LOGIN (مش عارف أدخل، هحاول تاني)");
+                
+                // استنى 5 ثواني
+                await sleep(5000);
+                console.log("🧭 دوس باك (المرة الأولى)...");
+                await page.goBack().catch(() => {});
+                
+                // استنى 5 ثواني تانية
+                await sleep(5000);
+                console.log("🧭 دوس باك (المرة الثانية)...");
+                await page.goBack().catch(() => {});
+                
+                // استنى 5 ثواني وبعدين كرر المحاولة
+                await sleep(5000);
+                continue; // هيرجع تاني للـ while ويعيد الـ goto للداش بورد
+            } else {
+                console.log("✅ عرفت أدخل على الداش بورد بنجاح! (الحالي: " + page.url() + ")");
+                dashboardSuccess = true; // نكسر الحلقة ونكمل
+            }
         }
         
     } else {
@@ -61,7 +72,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     try {
       // (منطق السفر والبيع والشراء كما هو بالظبط)
       if (page.url().includes('travel')) {
-        // ... (نفس كود السفر السابق)
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
             let m = body.match(/Location\s*\n\s*(St Louis|Washington)/i);
@@ -170,7 +180,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // لو اللوكيشن null، اطبع التحذير وبعدين كمّل
+      // ✅ لو لسه على اللوجين، ارجع للحلقة الأولى عشان تعيد المحاولة
+      if (page.url().includes('login')) {
+          console.log("⚠️ الصفحة الحالية: LOGIN (هنايقف ويرجع يحاول يدخل داش بورد)");
+          await sleep(5000);
+          await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2' }).catch(() => {});
+          continue;
+      }
+
+      // لو اللوكيشن null، اطبع التحذير
       if (!state.loc) {
           console.log("⚠️ مش لاقي اللوكيشن. الرابط الحالي:", page.url());
           await sleep(5000);
@@ -183,11 +201,11 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         continue;
       }
 
-      // الباقي (بيع وشراء سانت لويس وواشنطن) كما هو في الكود السابق
+      // الباقي (بيع وشراء سانت لويس وواشنطن)
       if (state.loc === "St Louis") {
-        // ... (كود سانت لويس)
+        // ... (كود سانت لويس كما هو في ملفك السابق)
       } else if (state.loc === "Washington") {
-        // ... (كود واشنطن)
+        // ... (كود واشنطن كما هو في ملفك السابق)
       } else {
           console.log("📍 المدينة الحالية هي:", state.loc);
           await sleep(5000);
