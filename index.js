@@ -22,10 +22,17 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
+        
+        // 🔥 الدخول للداش بورد أولاً
+        await page.goto('https://www.project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز ووصلنا للداش بورد:", page.url());
+        
+        // ⏳ استنى 10 ثواني بعد الوصول للداش بورد
+        console.log("⏳ استنى 10 ثواني عشان الداش بورد تثبت...");
+        await sleep(10000);
+        
     } else {
-        await page.goto('https://project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
@@ -33,7 +40,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         await sleep(5000);
-        await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://www.project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالحساب ووصلنا للداش بورد");
     }
   } catch (e) {
@@ -55,7 +62,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             return null;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await page.goto('https://www.project-dark.co.uk/travel'); continue; }
 
         let destCity = (currentCity === 'Washington') ? 'St Louis' : 'Washington';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -85,7 +92,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
         await sleep(7000);
-        await page.goto('https://project-dark.co.uk/blackmarket');
+        await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
@@ -187,7 +194,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
            console.log("📍 سانت لويس - رايح واشنطن");
-           await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -213,7 +220,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Washington'));
            if (verify) console.log("🎉 وصلنا واشنطن!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
@@ -241,7 +248,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 واشنطن - رايح سانت لويس");
-           await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
            
            let travelCd = await page.evaluate(() => {
@@ -267,7 +274,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - St Louis'));
            if (verify) console.log("🎉 وصلنا سانت لويس!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
