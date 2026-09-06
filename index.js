@@ -1,6 +1,4 @@
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-puppeteer.use(StealthPlugin());
+const puppeteer = require('puppeteer');
 
 const USERNAME = process.env.PD_USER;
 const PASSWORD = process.env.PD_PASS;
@@ -18,109 +16,48 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] 
   });
   const page = await browser.newPage();
-  
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   await page.setViewport({ width: 1920, height: 1080 }); 
   page.setDefaultTimeout(15000);
 
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        
-        console.log("🚀 الذهاب لصفحة تسجيل الدخول بالكوكيز...");
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
-
-        // ⏳ استنى 10 ثواني أولاً
-        console.log("⏳ استنى 10 ثواني...");
-        await sleep(10000);
-
-        // 🔄 دوس ريفريش الأول واقرا الصفحة
-        console.log("🔄 الضغط على زر التحديث (Refresh)...");
-        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
-        await sleep(3000); // مهلة بسيطة للقراءة
-
-        // 🔍 قراءة الصفحة الحالية (هل فيها Location؟)
-        let currentBodyText = await page.evaluate(() => document.body.innerText).catch(() => "");
-        let readLocation = null;
-        if (currentBodyText.includes('Location')) {
-             let lines = currentBodyText.split('\n');
-             for (let i = 0; i < lines.length; i++) {
-                 if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                     for (let j = i + 1; j < lines.length; j++) {
-                         if (lines[j].trim()) { readLocation = lines[j].trim(); break; }
-                     }
-                     break;
-                 }
-             }
-             if (readLocation) {
-                 console.log("✅ قرأت اللوكيشن من بعد التحديث:", readLocation);
-                 // لو لقيت اللوكيشن خلاص، اكمل على طول
-                 await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-             }
-        }
-
-        // لو ملقتش اللوكيشن بعد التحديث، استنى 10 ثواني تانية وبعدين دوس باك
-        if (!readLocation) {
-             console.log("❌ ملقتش اللوكيشن من التحديث. استنى 10 ثواني تانية وبعدين دوس باك...");
-             await sleep(10000);
-             
-             // 🧭 دوس باك
-             console.log("🧭 الضغط على زر الرجوع (Back)...");
-             await page.goBack().catch(() => {});
-             await sleep(2000);
-
-             // بعد الباك، استنى 10 ثواني كمان
-             console.log("⏳ استنى 10 ثواني بعد الباك...");
-             await sleep(10000);
-        }
-
-        // ✅ وبعد كده التوجه للبلاك ماركت
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-        console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", page.url());
+        await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log("✅ دخلنا بالكوكيز ووصلنا للداش بورد:", page.url());
     } else {
-        // (لو بيستخدم اليوزر والباسورد، نفس اللوجيك ده بالظبط)
-        await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        await page.goto('https://project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
            await inputs[0].type(USERNAME);
            await inputs[1].type(PASSWORD);
         }
         await page.click('button[type="submit"]').catch(() => {});
-        
-        console.log("⏳ تم تسجيل الدخول، استنى 10 ثواني...");
-        await sleep(10000);
-        console.log("🔄 دوس ريفريش...");
-        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
-        
-        console.log("🧭 دوس باك...");
-        await page.goBack().catch(() => {});
-        await sleep(10000);
-
-        await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+        await sleep(5000);
+        await page.goto('https://project-dark.co.uk/dashboard', { waitUntil: 'networkidle2', timeout: 60000 });
+        console.log("✅ دخلنا بالحساب ووصلنا للداش بورد");
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
-  // هنا يبدأ يقرأ اللوكيشن من فوق ويفضل شغال في نفس الصفحة
   while (true) {
     try {
       // ═══════════════════════════════════════════════════════════════
-      // 1) لو إحنا في صفحة الترافل (نفذ السفر بالطريقة الصح)
+      // 1) لو إحنا في صفحة الترافل (السفر الجديد: سانت لويس <-> واشنطن)
       // ═══════════════════════════════════════════════════════════════
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            let m = body.match(/Location\s*\n\s*(Cairo|Tokyo)/i);
+            let m = body.match(/Location\s*\n\s*(St Louis|Washington)/i);
             if (m) return m[1];
-            if (body.includes('Black Market - Tokyo')) return 'Tokyo';
-            if (body.includes('Black Market - Cairo')) return 'Cairo';
+            if (body.includes('Black Market - Washington')) return 'Washington';
+            if (body.includes('Black Market - St Louis')) return 'St Louis';
             return null;
         });
 
         if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
 
-        let destCity = (currentCity === 'Tokyo') ? 'Cairo' : 'Tokyo';
+        let destCity = (currentCity === 'Washington') ? 'St Louis' : 'Washington';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
@@ -128,7 +65,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
         await page.evaluate((city) => {
             let elements = [...document.querySelectorAll('div, span, a')];
-            let textEl = elements.find(el => el.innerText.trim() === city && el.offsetParent !== null);
+            let textEl = elements.find(el => el.innerText.trim().toUpperCase() === city.toUpperCase() && el.offsetParent !== null);
             if (textEl) {
                 let card = textEl.closest('div');
                 if (card && card.offsetWidth > 100) card.click();
@@ -140,7 +77,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
         
         await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
@@ -149,20 +85,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
         await sleep(7000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket');
+        await page.goto('https://project-dark.co.uk/blackmarket');
         continue;
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 2) قراءة المدينة من فوق يسار (PLAYER INFO -> LOCATION)
+      // 2) لو إحنا في السوق (بيع وشراء - المدن الجديدة)
       // ═══════════════════════════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
-        
-        if (body.includes('Game Closed')) {
-            return { loc: "GAME_CLOSED", cd: null, hold: 0, heldItem: null };
-        }
-
         let loc = null;
         let cooldownStr = null;
         
@@ -175,9 +106,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
                 break;
             }
         }
-        if (loc && loc.includes('Cairo')) loc = 'Cairo';
-        else if (loc && loc.includes('Tokyo')) loc = 'Tokyo';
-        else if (loc && loc.includes('Washington')) loc = 'Washington';
+
+        // ✅ المدن الجديدة
+        if (loc && loc.includes('Washington')) loc = 'Washington';
+        else if (loc && loc.includes('St Louis')) loc = 'St Louis';
+        else if (loc && loc.includes('Atlanta')) loc = 'Atlanta';
+        else if (loc && loc.includes('Boston')) loc = 'Boston';
+        else if (loc && loc.includes('Chicago')) loc = 'Chicago';
+        else if (loc && loc.includes('Dallas')) loc = 'Dallas';
+        else if (loc && loc.includes('Denver')) loc = 'Denver';
+        else if (loc && loc.includes('Los Angeles')) loc = 'Los Angeles';
+        else if (loc && loc.includes('New York')) loc = 'New York';
+        else if (loc && loc.includes('Phoenix')) loc = 'Phoenix';
+        else if (loc && loc.includes('San Francisco')) loc = 'San Francisco';
+        else if (loc && loc.includes('Seattle')) loc = 'Seattle';
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -215,30 +157,17 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      if (state.loc === "GAME_CLOSED") {
-          console.log("🌙 اللعبة مقفولة حالياً، هستنى 5 دقايق وأحاول تاني...");
-          await sleep(300000);
-          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }).catch(() => {});
-          continue;
-      }
-
-      // 🔥 هنا يقولك هل قريت اللوكيشن ولا لأ
-      if (state.loc) {
-          console.log("✅ تم قراءة اللوكيشن بنجاح، المدينة هي:", state.loc);
-      } else {
-          console.log("❌ لسه مش قادر أقرأ اللوكيشن، بجرب تاني...");
-      }
-      
+      // ✅ لو في كولداون
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
         await sleep(60000);
         continue;
       }
 
-      // باقي عمليات البيع والشراء (نفس كودك بالظبط)
-      if (state.loc === "Cairo") {
+      // ✅ سانت لويس (بدل كايرو): بيع الإلكترونيكس أو شراء الأنابوليك
+      if (state.loc === "St Louis") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
-           console.log("📍 كايرو - بيع الإلكترونيكس");
+           console.log("📍 سانت لويس - بيع الإلكترونيكس");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
@@ -246,47 +175,53 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
+        
         if (state.hold === 0) {
-           console.log("📍 كايرو - شراء أنابوليك سترويدز");
+           console.log("📍 سانت لويس - شراء أنابوليك سترويدز");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(3000);
            continue;
         }
+        
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 كايرو - رايح طوكيو");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           console.log("📍 سانت لويس - رايح واشنطن");
+           await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
+           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
+           
            if (travelCd) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
                await sleep(60000);
                continue;
            }
+
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
-           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'TOKYO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim().toUpperCase() === 'WASHINGTON' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
-           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Tokyo'));
-           if (verify) console.log("🎉 وصلنا طوكيو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Washington'));
+           if (verify) console.log("🎉 وصلنا واشنطن!");
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
 
-      else if (state.loc === "Tokyo") {
+      // ✅ واشنطن (بدل طوكيو): بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لسانت لويس
+      else if (state.loc === "Washington") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 طوكيو - بيع الأنابوليك سترويدز");
+           console.log("📍 واشنطن - بيع الأنابوليك سترويدز");
            await page.evaluate(() => { const rows = [...document.querySelectorAll('tr')]; for (let r of rows) { const text = r.innerText; if (text.includes('Anabolic steroid') && text.includes('Sell All') && !text.includes('Confirm')) { const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
@@ -294,46 +229,52 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000);
            continue;
         }
+        
         if (state.hold === 0) {
-           console.log("📍 طوكيو - شراء إلكترونيكس");
+           console.log("📍 واشنطن - شراء إلكترونيكس");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Electronics') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
            await sleep(3000);
            continue;
         }
+
         if (state.heldItem === "Electronics" && state.hold > 0) {
-           console.log("📍 طوكيو - رايح كايرو (سأقرأ الكولداون أولاً)");
-           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+           console.log("📍 واشنطن - رايح سانت لويس");
+           await page.goto('https://project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
+           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
+           
            if (travelCd) {
                console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
                await sleep(60000);
                continue;
            }
+
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
-           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'CAIRO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
+           await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim().toUpperCase() === 'ST LOUIS' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
            await sleep(1500);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
            await sleep(1500);
            await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
            await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
            await sleep(5000);
-           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Cairo'));
-           if (verify) console.log("🎉 وصلنا كايرو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - St Louis'));
+           if (verify) console.log("🎉 وصلنا سانت لويس!");
+           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
       
+      // ✅ المدن الجديدة الأخرى (مقروءة فقط)
       else {
-          console.log("📍 لسه مش لاقي بيانات اللاعب، بجرب تاني...");
+          console.log("📍 المدينة الحالية هي:", state.loc);
           await sleep(5000);
           continue;
       }
