@@ -26,8 +26,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   try {
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
-        
-        // ✅ الرابط الصح هو blackmarket زي ما طلبت
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", page.url());
     } else {
@@ -38,7 +36,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await inputs[1].type(PASSWORD);
         }
         await page.click('button[type="submit"]').catch(() => {});
-        await sleep(5000);
+        
+        // 🔥 التعديل الجديد: استنى 10 ثواني بعد تسجيل الدخول
+        console.log("⏳ تم تسجيل الدخول، استنى 10 ثواني...");
+        await sleep(10000);
+        
+        // 🔥 التعديل الجديد: الضغط على زر الرجوع (Back) في المتصفح
+        console.log("🧭 الضغط على زر الرجوع (Back)...");
+        await page.goBack().catch(() => {});
+        await sleep(2000); // استنى ثانيتين عشان الصفحة تثبت
+
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
   } catch (e) {
@@ -92,7 +99,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
         await sleep(7000);
-        await page.goto('https://www.project-dark.co.uk/blackmarket'); // الرجوع لنفس صفحة البلاك ماركت
+        await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
@@ -102,7 +109,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
         
-        // لو اللعبة مقفولة
         if (body.includes('Game Closed')) {
             return { loc: "GAME_CLOSED", cd: null, hold: 0, heldItem: null };
         }
@@ -159,7 +165,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // لو مقفولة استنى
       if (state.loc === "GAME_CLOSED") {
           console.log("🌙 اللعبة مقفولة حالياً، هستنى 5 دقايق وأحاول تاني...");
           await sleep(300000);
