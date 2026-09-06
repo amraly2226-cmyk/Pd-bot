@@ -27,23 +27,58 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     if (COOKIE_VALUE) {
         await page.setCookie({ name: 'project-dark-session', value: COOKIE_VALUE, domain: '.project-dark.co.uk' });
         
-        // 🔥 التعديل الجديد: أول حاجة نروح لصفحة اللوجين
         console.log("🚀 الذهاب لصفحة تسجيل الدخول بالكوكيز...");
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
 
-        // ⏳ استنى 10 ثواني
-        console.log("⏳ استنى 10 ثواني قبل الضغط على زر الرجوع...");
+        // ⏳ استنى 10 ثواني أولاً
+        console.log("⏳ استنى 10 ثواني...");
         await sleep(10000);
 
-        // 🧭 الضغط على زر الرجوع (Back)
-        console.log("🧭 الضغط على زر الرجوع (Back)...");
-        await page.goBack().catch(() => {});
-        await sleep(2000);
+        // 🔄 دوس ريفريش الأول واقرا الصفحة
+        console.log("🔄 الضغط على زر التحديث (Refresh)...");
+        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
+        await sleep(3000); // مهلة بسيطة للقراءة
+
+        // 🔍 قراءة الصفحة الحالية (هل فيها Location؟)
+        let currentBodyText = await page.evaluate(() => document.body.innerText).catch(() => "");
+        let readLocation = null;
+        if (currentBodyText.includes('Location')) {
+             let lines = currentBodyText.split('\n');
+             for (let i = 0; i < lines.length; i++) {
+                 if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                     for (let j = i + 1; j < lines.length; j++) {
+                         if (lines[j].trim()) { readLocation = lines[j].trim(); break; }
+                     }
+                     break;
+                 }
+             }
+             if (readLocation) {
+                 console.log("✅ قرأت اللوكيشن من بعد التحديث:", readLocation);
+                 // لو لقيت اللوكيشن خلاص، اكمل على طول
+                 await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+             }
+        }
+
+        // لو ملقتش اللوكيشن بعد التحديث، استنى 10 ثواني تانية وبعدين دوس باك
+        if (!readLocation) {
+             console.log("❌ ملقتش اللوكيشن من التحديث. استنى 10 ثواني تانية وبعدين دوس باك...");
+             await sleep(10000);
+             
+             // 🧭 دوس باك
+             console.log("🧭 الضغط على زر الرجوع (Back)...");
+             await page.goBack().catch(() => {});
+             await sleep(2000);
+
+             // بعد الباك، استنى 10 ثواني كمان
+             console.log("⏳ استنى 10 ثواني بعد الباك...");
+             await sleep(10000);
+        }
 
         // ✅ وبعد كده التوجه للبلاك ماركت
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز ووصلنا للبلاك ماركت:", page.url());
     } else {
+        // (لو بيستخدم اليوزر والباسورد، نفس اللوجيك ده بالظبط)
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
@@ -52,12 +87,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         await page.click('button[type="submit"]').catch(() => {});
         
-        // 🔥 نفس الفكرة هنا بالظبط
         console.log("⏳ تم تسجيل الدخول، استنى 10 ثواني...");
         await sleep(10000);
-        console.log("🧭 الضغط على زر الرجوع (Back)...");
+        console.log("🔄 دوس ريفريش...");
+        await page.reload({ waitUntil: 'networkidle2', timeout: 60000 });
+        
+        console.log("🧭 دوس باك...");
         await page.goBack().catch(() => {});
-        await sleep(2000);
+        await sleep(10000);
 
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
@@ -185,7 +222,12 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           continue;
       }
 
-      console.log("📍 المدينة الحالية من فوق يسار:", state.loc);
+      // 🔥 هنا يقولك هل قريت اللوكيشن ولا لأ
+      if (state.loc) {
+          console.log("✅ تم قراءة اللوكيشن بنجاح، المدينة هي:", state.loc);
+      } else {
+          console.log("❌ لسه مش قادر أقرأ اللوكيشن، بجرب تاني...");
+      }
       
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
