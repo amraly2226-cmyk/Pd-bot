@@ -5,11 +5,12 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "npx puppeteer browsers install chrome"
+    "postinstall": "PUPPETEER_PRODUCT=firefox npx puppeteer browsers install firefox"
   },
   "dependencies": {
-    "puppeteer": "^23.0.0",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
-  }
+    "puppeteer": "^23.0.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }
