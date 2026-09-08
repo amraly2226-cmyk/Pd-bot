@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer');
 
-// ⬅️ بيانات الدخول (مكتوبة هنا في السكربت نفسه)
+// ⬅️ بيانات الدخول
 const USERNAME = 'amr.aly.2226@gmail.com'; 
 const PASSWORD = 'Gun@12345';
 
@@ -20,33 +20,77 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(15000);
 
   try {
-    // ✅ الدخول دائمًا باليوزرنيم والباسورد
-    console.log("🔐 جاري الدخول باليوزرنيم والباسورد...");
+    console.log("🔐 جاري فتح صفحة الدخول...");
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
     
-    // كتابة البيانات
+    // ⭐ الخطوة 1: انتظار ظهور مربع التحقق أو علامة الصح
+    console.log("⏳ في انتظار ظهور مربع التحقق (علامة الصح) ...");
+    let verified = false;
+    try {
+        // انتظر ظهور أي عنصر يحوي ✓ أو "Success!" أو "CLOUDFLARE" أو مربع check
+        await page.waitForFunction(() => {
+            const body = document.body.innerText;
+            // البحث عن علامة الصح أو النص الدال على اكتمال التحقق
+            if (body.includes('✓') || body.includes('Success!') || body.includes('CLOUDFLARE')) {
+                return true;
+            }
+            // البحث عن مربع اختيار (checkbox) أو عنصر يشبهه
+            const checkboxes = document.querySelectorAll('input[type="checkbox"], [role="checkbox"]');
+            for (let cb of checkboxes) {
+                if (cb.offsetParent !== null && (cb.checked || cb.getAttribute('aria-checked') === 'true')) {
+                    return true;
+                }
+            }
+            return false;
+        }, { timeout: 60000 });
+        console.log("✅ تم اكتشاف اكتمال التحقق (ظهرت العلامة أو تم تفعيل المربع)");
+        verified = true;
+    } catch (e) {
+        console.log("⚠️ لم تظهر العلامة تلقائياً، نحاول النقر على مربع التحقق إن وجد...");
+        // محاولة النقر على مربع التحقق (إذا كان موجوداً)
+        const clicked = await page.evaluate(() => {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"], [role="checkbox"]');
+            for (let cb of checkboxes) {
+                if (cb.offsetParent !== null && !cb.checked && cb.getAttribute('aria-checked') !== 'true') {
+                    cb.click();
+                    return true;
+                }
+            }
+            return false;
+        });
+        if (clicked) {
+            console.log("✅ تم النقر على مربع التحقق، ننتظر ثانية...");
+            await sleep(1000);
+            // نتحقق مرة أخرى من ظهور العلامة
+            const recheck = await page.evaluate(() => {
+                const body = document.body.innerText;
+                return body.includes('✓') || body.includes('Success!') || body.includes('CLOUDFLARE');
+            });
+            if (recheck) {
+                console.log("✅ أصبحت العلامة ظاهرة الآن");
+                verified = true;
+            } else {
+                console.log("⚠️ ما زالت العلامة غير ظاهرة، لكننا سنكمل...");
+            }
+        } else {
+            console.log("⚠️ لم نجد مربع تحقق للنقر عليه، سنكمل على أي حال...");
+        }
+    }
+
+    // ⭐ الخطوة 2: كتابة البيانات (إن لم تكن مكتوبة بالفعل)
+    console.log("✍️ جاري كتابة اليوزرنيم والباسورد...");
     const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
     if (inputs.length >= 2) {
+        // التأكد من أن الحقول فارغة أو نكتب فوقها
         await inputs[0].click({ clickCount: 3 });
         await inputs[0].type(USERNAME);
         await inputs[1].click({ clickCount: 3 });
         await inputs[1].type(PASSWORD);
     }
     console.log("✅ تم كتابة البيانات");
-    
-    // انتظار ظهور علامة الصح (✓) أو "Success!" أو "CLOUDFLARE"
-    console.log("⏳ في انتظار اكتمال التحقق (علامة الصح) ...");
-    try {
-        await page.waitForFunction(() => {
-            const body = document.body.innerText;
-            return body.includes('✓') || body.includes('Success!') || body.includes('CLOUDFLARE');
-        }, { timeout: 60000 });
-        console.log("✅ تم اكتشاف اكتمال التحقق (ظهرت العلامة)");
-    } catch (e) {
-        console.log("⚠️ لم تظهر العلامة خلال 60 ثانية، سنضغط Login على أي حال...");
-    }
-    
-    // الضغط على زر Login
+
+    // ⭐ الخطوة 3: الضغط على Login
+    console.log("🔑 جاري الضغط على Login...");
     await page.click('button[type="submit"]').catch(async () => {
         await page.evaluate(() => {
             const btns = [...document.querySelectorAll('button, input[type="submit"]')];
@@ -58,16 +102,24 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         });
     });
     console.log("✅ تم الضغط على Login");
-    
+
+    // انتظار التوجيه إلى البلاك ماركت
     await sleep(5000);
-    // التوجه إلى البلاك ماركت
+    console.log("🚀 جاري التوجه إلى البلاك ماركت...");
     await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-    
+
     // انتظار ظهور اسم المدينة (من أي مصدر)
-    await page.waitForFunction(() => {
-        const body = document.body.innerText;
-        return body.includes('Location') || body.includes('Black Market -');
-    }, { timeout: 30000 }).catch(() => console.log("⚠️ لم نجد المدينة، لكن نكمل"));
+    try {
+        await page.waitForFunction(() => {
+            const body = document.body.innerText;
+            return body.includes('Location') || body.includes('Black Market -') || body.includes('Los Angeles') || body.includes('San Francisco');
+        }, { timeout: 30000 });
+        console.log("✅ تم تحميل البلاك ماركت بنجاح");
+    } catch (e) {
+        console.log("⚠️ لم نجد المدينة بعد الدخول، نعيد تحميل الصفحة...");
+        await page.reload({ waitUntil: 'networkidle2' });
+        await sleep(5000);
+    }
 
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
@@ -82,13 +134,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
             let body = document.body.innerText;
-            // حاول من Black Market
             let match = body.match(/Black Market - (Los Angeles|San Francisco)/i);
             if (match) return match[1];
-            // حاول من Location
             let locMatch = body.match(/Location\s*\n\s*(Los Angeles|San Francisco)/i);
             if (locMatch) return locMatch[1];
-            // بحث عام
             if (body.includes('Los Angeles')) return 'Los Angeles';
             if (body.includes('San Francisco')) return 'San Francisco';
             return null;
@@ -138,7 +187,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         await page.waitForFunction(() => {
             const body = document.body.innerText;
-            return body.includes('Location') || body.includes('Black Market -');
+            return body.includes('Location') || body.includes('Black Market -') || body.includes('Los Angeles') || body.includes('San Francisco');
         }, { timeout: 20000 }).catch(() => console.log("⚠️ لم نجد المدينة بعد السفر"));
         continue;
       }
