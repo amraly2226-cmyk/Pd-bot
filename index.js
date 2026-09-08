@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer');
 
+// ⬅️ بيانات الدخول (مكتوبة هنا في السكربت نفسه)
 const USERNAME = 'amr.aly.2226@gmail.com'; 
 const PASSWORD = 'Gun@12345';
 const COOKIE_VALUE = process.env.PD_COOKIE || "";
@@ -25,24 +26,58 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
         console.log("✅ دخلنا بالكوكيز");
     } else {
+        // 1. فتح صفحة الدخول
         await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
+        
+        // 2. كتابة اليوزرنيم والباسورد (مع مسح أي نص مسبق)
         const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
         if (inputs.length >= 2) {
-           await inputs[0].type(USERNAME);
-           await inputs[1].type(PASSWORD);
+            await inputs[0].click({ clickCount: 3 }); // تحديد الكل
+            await inputs[0].type(USERNAME);
+            await inputs[1].click({ clickCount: 3 });
+            await inputs[1].type(PASSWORD);
         }
-        await page.click('button[type="submit"]').catch(() => {});
+        console.log("✅ تم كتابة البيانات");
+        
+        // 3. انتظار ظهور علامة الصح (✓) أو "Success!" أو "CLOUDFLARE"
+        console.log("⏳ في انتظار اكتمال التحقق (علامة الصح) ...");
+        try {
+            await page.waitForFunction(() => {
+                const body = document.body.innerText;
+                return body.includes('✓') || body.includes('Success!') || body.includes('CLOUDFLARE');
+            }, { timeout: 60000 });
+            console.log("✅ تم اكتشاف اكتمال التحقق (ظهرت العلامة)");
+        } catch (e) {
+            console.log("⚠️ لم تظهر العلامة خلال 60 ثانية، سنضغط Login على أي حال...");
+        }
+        
+        // 4. الضغط على زر Login
+        await page.click('button[type="submit"]').catch(async () => {
+            // بديل: البحث عن أي زر/إدخال يحتوي على "Login"
+            await page.evaluate(() => {
+                const btns = [...document.querySelectorAll('button, input[type="submit"]')];
+                const loginBtn = btns.find(b => 
+                    b.innerText?.toLowerCase().includes('login') || 
+                    b.value?.toLowerCase().includes('login')
+                );
+                if (loginBtn) loginBtn.click();
+            });
+        });
+        console.log("✅ تم الضغط على Login بعد التحقق");
+        
         await sleep(5000);
+        // 5. التوجه إلى السوق
         await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
     }
   } catch (e) {
     console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
+  // ========== باقي السكربت (التداول والسفر) ==========
   while (true) {
     try {
       // ═══════════════════════════════════════════════════════════════
-      // 1) لو إحنا في صفحة الترافل (نفذ السفر بالطريقة الصح 100%)
+      // 1) لو إحنا في صفحة الترافل
       // ═══════════════════════════════════════════════════════════════
       if (page.url().includes('travel')) {
         let currentCity = await page.evaluate(() => {
@@ -59,11 +94,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let destCity = (currentCity === 'Los Angeles') ? 'San Francisco' : 'Los Angeles';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
 
-        // 1) اختيار جرايد فيو
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
         await sleep(1500);
 
-        // 2) اختيار البلد من البطاقة (نبحث عن النص الكبير بالحروف الكبيرة)
         await page.evaluate((city) => {
             let cityUpper = city.toUpperCase();
             let elements = [...document.querySelectorAll('div, span, a')];
@@ -76,27 +109,22 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }, destCity);
         await sleep(1500);
 
-        // 3) الضغط على Travel to Selected Location
         await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
-        
-        // 4) انتظار ظهور البوباب (Are you sure)
         await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
-
-        // ⚡ الخطوة الأهم: البحث عن زر TRAVEL في النافذة والضغط عليه
         await page.evaluate(() => {
             let allBtns = [...document.querySelectorAll('button')];
             let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
             if (travelBtn) travelBtn.click();
         });
         
-        console.log(`✈️ تم الضغط على زر TRAVEL في النافذة لـ ${destCity}`);
-        await sleep(7000); // انتظار تحميل المدينة الجديدة
+        console.log(`✈️ تم الضغط على TRAVEL لـ ${destCity}`);
+        await sleep(7000);
         await page.goto('https://www.project-dark.co.uk/blackmarket');
         continue;
       }
 
       // ═══════════════════════════════════════════════════════════════
-      // 2) لو إحنا في السوق (بيع وشراء)
+      // 2) السوق
       // ═══════════════════════════════════════════════════════════════
       let state = await page.evaluate((items) => {
         let body = document.body.innerText;
@@ -151,14 +179,13 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
 
-      // ✅ لو في كولداون حقيقي، انتظر
       if (state.cd) {
-        console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
+        console.log(`⏳ كولداون: ${state.cd} - هستنى دقيقة...`);
         await sleep(60000);
         continue;
       }
 
-      // ✅ سان فرانسيسكو: بيع الإلكترونيكس أو شراء الأنابوليك
+      // San Francisco
       if (state.loc === "San Francisco") {
         if (state.heldItem === "Electronics" && state.hold > 0) {
            console.log("📍 سان فرانسيسكو - بيع الإلكترونيكس");
@@ -171,7 +198,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         if (state.hold === 0) {
-           console.log("📍 سان فرانسيسكو - شراء أنابوليك سترويدز");
+           console.log("📍 سان فرانسيسكو - شراء أنابوليك");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Anabolic steroid') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
            await sleep(1000);
            await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); if (btn) btn.click(); });
@@ -180,22 +207,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
         
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 سان فرانسيسكو - رايح لوس أنجلوس");
+           console.log("📍 سان فرانسيسكو → رايح لوس أنجلوس");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
-           
-           if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
-
+           if (travelCd) { console.log(`⏳ كولداون سفر: ${travelCd}`); await sleep(60000); continue; }
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'LOS ANGELES' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -207,15 +227,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - Los Angeles'));
            if (verify) console.log("🎉 وصلنا لوس أنجلوس!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ مشكلة، نرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
 
-      // ✅ لوس أنجلوس: بيع الأنابوليك، أو شراء الإلكترونيكس، أو السفر لسان فرانسيسكو
+      // Los Angeles
       else if (state.loc === "Los Angeles") {
         if (state.heldItem === "Anabolic steroid" && state.hold > 0) {
-           console.log("📍 لوس أنجلوس - بيع الأنابوليك سترويدز");
+           console.log("📍 لوس أنجلوس - بيع الأنابوليك");
            await page.evaluate(() => { const rows = [...document.querySelectorAll('tr')]; for (let r of rows) { const text = r.innerText; if (text.includes('Anabolic steroid') && text.includes('Sell All') && !text.includes('Confirm')) { const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
            await sleep(2000);
            await page.waitForFunction(() => document.body.innerText.includes('Confirm Sell All'), { timeout: 5000 }).catch(() => {});
@@ -234,22 +254,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
 
         if (state.heldItem === "Electronics" && state.hold > 0) {
-           console.log("📍 لوس أنجلوس - رايح سان فرانسيسكو");
+           console.log("📍 لوس أنجلوس → رايح سان فرانسيسكو");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
            await sleep(2500);
-           
            let travelCd = await page.evaluate(() => {
                let body = document.body.innerText;
                let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
                return cdMatch ? cdMatch[1] : null;
            });
-           
-           if (travelCd) {
-               console.log(`⏳ لقيت كولداون في السفر: ${travelCd} - هستنى دقيقة...`);
-               await sleep(60000);
-               continue;
-           }
-
+           if (travelCd) { console.log(`⏳ كولداون سفر: ${travelCd}`); await sleep(60000); continue; }
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => { let cards = [...document.querySelectorAll('div')]; let target = cards.find(el => el.innerText.trim() === 'SAN FRANCISCO' && el.offsetWidth > 150 && el.offsetHeight > 50); if (target) target.click(); });
@@ -261,7 +274,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(5000);
            let verify = await page.evaluate(() => document.body.innerText.includes('Black Market - San Francisco'));
            if (verify) console.log("🎉 وصلنا سان فرانسيسكو!");
-           else { console.log("⚠️ حصلت مشكلة، هنرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
+           else { console.log("⚠️ مشكلة، نرجع للسوق"); await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2' }); }
            continue;
         }
       }
