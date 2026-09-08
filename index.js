@@ -15,7 +15,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 (async () => {
   console.log("🚀 البوت شغال...");
 
-  // ✅ تشغيل المتصفح (headless: true مناسب للخوادم، لكن يمكنك جعله false للتصحيح)
+  // ✅ تشغيل المتصفح (headless: true مناسب للخوادم)
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
@@ -29,21 +29,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     console.log("🔐 جاري فتح صفحة الدخول...");
     await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
 
-    // =================== الخطوة 2: انتظار ظهور حقول الإدخال ===================
-    await page.waitForSelector('input[type="text"], input[type="email"], input[type="password"]', { timeout: 30000 });
-
-    // =================== الخطوة 3: كتابة البيانات ===================
-    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-    if (inputs.length >= 2) {
-      await inputs[0].click({ clickCount: 3 });
-      await inputs[0].type(USERNAME);
-      await inputs[1].click({ clickCount: 3 });
-      await inputs[1].type(PASSWORD);
-    }
-    console.log("✅ تم كتابة البيانات");
-
-    // =================== الخطوة 4: التعامل مع التحقق (علامة الصح) ===================
-    console.log("⏳ في انتظار ظهور مربع التحقق أو علامة الصح...");
+    // =================== الخطوة 2: انتظار ظهور مربع التحقق ===================
+    console.log("⏳ في انتظار ظهور مربع التحقق (علامة الصح)...");
     let verified = false;
 
     // انتظر حتى تظهر علامة الصح أو يتم تفعيل checkbox
@@ -87,7 +74,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       }
     }
 
-    // =================== الخطوة 5: الضغط على زر Login ===================
+    // =================== الخطوة 3: كتابة البيانات (بعد التحقق) ===================
+    console.log("✍️ جاري كتابة اليوزرنيم والباسورد...");
+    const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+    if (inputs.length >= 2) {
+      await inputs[0].click({ clickCount: 3 });
+      await inputs[0].type(USERNAME);
+      await inputs[1].click({ clickCount: 3 });
+      await inputs[1].type(PASSWORD);
+    }
+    console.log("✅ تم كتابة البيانات");
+
+    // =================== الخطوة 4: الضغط على زر Login ===================
     console.log("🔑 جاري الضغط على Login...");
     await page.click('button[type="submit"]').catch(async () => {
       await page.evaluate(() => {
@@ -98,14 +96,14 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
     });
     console.log("✅ تم الضغط على Login");
 
-    // =================== الخطوة 6: انتظار التوجيه ===================
+    // =================== الخطوة 5: انتظار التوجيه ===================
     console.log("⏳ في انتظار التوجيه بعد الدخول...");
     await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {
       console.log("⚠️ لم يحدث توجيه تلقائي، ننتظر 5 ثوانٍ ثم نكمل...");
     });
     await sleep(5000);
 
-    // =================== الخطوة 7: التوجه إلى البلاك ماركت ===================
+    // =================== الخطوة 6: التوجه إلى البلاك ماركت ===================
     if (!page.url().includes('blackmarket')) {
       console.log("🚀 جاري التوجه إلى البلاك ماركت يدوياً...");
       await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
@@ -113,7 +111,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       console.log("✅ بالفعل في البلاك ماركت");
     }
 
-    // =================== الخطوة 8: قراءة المدينة (مع إعادة المحاولة) ===================
+    // =================== الخطوة 7: قراءة المدينة (مع إعادة المحاولة) ===================
     let currentCity = null;
     for (let attempt = 0; attempt < 5; attempt++) {
       currentCity = await page.evaluate(() => {
