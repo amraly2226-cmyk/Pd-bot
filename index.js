@@ -12,22 +12,18 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 (async () => {
   console.log("🚀 البوت شغال...");
   
-  // إعدادات خاصة بـ Railway (بيستخدم Chromium النظام)
   const launchOptions = {
-    headless: 'new',
+    headless: false, // ✅ non-headless عشان Cloudflare
     args: [
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
-      '--disable-dev-shm-usage', 
-      '--disable-gpu',
+      '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--window-size=1920,1080',
-      '--single-process',
-      '--no-zygote'
+      '--start-maximized'
     ]
   };
   
-  // لو Railway حدد مسار Chromium، استخدمه
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   }
@@ -39,41 +35,54 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(30000);
 
   // ═══════════════════════════════════════════════════════════════
-  // 1) الدخول
+  // 1) الدخول بالترتيب: Success! -> Username -> Password -> LOGIN
   // ═══════════════════════════════════════════════════════════════
   let loginSuccess = false;
   try {
-      console.log("🔄 جاري فتح صفحة اللوجن...");
+      console.log("🔄 [1/5] فتح صفحة اللوجن...");
       await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await sleep(5000);
 
-      console.log("⏳ انتظار ظهور كلمة Success! (حل الكابتشا)...");
-      await page.waitForFunction(() => document.body.innerText.includes('Success!'), { timeout: 120000 }).catch(() => console.log("⚠️ الكابتشا واخدة وقت..."));
-      console.log("✅ الكابتشا خلصت.");
+      console.log("⏳ [2/5] انتظار ظهور كلمة 'Success!' (حل الكابتشا)...");
+      await page.waitForFunction(
+          () => document.body.innerText.includes('Success!'),
+          { timeout: 180000, polling: 1000 }
+      ).catch(() => console.log("⚠️ الكابتشا واخدة وقت، هنكمل..."));
+      console.log("✅ [2/5] لقينا 'Success!' - الكابتشا خلصت.");
+      
+      // استنى شوية عشان الفورم تبقى جاهزة بعد الكابتشا
       await sleep(3000);
 
-      const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-      console.log(`📝 عدد الخانات: ${inputs.length}`);
-      
-      if (inputs.length >= 2) {
-          await inputs[0].click({ clickCount: 3 });
-          await page.keyboard.press('Backspace');
-          await inputs[0].type(USERNAME, { delay: 100 });
-          console.log("✅ تم إدخال اليوزر نيم");
-          
-          await inputs[1].click({ clickCount: 3 });
-          await page.keyboard.press('Backspace');
-          await inputs[1].type(PASSWORD, { delay: 100 });
-          console.log("✅ تم إدخال الباسورد");
+      // ✅ تأكد إن الخانات جاهزة قبل ما نكتب
+      console.log("⏳ [3/5] التأكد إن خانات اليوزر والباسورد جاهزة...");
+      await page.waitForSelector('input[type="email"]', { timeout: 15000 });
+      await page.waitForSelector('input[type="password"]', { timeout: 15000 });
+      console.log("✅ [3/5] الخانات جاهزة.");
+
+      // كتابة اليوزر
+      const emailInput = await page.$('input[type="email"]');
+      await emailInput.click({ clickCount: 3 });
+      await page.keyboard.press('Backspace');
+      await emailInput.type(USERNAME, { delay: 120 });
+      console.log(`✅ [4/5] تم إدخال اليوزر: ${USERNAME}`);
+
+      // كتابة الباسورد
+      const passInput = await page.$('input[type="password"]');
+      await passInput.click({ clickCount: 3 });
+      await page.keyboard.press('Backspace');
+      await passInput.type(PASSWORD, { delay: 120 });
+      console.log("✅ [4/5] تم إدخال الباسورد.");
+
+      // تأكد إن الكابتشا لسه Success قبل ما ندوس
+      let stillSuccess = await page.evaluate(() => document.body.innerText.includes('Success!'));
+      if (!stillSuccess) {
+          console.log("⚠️ Success! اختفت، هستنى تاني...");
+          await page.waitForFunction(() => document.body.innerText.includes('Success!'), { timeout: 60000 }).catch(() => {});
+          await sleep(2000);
       }
 
-      await page.evaluate(() => {
-          let checkbox = document.querySelector('input[type="checkbox"]');
-          if (checkbox && !checkbox.checked) checkbox.click();
-      });
-      await sleep(1000);
-
-      console.log("🖱️ جاري الضغط على زر LOGIN...");
+      // الضغط على زر LOGIN
+      console.log("🖱️ [5/5] الضغط على زر LOGIN...");
       await page.evaluate(() => {
           let btns = [...document.querySelectorAll('button')];
           let formBtn = btns.find(b => b.innerText.trim() === 'LOGIN' && b.offsetWidth > 200);
@@ -84,8 +93,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           }
       });
 
-      console.log("⏳ انتظار تحويل الصفحة بعد اللوجن...");
-      await sleep(20000);
+      console.log("⏳ انتظار تحويل الصفحة بعد اللوجن (30 ثانية)...");
+      await sleep(30000);
 
       let currentUrl = page.url();
       console.log(`🔗 الرابط الحالي: ${currentUrl}`);
@@ -107,34 +116,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
   } catch (e) {
       console.log("⚠️ مشكلة في الدخول:", e.message);
-  }
-
-  if (!loginSuccess) {
-      console.log("🔄 محاولة تانية للدخول...");
-      try {
-          await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
-          await sleep(8000);
-          
-          const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-          if (inputs.length >= 2) {
-              await inputs[0].click({ clickCount: 3 });
-              await inputs[0].type(USERNAME, { delay: 100 });
-              await inputs[1].click({ clickCount: 3 });
-              await inputs[1].type(PASSWORD, { delay: 100 });
-          }
-          await page.evaluate(() => {
-              let btns = [...document.querySelectorAll('button')];
-              let btn = btns.find(b => b.innerText.trim() === 'LOGIN' && b.offsetWidth > 200) || btns.find(b => b.innerText.trim() === 'LOGIN');
-              if (btn) btn.click();
-          });
-          await sleep(20000);
-          
-          if (!page.url().includes('/login')) {
-              console.log("✅ اللوجن نجح في المحاولة التانية!");
-              await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
-              await sleep(5000);
-          }
-      } catch (e) { console.log("فشلت المحاولة التانية:", e.message); }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -233,7 +214,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
       if (state.cd) { console.log(`⏳ كولداون: ${state.cd} - هستنى دقيقة`); await sleep(60000); continue; }
 
-      // نيويورك
       if (state.loc === "New York") {
         if (state.heldItem === "Stolen paintings" && state.hold > 0) {
            console.log("📍 نيويورك - بيع Stolen paintings");
@@ -269,7 +249,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await sleep(3000); continue;
         }
       }
-      // بوسطن
       else if (state.loc === "Boston") {
         if (state.heldItem === "Plastic jewelry" && state.hold > 0) {
            console.log("📍 بوسطن - بيع Plastic jewelry");
