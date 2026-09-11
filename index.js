@@ -13,15 +13,15 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   console.log("🚀 البوت شغال...");
   
   const launchOptions = {
-    headless: false,
+    // ✅ استخدام الوضع الجديد بدلاً من headless: false
+    headless: 'new',
     args: [
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--window-size=1920,1080',
-      '--start-maximized',
-      '--dbus-stub'
+      '--start-maximized'
     ]
   };
   
