@@ -22,7 +22,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       '--window-size=1920,1080',
       '--start-maximized',
       '--disable-dbus',
-      '--disable-features=dbus'
+      '--disable-features=dbus',
+      '--disable-features=UseDBus'
     ]
   };
   
