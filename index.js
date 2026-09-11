@@ -54,7 +54,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
             return null;
         });
 
-        if (!currentCity) { await page.goto('https://project-dark.co.uk/travel'); continue; }
+        if (!currentCity) { await page.goto('https://www.project-dark.co.uk/travel'); continue; }
 
         let destCity = (currentCity === 'San Francisco') ? 'New York' : 'San Francisco';
         console.log(`✈️ ${currentCity} - جاري تجهيز السفر إلى ${destCity}`);
@@ -102,17 +102,20 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let loc = null;
         let cooldownStr = null;
         
-        let lines = body.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                for (let j = i + 1; j < lines.length; j++) {
-                    if (lines[j].trim()) { loc = lines[j].trim(); break; }
-                }
-                break;
-            }
+        // ✅ قراءة الموقع بشكل أكثر مرونة
+        let locMatch = body.match(/Location\s*:?\s*\n?\s*([A-Za-z\s]+)/i);
+        if (locMatch) {
+            let rawLoc = locMatch[1].trim();
+            if (/New York/i.test(rawLoc)) loc = 'New York';
+            else if (/San Francisco/i.test(rawLoc)) loc = 'San Francisco';
+            else loc = rawLoc; // لو مدينة تانية
         }
-        if (loc && /New York/i.test(loc)) loc = 'New York';
-        else if (loc && /San Francisco/i.test(loc)) loc = 'San Francisco';
+        
+        // لو ملقاش كلمة Location، يدور على اسم المدينة مباشرة
+        if (!loc) {
+            if (/New York/i.test(body)) loc = 'New York';
+            else if (/San Francisco/i.test(body)) loc = 'San Francisco';
+        }
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
         if (cdMatch) cooldownStr = cdMatch[1];
@@ -149,6 +152,9 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         
         return { loc, cd: cooldownStr, hold, heldItem };
       }, ITEMS);
+
+      // ✅ طباعة الموقع الحالي عشان نعرف البوت شايف إيه
+      console.log(`📍 الموقع الحالي: ${state.loc || 'غير معروف'} | الكولداون: ${state.cd || 'لا يوجد'}`);
 
       if (state.cd) {
         console.log(`⏳ في كولداون: ${state.cd} - هستنى دقيقة وأعيد المحاولة...`);
@@ -274,9 +280,27 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
       
+      // ✅ لو المدينة مش نيويورك ولا سان فرانسيسكو (مثلاً لندن)، نسافر لنيويورك فوراً
       else {
-          console.log("⚠️ مش لاقي المدينة، بجرب تاني...");
-          await sleep(5000);
+          console.log(`⚠️ مش لاقي مدينة معروفة (الحالي: ${state.loc || 'غير معروف'})، جاري السفر إلى نيويورك للبدء...`);
+          await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
+          await sleep(3000);
+          
+          await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
+          await sleep(1500);
+          await page.evaluate(() => {
+              const norm = s => (s || '').trim().toLowerCase();
+              let cards = [...document.querySelectorAll('div')];
+              let target = cards.find(el => norm(el.innerText) === 'new york' && el.offsetWidth > 150 && el.offsetHeight > 50);
+              if (target) target.click();
+          });
+          await sleep(1500);
+          await page.evaluate(() => { let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); if (btn) btn.click(); });
+          await sleep(1500);
+          await page.waitForFunction(() => document.body.innerText.includes('Are you sure'), { timeout: 15000 }).catch(() => {});
+          await page.evaluate(() => { let allBtns = [...document.querySelectorAll('button')]; let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL'); if (travelBtn) travelBtn.click(); });
+          await sleep(7000);
+          await page.goto('https://www.project-dark.co.uk/blackmarket');
           continue;
       }
 
