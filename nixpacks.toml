@@ -8,9 +8,9 @@ cmds = ["npm install"]
 cmds = ["echo 'Build complete'"]
 
 [start]
-cmd = "dbus-daemon --system --fork && xvfb-run -a --server-args='-screen 0 1920x1080x24' node index.js"
+cmd = "xvfb-run -a --server-args='-screen 0 1920x1080x24' node index.js"
 
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
 PUPPETEER_EXECUTABLE_PATH = "/nix/var/nix/profiles/default/bin/chromium"
-DBUS_SESSION_BUS_ADDRESS = "unix:path=/run/dbus/system_bus_socket"
+DBUS_SESSION_BUS_ADDRESS = "autolaunch:"
