@@ -1,16 +1,19 @@
 {
   "name": "pd-bot",
   "version": "1.0.0",
-  "description": "Bot for Project: Dark",
+  "description": "Project Dark Black Market Bot - Auto buy/sell between New York and Boston",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "postinstall": "PUPPETEER_PRODUCT=firefox npx puppeteer browsers install firefox"
+    "start": "node index.js"
   },
-  "dependencies": {
-    "puppeteer": "^23.0.0"
-  },
-  "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "MIT",
+  "dependencies": {
+    "puppeteer": "^22.15.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
