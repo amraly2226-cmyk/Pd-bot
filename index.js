@@ -5,15 +5,56 @@ puppeteer.use(StealthPlugin());
 const USERNAME = 'amr.aly.2226@gmail.com'; 
 const PASSWORD = 'Gun@12345';
 
+// ✅ بيانات البروكسي (Webshare)
+const PROXY_IP = '31.59.20.176';
+const PROXY_PORT = '6754';
+const PROXY_USER = 'jyzzckot';
+const PROXY_PASS = '6outw4t1otkr';
+
 const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"];
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// دالة بتدور على مربع Cloudflare وبتدوس عليه
+async function clickCloudflareCheckbox(page) {
+    try {
+        const frames = page.frames();
+        for (const frame of frames) {
+            const url = frame.url();
+            if (url.includes('challenges.cloudflare.com') || url.includes('turnstile')) {
+                const checkbox = await frame.$('input[type="checkbox"]').catch(() => null);
+                if (checkbox) {
+                    await checkbox.click().catch(() => {});
+                    return 'inner-click';
+                }
+                
+                const label = await frame.$('.ctp-checkbox-label, label, #challenge-stage, body').catch(() => null);
+                if (label) {
+                    await label.click().catch(() => {});
+                    return 'label-click';
+                }
+            }
+        }
+        
+        const iframeHandle = await page.$('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]');
+        if (iframeHandle) {
+            const box = await iframeHandle.boundingBox();
+            if (box) {
+                await page.mouse.click(box.x + 30, box.y + box.height / 2);
+                return 'coord-click';
+            }
+        }
+        
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
 
 (async () => {
   console.log("🚀 البوت شغال...");
   
   const launchOptions = {
-    // ✅ استخدام الوضع الجديد بدلاً من headless: false
     headless: 'new',
     args: [
       '--no-sandbox', 
@@ -21,7 +62,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--window-size=1920,1080',
-      '--start-maximized'
+      '--start-maximized',
+      `--proxy-server=http://${PROXY_IP}:${PROXY_PORT}`
     ]
   };
   
@@ -31,26 +73,52 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   
   const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
+  
+  // ✅ تسجيل الدخول للبروكسي
+  await page.authenticate({
+      username: PROXY_USER,
+      password: PROXY_PASS
+  });
+  
   await page.setViewport({ width: 1920, height: 1080 }); 
   await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
   page.setDefaultTimeout(30000);
 
+  console.log(`🌐 البروكسي: ${PROXY_IP}:${PROXY_PORT}`);
+
   // ═══════════════════════════════════════════════════════════════
-  // 1) الدخول بالترتيب: Success! -> Username -> Password -> LOGIN
+  // 1) الدخول
   // ═══════════════════════════════════════════════════════════════
-  let loginSuccess = false;
   try {
       console.log("🔄 [1/5] فتح صفحة اللوجن...");
       await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
       await sleep(5000);
 
-      console.log("⏳ [2/5] انتظار ظهور كلمة 'Success!' (حل الكابتشا)...");
-      await page.waitForFunction(
-          () => document.body.innerText.includes('Success!'),
-          { timeout: 180000, polling: 1000 }
-      ).catch(() => console.log("⚠️ الكابتشا واخدة وقت، هنكمل..."));
-      console.log("✅ [2/5] لقينا 'Success!' - الكابتشا خلصت.");
+      console.log("⏳ [2/5] انتظار 'Success!' مع محاولة الضغط على الكابتشا...");
       
+      let captchaSolved = false;
+      for (let attempt = 1; attempt <= 30; attempt++) {
+          const solved = await page.evaluate(() => document.body.innerText.includes('Success!')).catch(() => false);
+          if (solved) {
+              captchaSolved = true;
+              console.log(`✅ 'Success!' ظهرت بعد ${attempt} محاولة`);
+              break;
+          }
+          
+          const clicked = await clickCloudflareCheckbox(page);
+          if (clicked) {
+              console.log(`🖱️ محاولة ${attempt}: ضغطت على المربع (${clicked})`);
+          } else {
+              console.log(`⏳ محاولة ${attempt}: المربع لسه مش ظاهر، هستنى 5 ثواني...`);
+          }
+          
+          await sleep(5000);
+      }
+      
+      if (!captchaSolved) {
+          console.log("⚠️ الكابتشا مخلصتش بعد 30 محاولة، هنكمل باليوزر والباسورد بأي حال...");
+      }
+
       await sleep(3000);
 
       console.log("⏳ [3/5] التأكد إن خانات اليوزر والباسورد جاهزة...");
@@ -103,7 +171,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           });
           console.log("🔍 نص الصفحة:", errText);
       } else {
-          loginSuccess = true;
           console.log("✅ اللوجن نجح! جاري الذهاب للبلاك ماركت...");
           await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'domcontentloaded', timeout: 60000 });
           await sleep(5000);
