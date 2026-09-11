@@ -20,90 +20,82 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(15000);
 
   // ═══════════════════════════════════════════════════════════════
-  // 1) الدخول (الصفحة الرئيسية -> LOGIN -> استنى Success! -> يوزر وباسورد)
+  // 1) الدخول (يوزر وباسورد -> لوجن -> بلاك ماركت مباشرة)
   // ═══════════════════════════════════════════════════════════════
   try {
-      console.log("🔄 جاري فتح الصفحة الرئيسية...");
+      console.log("🔄 جاري الدخول...");
       await page.goto('https://www.project-dark.co.uk/', { waitUntil: 'networkidle2', timeout: 60000 });
-      await sleep(3000); 
+      await sleep(3000);
 
-      console.log("🖱️ جاري الضغط على زر LOGIN...");
+      // الدخول لصفحة اللوجن
       await page.evaluate(() => {
-          let links = [...document.querySelectorAll('a, button')];
-          let loginLink = links.find(el => el.innerText && el.innerText.trim().toUpperCase() === 'LOGIN');
+          let links = [...document.querySelectorAll('a')];
+          let loginLink = links.find(el => el.innerText.trim().toUpperCase() === 'LOGIN');
           if (loginLink) loginLink.click();
       });
+      await sleep(10000); // استنى الصفحة والكابتشا
 
-      console.log("⏳ انتظار تحميل صفحة اللوجن...");
-      await sleep(5000); 
-
-      console.log("⏳ انتظار ظهور كلمة Success! (حل الكابتشا)...");
-      // بيستنى لحد 90 ثانية عشان الكابتشا تخلص وتظهر كلمة Success!
-      await page.waitForFunction(() => {
-          return document.body.innerText.includes('Success!');
-      }, { timeout: 90000 }).catch(() => console.log("⚠️ الكابتشا واخدة وقت أو مش ظاهرة، هنكمل باليوزر والباسورد بأي حال..."));
-
-      // بعد ما الكابتشا تخلص (أو نستنى وقت كافي)
+      // كتابة البيانات
       const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
       if (inputs.length >= 2) {
-          // مسح أي نص قديم وكتابة اليوزر
           await inputs[0].click({ clickCount: 3 });
           await inputs[0].type(USERNAME, { delay: 100 });
-          console.log("✅ تم إدخال اليوزر نيم");
-          
-          // مسح أي نص قديم وكتابة الباسورد
           await inputs[1].click({ clickCount: 3 });
           await inputs[1].type(PASSWORD, { delay: 100 });
-          console.log("✅ تم إدخال الباسورد");
-      } else {
-          console.log("⚠️ مش لاقي خانات اليوزر والباسورد!");
+          console.log("✅ تم إدخال البيانات، جاري الضغط على LOGIN...");
       }
 
-      // الضغط على زر LOGIN
+      // الضغط على زر اللوجن
       await page.evaluate(() => {
-          let btns = [...document.querySelectorAll('button, input[type="submit"]')];
-          let loginBtn = btns.find(b => (b.innerText && b.innerText.toLowerCase().includes('login')) || (b.value && b.value.toLowerCase().includes('login')));
+          let btns = [...document.querySelectorAll('button')];
+          let loginBtn = btns.find(b => b.innerText.trim() === 'LOGIN');
           if (loginBtn) loginBtn.click();
-          else if (btns.length > 0) btns[0].click();
+          else {
+              let submitBtn = document.querySelector('button[type="submit"]');
+              if (submitBtn) submitBtn.click();
+          }
       });
-      
-      console.log("⏳ انتظار تحميل الصفحة بعد اللوجن...");
-      await sleep(10000); 
+      await sleep(10000); // استنى اللوجن تخلص
+
+      // ✅ الذهاب مباشرة للبلاك ماركت بدون Refresh أو Back
+      console.log("🔄 جاري الذهاب مباشرة لصفحة البلاك ماركت...");
+      await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+      await sleep(5000);
+
+      // ✅ Check: لو لسه في صفحة اللوجن، نحاول تاني بسرعة
+      if (page.url().includes('login')) {
+          console.log("⚠️ لسه في صفحة اللوجن، هحاول أدخل تاني...");
+          const retryInputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+          if (retryInputs.length >= 2) {
+              await retryInputs[0].click({ clickCount: 3 });
+              await retryInputs[0].type(USERNAME, { delay: 100 });
+              await retryInputs[1].click({ clickCount: 3 });
+              await retryInputs[1].type(PASSWORD, { delay: 100 });
+          }
+          await page.evaluate(() => {
+              let btns = [...document.querySelectorAll('button')];
+              let loginBtn = btns.find(b => b.innerText.trim() === 'LOGIN');
+              if (loginBtn) loginBtn.click();
+          });
+          await sleep(10000);
+          
+          // نروح للبلاك ماركت تاني
+          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
+          await sleep(5000);
+      }
+
+      if (page.url().includes('login')) {
+          console.log("❌ فشل الدخول، ممكن اليوزر أو الباسورد غلط أو الكابتشا.");
+      } else {
+          console.log("✅ تم الدخول بنجاح، الصفحة جاهزة.");
+      }
+
   } catch (e) {
       console.log("⚠️ مشكلة في الدخول:", e.message);
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 2) تجهيز الصفحة (بلاك ماركت -> ريفريش x2 -> باك)
-  // ═══════════════════════════════════════════════════════════════
-  try {
-      console.log("🔄 جاري تجهيز الصفحة (بلاك ماركت -> ريفريش x2 -> باك)...");
-      
-      await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-      await sleep(3000);
-
-      await page.reload({ waitUntil: 'networkidle2' });
-      await sleep(2000);
-      await page.reload({ waitUntil: 'networkidle2' });
-      await sleep(2000);
-
-      await page.goBack({ waitUntil: 'networkidle2' }).catch(() => console.log("مش مشكلة لو الباك مش شغال..."));
-      await sleep(3000);
-
-      await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-      await sleep(3000);
-
-      if (page.url().includes('login')) {
-          console.log("⚠️ لسه في صفحة اللوجن! ممكن اليوزر أو الباسورد غلط.");
-      } else {
-          console.log("✅ الصفحة جاهزة، هنبدأ نقرا المدن...");
-      }
-  } catch (e) {
-      console.log("⚠️ مشكلة في تجهيز الصفحة:", e.message);
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  // 3) اللوب الرئيسي
+  // 2) اللوب الرئيسي
   // ═══════════════════════════════════════════════════════════════
   while (true) {
     try {
