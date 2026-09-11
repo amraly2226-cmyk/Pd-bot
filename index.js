@@ -15,39 +15,82 @@ const ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic j
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// دالة بتدور على مربع Cloudflare وبتدوس عليه
-async function clickCloudflareCheckbox(page) {
+// ═══════════════════════════════════════════════════════════════
+// ✅ دالة محسّنة: تدور على علامة الصح جوه الـ iframe وتحرك الماوس
+// ═══════════════════════════════════════════════════════════════
+async function trySolveCloudflare(page) {
     try {
         const frames = page.frames();
         for (const frame of frames) {
             const url = frame.url();
             if (url.includes('challenges.cloudflare.com') || url.includes('turnstile')) {
-                const checkbox = await frame.$('input[type="checkbox"]').catch(() => null);
-                if (checkbox) {
-                    await checkbox.click().catch(() => {});
-                    return 'inner-click';
+                
+                // ✅ 1. نشوف لو علامة الصح ظهرت جوه الـ iframe
+                const frameStatus = await frame.evaluate(() => {
+                    const text = document.body ? document.body.innerText : '';
+                    // علامات النجاح المحتملة
+                    const hasSuccess = /success|verified|passed/i.test(text);
+                    // علامات جاري التحقق
+                    const hasVerifying = /verifying|checking|wait/i.test(text);
+                    // نشوف هل فيه عنصر فيه class success
+                    const hasSuccessEl = !!document.querySelector('.success, [class*="success"], [class*="verified"]');
+                    // نشوف هل فيه علامة ✓
+                    const hasCheck = text.includes('✓') || text.includes('✔');
+                    
+                    // نجرب نشوف الـ input لو موجود
+                    const checkbox = document.querySelector('input[type="checkbox"]');
+                    const checkboxChecked = checkbox ? checkbox.checked : null;
+                    
+                    return { hasSuccess, hasVerifying, hasSuccessEl, hasCheck, checkboxChecked, text: text.substring(0, 200) };
+                }).catch(() => null);
+                
+                if (frameStatus) {
+                    if (frameStatus.hasSuccess || frameStatus.hasSuccessEl || frameStatus.hasCheck || frameStatus.checkboxChecked === true) {
+                        return 'success';
+                    }
+                    if (frameStatus.hasVerifying) {
+                        return 'verifying';
+                    }
                 }
                 
-                const label = await frame.$('.ctp-checkbox-label, label, #challenge-stage, body').catch(() => null);
-                if (label) {
-                    await label.click().catch(() => {});
-                    return 'label-click';
+                // ✅ 2. نحاول نحرك الماوس على الـ checkbox ثم ندوس
+                const checkboxSelectors = [
+                    'input[type="checkbox"]',
+                    '.ctp-checkbox-label',
+                    'label',
+                    '#challenge-stage',
+                    '.cb-lb',
+                    'body'
+                ];
+                
+                for (const sel of checkboxSelectors) {
+                    try {
+                        const el = await frame.$(sel);
+                        if (el) {
+                            const box = await el.boundingBox();
+                            if (box && box.width > 0 && box.height > 0) {
+                                // حرك الماوس للعنصر
+                                await page.mouse.move(
+                                    box.x + box.width / 2,
+                                    box.y + box.height / 2,
+                                    { steps: 10 }
+                                );
+                                await sleep(300);
+                                // دوس
+                                await page.mouse.click(
+                                    box.x + box.width / 2,
+                                    box.y + box.height / 2
+                                );
+                                return `mouse-click-${sel}`;
+                            }
+                        }
+                    } catch (e) { /* نجرب اللي بعده */ }
                 }
             }
         }
-        
-        const iframeHandle = await page.$('iframe[src*="challenges.cloudflare.com"], iframe[src*="turnstile"]');
-        if (iframeHandle) {
-            const box = await iframeHandle.boundingBox();
-            if (box) {
-                await page.mouse.click(box.x + 30, box.y + box.height / 2);
-                return 'coord-click';
-            }
-        }
-        
-        return null;
+        return 'no-iframe';
     } catch (e) {
-        return null;
+        return `error-${e.message}`;
     }
 }
 
@@ -74,7 +117,6 @@ async function clickCloudflareCheckbox(page) {
   const browser = await puppeteer.launch(launchOptions);
   const page = await browser.newPage();
   
-  // ✅ تسجيل الدخول للبروكسي
   await page.authenticate({
       username: PROXY_USER,
       password: PROXY_PASS
@@ -97,26 +139,45 @@ async function clickCloudflareCheckbox(page) {
       console.log("⏳ [2/5] انتظار 'Success!' مع محاولة الضغط على الكابتشا...");
       
       let captchaSolved = false;
-      for (let attempt = 1; attempt <= 30; attempt++) {
-          const solved = await page.evaluate(() => document.body.innerText.includes('Success!')).catch(() => false);
-          if (solved) {
+      for (let attempt = 1; attempt <= 40; attempt++) {
+          // ✅ 1. نشوف "Success!" في الصفحة الرئيسية
+          const mainSuccess = await page.evaluate(() => {
+              const body = document.body.innerText || '';
+              return {
+                  success: body.includes('Success!'),
+                  verifying: /verifying|checking/i.test(body)
+              };
+          }).catch(() => ({ success: false, verifying: false }));
+          
+          if (mainSuccess.success) {
               captchaSolved = true;
-              console.log(`✅ 'Success!' ظهرت بعد ${attempt} محاولة`);
+              console.log(`✅ 'Success!' ظهرت في الصفحة بعد ${attempt} محاولة`);
               break;
           }
           
-          const clicked = await clickCloudflareCheckbox(page);
-          if (clicked) {
-              console.log(`🖱️ محاولة ${attempt}: ضغطت على المربع (${clicked})`);
-          } else {
-              console.log(`⏳ محاولة ${attempt}: المربع لسه مش ظاهر، هستنى 5 ثواني...`);
+          // ✅ 2. نجرب نحل الكابتشا
+          const result = await trySolveCloudflare(page);
+          
+          if (result === 'success') {
+              captchaSolved = true;
+              console.log(`✅ علامة الصح ظهرت جوه الـ iframe بعد ${attempt} محاولة`);
+              await sleep(2000); // ندي الصفحة فرصة تحدث
+              break;
+          } else if (result === 'verifying') {
+              console.log(`⏳ محاولة ${attempt}: Cloudflare بيحقق... هستنى`);
+          } else if (result === 'no-iframe') {
+              console.log(`⏳ محاولة ${attempt}: مفيش iframe، هستنى`);
+          } else if (result && result.startsWith('mouse-click')) {
+              console.log(`🖱️ محاولة ${attempt}: دُست على (${result})`);
+          } else if (result && result.startsWith('error')) {
+              console.log(`⚠️ محاولة ${attempt}: ${result}`);
           }
           
-          await sleep(5000);
+          await sleep(4000);
       }
       
       if (!captchaSolved) {
-          console.log("⚠️ الكابتشا مخلصتش بعد 30 محاولة، هنكمل باليوزر والباسورد بأي حال...");
+          console.log("⚠️ الكابتشا مخلصتش، هنكمل باليوزر والباسورد بأي حال...");
       }
 
       await sleep(3000);
@@ -138,11 +199,16 @@ async function clickCloudflareCheckbox(page) {
       await passInput.type(PASSWORD, { delay: 120 });
       console.log("✅ [4/5] تم إدخال الباسورد.");
 
+      // ✅ قبل ما ندوس، نتأكد من Success!
       let stillSuccess = await page.evaluate(() => document.body.innerText.includes('Success!'));
       if (!stillSuccess) {
-          console.log("⚠️ Success! اختفت، هستنى تاني...");
-          await page.waitForFunction(() => document.body.innerText.includes('Success!'), { timeout: 60000 }).catch(() => {});
-          await sleep(2000);
+          console.log("⚠️ Success! مش موجودة، هستنى شوية...");
+          for (let i = 0; i < 15; i++) {
+              await trySolveCloudflare(page);
+              await sleep(3000);
+              stillSuccess = await page.evaluate(() => document.body.innerText.includes('Success!')).catch(() => false);
+              if (stillSuccess) break;
+          }
       }
 
       console.log("🖱️ [5/5] الضغط على زر LOGIN...");
@@ -181,7 +247,7 @@ async function clickCloudflareCheckbox(page) {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // 2) اللوب الرئيسي
+  // 2) اللوب الرئيسي (زي ما هو)
   // ═══════════════════════════════════════════════════════════════
   while (true) {
     try {
