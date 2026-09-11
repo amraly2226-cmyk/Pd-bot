@@ -13,14 +13,16 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   console.log("🚀 البوت شغال...");
   
   const launchOptions = {
-    headless: false, // ✅ non-headless عشان Cloudflare
+    headless: false,
     args: [
       '--no-sandbox', 
       '--disable-setuid-sandbox', 
       '--disable-dev-shm-usage',
       '--disable-blink-features=AutomationControlled',
       '--window-size=1920,1080',
-      '--start-maximized'
+      '--start-maximized',
+      '--disable-dbus',
+      '--disable-features=dbus'
     ]
   };
   
@@ -50,30 +52,25 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
       ).catch(() => console.log("⚠️ الكابتشا واخدة وقت، هنكمل..."));
       console.log("✅ [2/5] لقينا 'Success!' - الكابتشا خلصت.");
       
-      // استنى شوية عشان الفورم تبقى جاهزة بعد الكابتشا
       await sleep(3000);
 
-      // ✅ تأكد إن الخانات جاهزة قبل ما نكتب
       console.log("⏳ [3/5] التأكد إن خانات اليوزر والباسورد جاهزة...");
       await page.waitForSelector('input[type="email"]', { timeout: 15000 });
       await page.waitForSelector('input[type="password"]', { timeout: 15000 });
       console.log("✅ [3/5] الخانات جاهزة.");
 
-      // كتابة اليوزر
       const emailInput = await page.$('input[type="email"]');
       await emailInput.click({ clickCount: 3 });
       await page.keyboard.press('Backspace');
       await emailInput.type(USERNAME, { delay: 120 });
       console.log(`✅ [4/5] تم إدخال اليوزر: ${USERNAME}`);
 
-      // كتابة الباسورد
       const passInput = await page.$('input[type="password"]');
       await passInput.click({ clickCount: 3 });
       await page.keyboard.press('Backspace');
       await passInput.type(PASSWORD, { delay: 120 });
       console.log("✅ [4/5] تم إدخال الباسورد.");
 
-      // تأكد إن الكابتشا لسه Success قبل ما ندوس
       let stillSuccess = await page.evaluate(() => document.body.innerText.includes('Success!'));
       if (!stillSuccess) {
           console.log("⚠️ Success! اختفت، هستنى تاني...");
@@ -81,7 +78,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           await sleep(2000);
       }
 
-      // الضغط على زر LOGIN
       console.log("🖱️ [5/5] الضغط على زر LOGIN...");
       await page.evaluate(() => {
           let btns = [...document.querySelectorAll('button')];
