@@ -63,11 +63,10 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         await page.evaluate(() => { let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
         await sleep(1500);
 
-        // 2) اختيار البلد من البطاقة
+        // 2) اختيار البلد من البطاقة (بمرونة أكبر)
         await page.evaluate((city) => {
-            const norm = s => (s || '').trim().toLowerCase();
             let elements = [...document.querySelectorAll('div, span, a')];
-            let textEl = elements.find(el => norm(el.innerText) === norm(city) && el.offsetParent !== null);
+            let textEl = elements.find(el => new RegExp(city, 'i').test(el.innerText) && el.offsetParent !== null && el.offsetWidth > 100);
             if (textEl) {
                 let card = textEl.closest('div');
                 if (card && card.offsetWidth > 100) card.click();
@@ -102,19 +101,21 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         let loc = null;
         let cooldownStr = null;
         
-        // ✅ قراءة الموقع بشكل أكثر مرونة
-        let locMatch = body.match(/Location\s*:?\s*\n?\s*([A-Za-z\s]+)/i);
+        // ✅ 1. القراءة من قائمة PLAYER INFO (الشمال) زي ما طلبت
+        let locMatch = body.match(/Location\s*\n\s*(New York|San Francisco)/i);
         if (locMatch) {
-            let rawLoc = locMatch[1].trim();
-            if (/New York/i.test(rawLoc)) loc = 'New York';
-            else if (/San Francisco/i.test(rawLoc)) loc = 'San Francisco';
-            else loc = rawLoc; // لو مدينة تانية
-        }
-        
-        // لو ملقاش كلمة Location، يدور على اسم المدينة مباشرة
-        if (!loc) {
-            if (/New York/i.test(body)) loc = 'New York';
-            else if (/San Francisco/i.test(body)) loc = 'San Francisco';
+            loc = locMatch[1];
+        } 
+        // ✅ 2. لو ملقاش، يدور على عنوان السوق (اليمين)
+        else {
+            let pageTitleMatch = body.match(/Black Market\s*-\s*(New York|San Francisco)/i);
+            if (pageTitleMatch) {
+                loc = pageTitleMatch[1];
+            } else {
+                // ✅ 3. احتياطي أخير: يدور على اسم المدينة في أي مكان
+                if (/New York/i.test(body)) loc = 'New York';
+                else if (/San Francisco/i.test(body)) loc = 'San Francisco';
+            }
         }
 
         let cdMatch = body.match(/You cannot travel for:?\s*([0-9hms ]+)/i) || body.match(/Travel in\s*([0-9hms ]+)/i);
@@ -203,9 +204,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => {
-               const norm = s => (s || '').trim().toLowerCase();
                let cards = [...document.querySelectorAll('div')];
-               let target = cards.find(el => norm(el.innerText) === 'san francisco' && el.offsetWidth > 150 && el.offsetHeight > 50);
+               let target = cards.find(el => /san francisco/i.test(el.innerText) && el.offsetWidth > 150 && el.offsetHeight > 50);
                if (target) target.click();
            });
            await sleep(1500);
@@ -262,9 +262,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
            await sleep(1500);
            await page.evaluate(() => {
-               const norm = s => (s || '').trim().toLowerCase();
                let cards = [...document.querySelectorAll('div')];
-               let target = cards.find(el => norm(el.innerText) === 'new york' && el.offsetWidth > 150 && el.offsetHeight > 50);
+               let target = cards.find(el => /new york/i.test(el.innerText) && el.offsetWidth > 150 && el.offsetHeight > 50);
                if (target) target.click();
            });
            await sleep(1500);
@@ -280,7 +279,7 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
       
-      // ✅ لو المدينة مش نيويورك ولا سان فرانسيسكو (مثلاً لندن)، نسافر لنيويورك فوراً
+      // ✅ لو المدينة مش نيويورك ولا سان فرانسيسكو، نسافر لنيويورك فوراً
       else {
           console.log(`⚠️ مش لاقي مدينة معروفة (الحالي: ${state.loc || 'غير معروف'})، جاري السفر إلى نيويورك للبدء...`);
           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
@@ -289,9 +288,8 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
           await page.evaluate(() => { let elements = [...document.querySelectorAll('a, span, div, button')]; let grid = elements.find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); if (grid) grid.click(); });
           await sleep(1500);
           await page.evaluate(() => {
-              const norm = s => (s || '').trim().toLowerCase();
               let cards = [...document.querySelectorAll('div')];
-              let target = cards.find(el => norm(el.innerText) === 'new york' && el.offsetWidth > 150 && el.offsetHeight > 50);
+              let target = cards.find(el => /new york/i.test(el.innerText) && el.offsetWidth > 150 && el.offsetHeight > 50);
               if (target) target.click();
           });
           await sleep(1500);
