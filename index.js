@@ -20,72 +20,56 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
   page.setDefaultTimeout(15000);
 
   // ═══════════════════════════════════════════════════════════════
-  // 1) الدخول (يوزر وباسورد -> لوجن -> بلاك ماركت مباشرة)
+  // 1) الدخول (نروح مباشرة لصفحة /login)
   // ═══════════════════════════════════════════════════════════════
   try {
-      console.log("🔄 جاري الدخول...");
-      await page.goto('https://www.project-dark.co.uk/', { waitUntil: 'networkidle2', timeout: 60000 });
+      console.log("🔄 جاري فتح صفحة اللوجن مباشرة...");
+      await page.goto('https://www.project-dark.co.uk/login', { waitUntil: 'networkidle2', timeout: 60000 });
       await sleep(3000);
 
-      // الدخول لصفحة اللوجن
-      await page.evaluate(() => {
-          let links = [...document.querySelectorAll('a')];
-          let loginLink = links.find(el => el.innerText.trim().toUpperCase() === 'LOGIN');
-          if (loginLink) loginLink.click();
-      });
-      await sleep(10000); // استنى الصفحة والكابتشا
+      console.log("⏳ انتظار ظهور كلمة Success! (حل الكابتشا)...");
+      // بنستنى لحد 90 ثانية عشان Cloudflare تخلص وتظهر كلمة Success!
+      await page.waitForFunction(() => {
+          return document.body.innerText.includes('Success!');
+      }, { timeout: 90000 }).catch(() => console.log("⚠️ الكابتشا واخدة وقت، هنكمل..."));
 
-      // كتابة البيانات
+      console.log("✅ الكابتشا خلصت، جاري كتابة اليوزر والباسورد...");
+      await sleep(2000);
+
+      // استنى ظهور خانات الإدخال
+      await page.waitForSelector('input[type="email"], input[type="text"]', { timeout: 10000 }).catch(() => {});
+
       const inputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
+      console.log(`📝 عدد الخانات اللي لقيتها: ${inputs.length}`);
+      
       if (inputs.length >= 2) {
           await inputs[0].click({ clickCount: 3 });
-          await inputs[0].type(USERNAME, { delay: 100 });
+          await inputs[0].type(USERNAME, { delay: 150 });
+          console.log("✅ تم إدخال اليوزر نيم");
+          
           await inputs[1].click({ clickCount: 3 });
-          await inputs[1].type(PASSWORD, { delay: 100 });
-          console.log("✅ تم إدخال البيانات، جاري الضغط على LOGIN...");
+          await inputs[1].type(PASSWORD, { delay: 150 });
+          console.log("✅ تم إدخال الباسورد");
+      } else {
+          console.log("⚠️ مش لاقي خانات اليوزر والباسورد!");
       }
 
-      // الضغط على زر اللوجن
+      // الضغط على زر LOGIN
       await page.evaluate(() => {
           let btns = [...document.querySelectorAll('button')];
           let loginBtn = btns.find(b => b.innerText.trim() === 'LOGIN');
           if (loginBtn) loginBtn.click();
-          else {
-              let submitBtn = document.querySelector('button[type="submit"]');
-              if (submitBtn) submitBtn.click();
-          }
       });
-      await sleep(10000); // استنى اللوجن تخلص
+      console.log("🖱️ تم الضغط على زر LOGIN، جاري الانتظار...");
+      await sleep(12000);
 
-      // ✅ الذهاب مباشرة للبلاك ماركت بدون Refresh أو Back
-      console.log("🔄 جاري الذهاب مباشرة لصفحة البلاك ماركت...");
+      // ✅ الذهاب مباشرة للبلاك ماركت
+      console.log("🔄 جاري الذهاب لصفحة البلاك ماركت...");
       await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
       await sleep(5000);
 
-      // ✅ Check: لو لسه في صفحة اللوجن، نحاول تاني بسرعة
       if (page.url().includes('login')) {
-          console.log("⚠️ لسه في صفحة اللوجن، هحاول أدخل تاني...");
-          const retryInputs = await page.$$('input[type="text"], input[type="email"], input[type="password"]');
-          if (retryInputs.length >= 2) {
-              await retryInputs[0].click({ clickCount: 3 });
-              await retryInputs[0].type(USERNAME, { delay: 100 });
-              await retryInputs[1].click({ clickCount: 3 });
-              await retryInputs[1].type(PASSWORD, { delay: 100 });
-          }
-          await page.evaluate(() => {
-              let btns = [...document.querySelectorAll('button')];
-              let loginBtn = btns.find(b => b.innerText.trim() === 'LOGIN');
-              if (loginBtn) loginBtn.click();
-          });
-          await sleep(10000);
-          
-          // نروح للبلاك ماركت تاني
-          await page.goto('https://www.project-dark.co.uk/blackmarket', { waitUntil: 'networkidle2', timeout: 60000 });
-          await sleep(5000);
-      }
-
-      if (page.url().includes('login')) {
-          console.log("❌ فشل الدخول، ممكن اليوزر أو الباسورد غلط أو الكابتشا.");
+          console.log("❌ فشل الدخول، ممكن البيانات غلط أو الكابتشا.");
       } else {
           console.log("✅ تم الدخول بنجاح، الصفحة جاهزة.");
       }
@@ -238,7 +222,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
       // ✅ نيويورك
       if (state.loc === "New York") {
-        // 1. لو معاه Stolen paintings (راجع من بوسطن) -> يبيع
         if (state.heldItem === "Stolen paintings" && state.hold > 0) {
            console.log("📍 نيويورك - بيع Stolen paintings (الرحلة العكسية)");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Sell All') && !r.innerText.includes('Confirm')) { let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
@@ -249,7 +232,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            continue;
         }
         
-        // 2. لو معاه Plastic jewelry -> يسافر بوسطن
         if (state.heldItem === "Plastic jewelry" && state.hold > 0) {
            console.log("📍 نيويورك - رايح بوسطن لبيع البلاستيك جيولوري");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
@@ -286,7 +268,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            continue;
         }
         
-        // 3. لو معاه 0 -> يشتري Plastic jewelry
         if (state.hold === 0) {
            console.log("📍 نيويورك - شراء Plastic jewelry");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Plastic jewelry') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
@@ -299,7 +280,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
       // ✅ بوسطن
       else if (state.loc === "Boston") {
-        // 1. لو معاه Plastic jewelry (راجع من نيويورك) -> يبيع
         if (state.heldItem === "Plastic jewelry" && state.hold > 0) {
            console.log("📍 بوسطن - بيع Plastic jewelry (الرحلة الأساسية)");
            await page.evaluate(() => { const rows = [...document.querySelectorAll('tr')]; for (let r of rows) { const text = r.innerText; if (text.includes('Plastic jewelry') && text.includes('Sell All') && !text.includes('Confirm')) { const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); if (btn) { btn.click(); break; } } } });
@@ -310,7 +290,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            continue;
         }
         
-        // 2. لو معاه Stolen paintings -> يسافر نيويورك
         if (state.heldItem === "Stolen paintings" && state.hold > 0) {
            console.log("📍 بوسطن - رايح نيويورك لبيع Stolen paintings");
            await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
@@ -347,7 +326,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
            continue;
         }
 
-        // 3. لو معاه 0 -> يشتري Stolen paintings
         if (state.hold === 0) {
            console.log("📍 بوسطن - شراء Stolen paintings");
            await page.evaluate(() => { let rows = [...document.querySelectorAll('tr')]; for (let r of rows) { if (r.innerText.includes('Stolen paintings') && r.innerText.includes('£')) { let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); if (mb) { mb.click(); break; } } } });
@@ -358,7 +336,6 @@ async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
         }
       }
       
-      // ✅ لو المدينة مش نيويورك ولا بوسطن، نسافر لنيويورك فوراً
       else {
           console.log(`⚠️ مش لاقي مدينة معروفة (الحالي: ${state.loc || 'غير معروف'})، جاري السفر إلى نيويورك للبدء...`);
           await page.goto('https://www.project-dark.co.uk/travel', { waitUntil: 'networkidle2' });
