@@ -3,6 +3,7 @@ import time
 import re
 import threading
 
+# 🔑 بيانات الدخول والكوكيز
 USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
@@ -32,135 +33,6 @@ def parse_cooldown(text):
     seconds = re.search(r'(\d+)\s*s', text)
     if seconds: total_seconds += int(seconds.group(1))
     return total_seconds
-
-# ═══════════════════════════════════════════════════════════════
-# 🔧 دوال مساعدة
-# ═══════════════════════════════════════════════════════════════
-
-def has_any_items(page):
-    """بترجع True لو فيه أي حاجة في المخزن"""
-    try:
-        return page.evaluate("""() => {
-            let rows = [...document.querySelectorAll('tr')];
-            for (let r of rows) {
-                let cells = [...r.querySelectorAll('td')];
-                if (cells.length >= 3) {
-                    let youHaveCell = cells[2].innerText;
-                    let match = youHaveCell.match(/(\\d+)/);
-                    if (match && parseInt(match[1]) > 0) return true;
-                }
-            }
-            return false;
-        }""")
-    except:
-        return False
-
-def sell_all_inventory(page):
-    """بتبيع أي حاجة موجودة في المخزن (أي صنف)"""
-    print("🛒 ببدأ عملية بيع كل المخزن...")
-    max_loops = 15
-    sold = 0
-    for i in range(max_loops):
-        clicked = page.evaluate("""() => {
-            let rows = [...document.querySelectorAll('tr')];
-            for (let r of rows) {
-                let cells = [...r.querySelectorAll('td')];
-                if (cells.length >= 3) {
-                    let youHaveCell = cells[2].innerText;
-                    let match = youHaveCell.match(/(\\d+)/);
-                    if (match && parseInt(match[1]) > 0) {
-                        let sellBtn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
-                        if (sellBtn && sellBtn.offsetParent !== null) {
-                            sellBtn.click();
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }""")
-        if not clicked:
-            break
-        sleep(2500)
-        try:
-            confirm_btn = page.locator('button:has-text("SELL ALL")').last
-            confirm_btn.wait_for(state="visible", timeout=5000)
-            confirm_btn.click(force=True)
-            sleep(3500)
-            sold += 1
-            print(f"✅ تم بيع مجموعة {sold}")
-        except:
-            print("⚠️ مفيش تأكيد")
-            break
-    
-    # نعمل refresh عشان نتأكد إن المخزن فاضي
-    page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
-    sleep(3000)
-    return sold > 0
-
-def click_sell_all_in_row(page, item_name):
-    try:
-        row = page.locator(f'tr:has-text("{item_name}")').first
-        row.wait_for(state="visible", timeout=10000)
-        sell_btn = row.locator('button:has-text("Sell All")').first
-        sell_btn.wait_for(state="visible", timeout=10000)
-        sell_btn.click(force=True)
-        return True
-    except Exception as e:
-        print(f"⚠️ مشكلة في الضغط على Sell All لـ {item_name}: {e}")
-    return False
-
-def click_max_buy_in_row(page, item_name):
-    try:
-        if 'blackmarket' not in page.url:
-            print(f"⚠️ مش في صفحة البلاك ماركت (URL: {page.url})")
-            return False
-        
-        # نستنى الجدول يظهر
-        try:
-            page.wait_for_selector('tr', timeout=10000)
-        except:
-            pass
-        
-        row = page.locator(f'tr:has-text("{item_name}")').first
-        row.wait_for(state="visible", timeout=15000)
-        
-        buy_btn = row.locator('button:has-text("Max Buy")').first
-        buy_btn.wait_for(state="visible", timeout=10000)
-        buy_btn.click(force=True)
-        return True
-    except Exception as e:
-        print(f"⚠️ مشكلة في الضغط على Max Buy لـ {item_name}: {e}")
-    return False
-
-def confirm_modal(page, button_text, timeout=10000):
-    try:
-        confirm_btn = page.locator(f'button:has-text("{button_text}")').last
-        confirm_btn.wait_for(state="visible", timeout=timeout)
-        confirm_btn.click(force=True)
-        return True
-    except Exception as e:
-        print(f"⚠️ زر التأكيد {button_text} مش ظهر: {e}")
-        return False
-
-def get_hold_count(page, item_name):
-    try:
-        return page.evaluate("""(itemName) => {
-            let rows = [...document.querySelectorAll('tr')];
-            for (let r of rows) {
-                if (r.innerText.toLowerCase().includes(itemName.toLowerCase())) {
-                    let cells = [...r.querySelectorAll('td')];
-                    if (cells.length >= 3) {
-                        let youHaveCell = cells[2].innerText;
-                        let match = youHaveCell.match(/(\\d+)/);
-                        if (match) return parseInt(match[1]);
-                    }
-                }
-            }
-            return 0;
-        }""", item_name)
-    except:
-        return 0
 
 # ═══════════════════════════════════════════════════════════════
 # 📈 بوت الأسهم
@@ -198,6 +70,7 @@ def run_stocks_bot():
                 except:
                     pass
                 
+                # بيع كل الأسهم
                 print("🔴 [الأسهم] بدأت عملية البيع...")
                 try:
                     sell_all_buttons = page.locator('button:has-text("Sell All")')
@@ -206,37 +79,39 @@ def run_stocks_bot():
                         sell_all_buttons.last.click(force=True)
                         print("✅ [الأسهم] تم الضغط على Sell All")
                         sleep(2000)
-                        if confirm_modal(page, "SELL ALL"):
+                        try:
+                            confirm_btn = page.locator('button:has-text("SELL ALL")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
                             print("✅ [الأسهم] تم تأكيد البيع")
                             sleep(4000)
-                        else:
+                        except:
                             print("⚠️ [الأسهم] مفيش زر تأكيد SELL ALL")
                     else:
                         print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
+                # شراء الأسهم الخضراء
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 
                 for attempt in range(5):
                     try:
-                        found_green = False
-                        rows = page.locator('tr')
-                        row_count = rows.count()
-                        
-                        for i in range(row_count):
-                            try:
-                                row = rows.nth(i)
-                                row_text = row.inner_text()
-                                if ('↑' in row_text or '▲' in row_text):
-                                    max_span = row.locator('span.stock-fillmax-btn').first
-                                    if max_span.count() > 0:
-                                        max_span.click(force=True)
-                                        found_green = True
-                                        break
-                            except:
-                                continue
+                        found_green = page.evaluate("""() => {
+                            const rows = document.querySelectorAll('tr');
+                            for (let row of rows) {
+                                const isGreen = [...row.querySelectorAll('td')].some(cell => {
+                                    const text = cell.innerText.trim();
+                                    return (text.includes('$') || text.includes('£')) && (text.includes('↑') || text.includes('▲'));
+                                });
+                                if (isGreen) {
+                                    const maxSpan = row.querySelector('span.stock-fillmax-btn');
+                                    if (maxSpan) { maxSpan.click(); return true; }
+                                }
+                            }
+                            return false;
+                        }""")
                         
                         if not found_green:
                             break
@@ -245,22 +120,19 @@ def run_stocks_bot():
                         print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}")
                         sleep(1500)
                         
-                        try:
-                            bottom_buy = page.locator('#bottomBuyBtn').first
-                            if bottom_buy.count() > 0:
-                                bottom_buy.click(force=True)
-                                sleep(1500)
-                        except:
-                            break
+                        page.evaluate("""() => {
+                            let buyBtn = document.getElementById('bottomBuyBtn');
+                            if (buyBtn) buyBtn.click();
+                        }""")
+                        sleep(1500)
                         
-                        try:
-                            yes_btn = page.locator('button:has-text("YES"), span:has-text("YES"), div:has-text("YES")').last
-                            yes_btn.wait_for(state="visible", timeout=5000)
-                            yes_btn.click(force=True)
-                        except:
-                            break
+                        page.evaluate("""() => {
+                            let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
+                            if (yesBtn) yesBtn.click();
+                        }""")
                         
                         sleep(2500)
+                        print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
@@ -278,7 +150,7 @@ def run_stocks_bot():
             time.sleep(STOCKS_INTERVAL)
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد
+# 🌐 بوت التريد (زي ما كان شغال بالظبط)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -305,7 +177,9 @@ def run_trade_bot():
 
         while True:
             try:
+                # ═══════════════════════════════════════
                 # 1) صفحة الترافل
+                # ═══════════════════════════════════════
                 if 'travel' in page.url:
                     cooldown_text = page.evaluate("""() => {
                         let body = document.body.innerText;
@@ -330,7 +204,7 @@ def run_trade_bot():
                             wait_seconds += 10
                             print(f"⏳ [التريد] كولداون: {cooldown_text} - هستنى {wait_seconds} ثانية...")
                             sleep(wait_seconds * 1000)
-                            print("✅ [التريد] العداد خلص!")
+                            print("✅ [التريد] العداد خلص! هسافر فوراً...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                             continue
                     
@@ -355,35 +229,42 @@ def run_trade_bot():
                         if grid_btn.count() > 0:
                             grid_btn.click(force=True)
                             sleep(2000)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ [التريد] Grid View: {e}")
 
                     try:
                         city_card = page.locator(f"text='{dest_city}'").first
                         if city_card.count() > 0:
                             city_card.click(force=True)
                             sleep(2000)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ [التريد] اختيار المدينة: {e}")
 
                     try:
                         travel_selected_btn = page.locator("button:has-text('Travel to Selected Location')").first
                         if travel_selected_btn.count() > 0:
                             travel_selected_btn.click(force=True)
                             sleep(2000)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ [التريد] Travel Selected: {e}")
 
-                    if confirm_modal(page, "TRAVEL"):
-                        print(f"🎉 [التريد] تم السفر إلى {dest_city}!")
-                        sleep(7000)
-                    
+                    try:
+                        page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
+                        travel_confirm_btn = page.locator("button:has-text('TRAVEL')").last
+                        if travel_confirm_btn.count() > 0:
+                            travel_confirm_btn.click(force=True)
+                            print(f"🎉 [التريد] تم السفر إلى {dest_city}!")
+                            sleep(7000)
+                    except Exception as e:
+                        print(f"⚠️ [التريد] تأكيد السفر: {e}")
+                        page.screenshot(path="travel_confirm_error.png")
+
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     continue
 
+                # ═══════════════════════════════════════
                 # 2) في السوق
-                if 'blackmarket' not in page.url:
-                    page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
-                    sleep(2000)
-                    continue
-
+                # ═══════════════════════════════════════
                 state = page.evaluate("""(items) => {
                     let body = document.body.innerText;
                     let loc = null;
@@ -450,103 +331,145 @@ def run_trade_bot():
 
                 # ✅ سان فرانسيسكو
                 if state['loc'] == "San Francisco":
-                    # فيه لوحات -> بيعها
+                    # بيع اللوحات
                     if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] سان فرانسيسكو - بيع اللوحات")
-                        if click_sell_all_in_row(page, "Stolen paintings"):
+                        clicked = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                if (r.innerText.includes('Stolen paintings')) {
+                                    let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                                    if (btn) { btn.click(); return true; }
+                                }
+                            }
+                            return false;
+                        }""")
+                        if clicked:
                             sleep(3000)
-                            if confirm_modal(page, "SELL ALL"):
-                                sleep(4000)
+                            try:
+                                confirm_btn = page.locator('button:has-text("SELL ALL")').last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
+                                confirm_btn.click(force=True)
                                 print("✅ [التريد] تم بيع اللوحات!")
+                            except Exception as e:
+                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_sell_paintings.png")
+                        else:
+                            print("⚠️ مفيش زر Sell All للوحات")
                         sleep(3000)
                         continue
                     
-                    # فيه بلاستيك -> سافر
-                    elif state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
+                    # معاه بلاستيك -> سافر
+                    if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] سان فرانسيسكو - رايح ST LOUIS")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(2500)
                         continue
-                    
-                    # فيه أي حاجة تانية -> بيعها الأول
-                    elif has_any_items(page):
-                        print("📍 [التريد] سان فرانسيسكو - فيه حاجات قديمة، ببيعها الأول")
-                        sell_all_inventory(page)
-                        continue
 
                     # فاضي -> اشتري بلاستيك
-                    else:
+                    if state['hold'] == 0:
                         print("📍 [التريد] سان فرانسيسكو - شراء بلاستيك")
-                        if click_max_buy_in_row(page, "Plastic jewelry"):
+                        clicked = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                if (r.innerText.includes('Plastic jewelry')) {
+                                    let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max Buy');
+                                    if (btn) { btn.click(); return true; }
+                                }
+                            }
+                            return false;
+                        }""")
+                        if clicked:
                             sleep(3000)
-                            if confirm_modal(page, "BUY MAX"):
-                                sleep(4000)
-                                new_count = get_hold_count(page, "Plastic jewelry")
-                                if new_count > 0:
-                                    print(f"✅ [التريد] تم شراء البلاستيك ({new_count})!")
-                                else:
-                                    print("⚠️ الشراء فشل!")
+                            try:
+                                confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
+                                confirm_btn.click(force=True)
+                                print("✅ [التريد] تم شراء البلاستيك!")
+                            except Exception as e:
+                                print(f"⚠️ زر التأكيد مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_buy.png")
                         else:
-                            print("⚠️ مفيش زر Max Buy")
-                            # نحاول نعمل refresh
-                            page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
-                            sleep(3000)
+                            print("⚠️ مفيش زر Max Buy للبلاستيك")
                         sleep(3000)
                         continue
 
                 # ✅ ST LOUIS
                 elif state['loc'] == "St Louis":
-                    # فيه بلاستيك -> بيع
+                    # بيع البلاستيك
                     if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] ST LOUIS - بيع البلاستيك")
-                        if click_sell_all_in_row(page, "Plastic jewelry"):
+                        clicked = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                if (r.innerText.includes('Plastic jewelry')) {
+                                    let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                                    if (btn) { btn.click(); return true; }
+                                }
+                            }
+                            return false;
+                        }""")
+                        if clicked:
                             sleep(3000)
-                            if confirm_modal(page, "SELL ALL"):
-                                sleep(4000)
+                            try:
+                                confirm_btn = page.locator('button:has-text("SELL ALL")').last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
+                                confirm_btn.click(force=True)
                                 print("✅ [التريد] تم بيع البلاستيك!")
+                            except Exception as e:
+                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_sell_plastic.png")
+                        else:
+                            print("⚠️ مفيش زر Sell All للبلاستيك")
                         sleep(3000)
                         continue
                     
-                    # فيه لوحات -> سافر
-                    elif state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
+                    # معاه لوحات -> سافر
+                    if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] ST LOUIS - رايح سان فرانسيسكو")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(2500)
                         continue
-                    
-                    # فيه أي حاجة تانية -> بيعها الأول
-                    elif has_any_items(page):
-                        print("📍 [التريد] ST LOUIS - فيه حاجات قديمة، ببيعها الأول")
-                        sell_all_inventory(page)
-                        continue
 
                     # فاضي -> اشتري لوحات
-                    else:
+                    if state['hold'] == 0:
                         print("📍 [التريد] ST LOUIS - شراء لوحات")
-                        if click_max_buy_in_row(page, "Stolen paintings"):
+                        clicked = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                if (r.innerText.includes('Stolen paintings')) {
+                                    let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max Buy');
+                                    if (btn) { btn.click(); return true; }
+                                }
+                            }
+                            return false;
+                        }""")
+                        if clicked:
                             sleep(3000)
-                            if confirm_modal(page, "BUY MAX"):
-                                sleep(4000)
-                                new_count = get_hold_count(page, "Stolen paintings")
-                                if new_count > 0:
-                                    print(f"✅ [التريد] تم شراء اللوحات ({new_count})!")
-                                else:
-                                    print("⚠️ الشراء فشل!")
+                            try:
+                                confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
+                                confirm_btn.click(force=True)
+                                print("✅ [التريد] تم شراء اللوحات!")
+                            except Exception as e:
+                                print(f"⚠️ زر التأكيد مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_buy_paintings.png")
                         else:
-                            print("⚠️ مفيش زر Max Buy")
-                            page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
-                            sleep(3000)
+                            print("⚠️ مفيش زر Max Buy للوحات")
                         sleep(3000)
                         continue
                 
                 else:
                     print("⚠️ [التريد] مش لاقي المدينة")
-                    page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     sleep(5000)
                     continue
 
             except Exception as e:
                 print(f"⚠️ [التريد] خطأ: {e}")
+                try:
+                    page.screenshot(path="error_screenshot.png")
+                except:
+                    pass
                 sleep(15000)
             
             sleep(10000)
