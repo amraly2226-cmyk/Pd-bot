@@ -175,11 +175,11 @@ with sync_playwright() as p:
                     if row.count() > 0:
                         sell_btn = row.locator("button", has_text="Sell All")
                         if sell_btn.count() > 0:
-                            sell_btn.click()
+                            sell_btn.click(force=True)
                             sleep(2000)
                             confirm_btn = page.locator("button:has-text('SELL ALL')").first
                             if confirm_btn.count() > 0:
-                                confirm_btn.click()
+                                confirm_btn.click(force=True)
                                 print("✅ تم بيع اللوحات!")
                             else:
                                 print("⚠️ مفيش زر تأكيد البيع")
@@ -194,25 +194,31 @@ with sync_playwright() as p:
 
                 if state['hold'] == 0:
                     print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
-                    # ✅ الطريقة الجديدة والأدق: بندور على الصف اللي فيه "Plastic jewelry" وندوس على زر "Max Buy" اللي جواه
                     buy_btn = page.locator('tr:has-text("Plastic jewelry") button:has-text("Max Buy")').first
                     
                     if buy_btn.count() > 0:
                         print("🔍 لقيت زر Max Buy، جاري الضغط...")
-                        # هناخد صورة قبل الضغط عشان نتأكد
                         page.screenshot(path="before_buy_click.png")
                         
-                        buy_btn.click()
-                        sleep(2000) # استنى شوية عشان نافذة التأكيد تظهر
+                        buy_btn.click(force=True)
+                        sleep(3000) # زيادة الوقت شوية عشان النافذة تظهر
                         
-                        # بعد الضغط على Max Buy، لازم نضغط على زر التأكيد BUY MAX
-                        confirm_btn = page.locator('button:has-text("BUY MAX")').first
-                        if confirm_btn.count() > 0:
-                            confirm_btn.click()
-                            print("✅ تم شراء البلاستيك بنجاح!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد BUY MAX")
-                            page.screenshot(path="no_confirm_buy.png")
+                        # ✅ التعديل الجديد: نستنى النافذة تظهر الأول
+                        try:
+                            page.wait_for_selector("text=Buy the maximum", timeout=5000)
+                            print("✅ نافذة التأكيد ظهرت، جاري الضغط على BUY MAX...")
+                            
+                            # بندور على زر BUY MAX اللي جوه النافذة (آخر زر في الصفحة)
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            if confirm_btn.count() > 0:
+                                confirm_btn.click(force=True)
+                                print("✅ تم شراء البلاستيك بنجاح!")
+                            else:
+                                print("⚠️ مفيش زر تأكيد BUY MAX في النافذة")
+                        except Exception as e:
+                            print(f"⚠️ النافذة المنبثقة لم تظهر في الوقت المحدد: {e}")
+                            page.screenshot(path="no_confirm_window.png")
+                    
                     else:
                         print("⚠️ مش لاقي زر Max Buy في صف Plastic jewelry")
                         page.screenshot(path="no_max_buy_btn.png")
@@ -228,11 +234,11 @@ with sync_playwright() as p:
                     if row.count() > 0:
                         sell_btn = row.locator("button", has_text="Sell All")
                         if sell_btn.count() > 0:
-                            sell_btn.click()
+                            sell_btn.click(force=True)
                             sleep(2000)
                             confirm_btn = page.locator("button:has-text('SELL ALL')").first
                             if confirm_btn.count() > 0:
-                                confirm_btn.click()
+                                confirm_btn.click(force=True)
                                 print("✅ تم بيع البلاستيك!")
                             else:
                                 print("⚠️ مفيش زر تأكيد البيع")
@@ -253,15 +259,22 @@ with sync_playwright() as p:
                         print("🔍 لقيت زر Max Buy للوحات، جاري الضغط...")
                         page.screenshot(path="before_buy_paintings.png")
                         
-                        buy_btn.click()
-                        sleep(2000)
+                        buy_btn.click(force=True)
+                        sleep(3000) # زيادة الوقت شوية عشان النافذة تظهر
                         
-                        confirm_btn = page.locator('button:has-text("BUY MAX")').first
-                        if confirm_btn.count() > 0:
-                            confirm_btn.click()
-                            print("✅ تم شراء اللوحات بنجاح!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد BUY MAX")
+                        # ✅ التعديل الجديد: نستنى النافذة تظهر الأول
+                        try:
+                            page.wait_for_selector("text=Buy the maximum", timeout=5000)
+                            print("✅ نافذة التأكيد ظهرت، جاري الضغط على BUY MAX...")
+                            
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            if confirm_btn.count() > 0:
+                                confirm_btn.click(force=True)
+                                print("✅ تم شراء اللوحات بنجاح!")
+                            else:
+                                print("⚠️ مفيش زر تأكيد BUY MAX في النافذة")
+                        except Exception as e:
+                            print(f"⚠️ النافذة المنبثقة لم تظهر في الوقت المحدد: {e}")
                             page.screenshot(path="no_confirm_buy_paintings.png")
                     else:
                         print("⚠️ مش لاقي زر Max Buy في صف Stolen paintings")
