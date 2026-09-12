@@ -1,7 +1,8 @@
 from playwright.sync_api import sync_playwright
 import time
+import re
 
-# 🔑 الكوكيز اللي إنت جبتها من متصفح Kiwi (تم تحويلها لصيغة Playwright)
+# 🔑 الكوكيز اللي إنت جبتها من متصفح Kiwi
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
     {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789214101$o8$g1$t1789214137$j24$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
@@ -20,7 +21,6 @@ with sync_playwright() as p:
         user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
     )
     
-    # ✅ هنا بنحط الكوكيز مباشرة في المتصفح
     print("🍪 2. جاري تحميل الكوكيز في المتصفح...")
     context.add_cookies(COOKIES)
     
@@ -29,19 +29,37 @@ with sync_playwright() as p:
     print("⏳ 3. جاري الدخول لصفحة البلاك ماركت مباشرة...")
     page.goto("https://www.project-dark.co.uk/blackmarket")
     
-    # استنى شوية عشان الصفحة تحمل
     page.wait_for_timeout(5000)
 
     print(f"🔗 الرابط النهائي: {page.url}")
 
     if "blackmarket" in page.url.lower():
         print("\n✅ ✅ ✅ دخلنا البلاك ماركت بنجاح باستخدام الكوكيز! ✅ ✅ ✅")
+        
         try:
-            location_element = page.locator("text=Location:").first
-            location = location_element.inner_text()
+            # الطريقة الجديدة: بندور على العنوان اللي فوق "Black Market - San Francisco"
+            # وهنقص اسم المدينة منه
+            header_element = page.locator("text=Black Market").first
+            header_text = header_element.inner_text()
+            
+            location = "مش لاقيها"
+            if "-" in header_text:
+                # هيقص الكلام بعد الشرطة ويخليه هو اللوكيشن
+                location = header_text.split("-")[-1].strip()
+            else:
+                location = header_text.strip()
+            
             print(f"📍 اللوكيشن الحالي هو: {location}")
+            
         except Exception as e:
-            print(f"⚠️ معرفتش أسحب اللوكيشن: {e}")
+            print(f"⚠️ معرفتش أسحب اللوكيشن بالطريقة دي، هجرب طريقة تانية...")
+            # طريقة احتياطية: نبحث في كود الصفحة عن كلمة Location
+            html_content = page.content()
+            match = re.search(r'Location[:\s]*([A-Za-z\s]+)', html_content)
+            if match:
+                print(f"📍 اللوكيشن الحالي (طريقة احتياطية): {match.group(1).strip()}")
+            else:
+                print("⚠️ للأسف معرفتش ألاقي اللوكيشن في الصفحة.")
     else:
         print("\n❌ ❌ ❌ فشل الدخول بالكوكيز. لسه في صفحة اللوجين.")
     
