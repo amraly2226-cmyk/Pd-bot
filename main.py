@@ -22,7 +22,7 @@ COOKIES = [
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
 
 # ⏰ إعدادات بوت الأسهم
-STOCKS_INTERVAL = 15 * 60  # كل 15 دقيقة
+STOCKS_INTERVAL = 15 * 60
 
 def sleep(ms):
     time.sleep(ms / 1000.0)
@@ -38,7 +38,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 🔧 دوال مساعدة (Playwright)
+# 🔧 دوال مساعدة
 # ═══════════════════════════════════════════════════════════════
 
 def click_sell_all_in_row(page, item_name):
@@ -75,8 +75,28 @@ def confirm_modal(page, button_text, timeout=10000):
         print(f"⚠️ زر التأكيد {button_text} مش ظهر: {e}")
         return False
 
+def get_hold_count(page, item_name):
+    """بترجع كمية العنصر اللي مع البوت من المخزن"""
+    try:
+        return page.evaluate("""(itemName) => {
+            let rows = [...document.querySelectorAll('tr')];
+            for (let r of rows) {
+                if (r.innerText.toLowerCase().includes(itemName.toLowerCase())) {
+                    let cells = [...r.querySelectorAll('td')];
+                    if (cells.length >= 3) {
+                        let youHaveCell = cells[2].innerText;
+                        let match = youHaveCell.match(/(\\d+)/);
+                        if (match) return parseInt(match[1]);
+                    }
+                }
+            }
+            return 0;
+        }""", item_name)
+    except:
+        return 0
+
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (Thread مستقل)
+# 📈 بوت الأسهم
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -95,8 +115,7 @@ def run_stocks_bot():
         page = context.new_page()
         page.set_default_timeout(15000)
         
-        # أول ما يشتغل، يبدأ فوراً
-        time.sleep(5)  # نستنى شوية عشان التريد يبدأ الأول
+        time.sleep(5)
         
         while True:
             try:
@@ -112,9 +131,7 @@ def run_stocks_bot():
                 except:
                     pass
                 
-                # ═══════════════════════════════════════
                 # 1) بيع كل الأسهم
-                # ═══════════════════════════════════════
                 print("🔴 [الأسهم] بدأت عملية البيع...")
                 try:
                     sell_all_buttons = page.locator('button:has-text("Sell All")')
@@ -135,9 +152,7 @@ def run_stocks_bot():
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # ═══════════════════════════════════════
                 # 2) شراء الأسهم الخضراء
-                # ═══════════════════════════════════════
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 
@@ -202,14 +217,11 @@ def run_stocks_bot():
             except Exception as e:
                 print(f"⚠️ [الأسهم] حصل خطأ: {e}")
             
-            # ⏰ نستنى 15 دقيقة قبل الدورة الجاية
             print(f"⏰ [الأسهم] هستنى 15 دقيقة للدورة الجاية...")
             time.sleep(STOCKS_INTERVAL)
-        
-        browser.close()
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (Thread رئيسي)
+# 🌐 بوت التريد
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -237,7 +249,7 @@ def run_trade_bot():
         while True:
             try:
                 # ═══════════════════════════════════════
-                # 1) لو إحنا في صفحة الترافل
+                # 1) صفحة الترافل
                 # ═══════════════════════════════════════
                 if 'travel' in page.url:
                     cooldown_text = page.evaluate("""() => {
@@ -261,18 +273,18 @@ def run_trade_bot():
                         wait_seconds = parse_cooldown(cooldown_text)
                         if wait_seconds > 0:
                             wait_seconds += 10
-                            print(f"⏳ [التريد] في كولداون للسفر: {cooldown_text} - هستنى {wait_seconds} ثانية...")
+                            print(f"⏳ [التريد] كولداون سفر: {cooldown_text} - هستنى {wait_seconds} ثانية...")
                             sleep(wait_seconds * 1000)
-                            print("✅ [التريد] العداد خلص! جاري السفر فوراً...")
+                            print("✅ [التريد] العداد خلص! هسافر فوراً...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                             continue
                     
                     current_city = page.evaluate("""() => {
                         let body = document.body.innerText;
+                        if (body.includes('Black Market - San Francisco')) return 'San Francisco';
+                        if (body.includes('Black Market - St Louis')) return 'St Louis';
                         let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
                         if (m) return m[1];
-                        if (body.includes('Black Market - St Louis')) return 'St Louis';
-                        if (body.includes('Black Market - San Francisco')) return 'San Francisco';
                         return null;
                     }""")
 
@@ -289,7 +301,7 @@ def run_trade_bot():
                             grid_btn.click(force=True)
                             sleep(2000)
                     except Exception as e:
-                        print(f"⚠️ [التريد] مشكلة في Grid View: {e}")
+                        print(f"⚠️ [التريد] Grid View: {e}")
 
                     try:
                         city_card = page.locator(f"text='{dest_city}'").first
@@ -297,7 +309,7 @@ def run_trade_bot():
                             city_card.click(force=True)
                             sleep(2000)
                     except Exception as e:
-                        print(f"⚠️ [التريد] مشكلة في اختيار المدينة: {e}")
+                        print(f"⚠️ [التريد] اختيار المدينة: {e}")
 
                     try:
                         travel_selected_btn = page.locator("button:has-text('Travel to Selected Location')").first
@@ -305,7 +317,7 @@ def run_trade_bot():
                             travel_selected_btn.click(force=True)
                             sleep(2000)
                     except Exception as e:
-                        print(f"⚠️ [التريد] مشكلة في Travel Selected: {e}")
+                        print(f"⚠️ [التريد] Travel Selected: {e}")
 
                     if confirm_modal(page, "TRAVEL"):
                         print(f"🎉 [التريد] تم السفر إلى {dest_city}!")
@@ -317,24 +329,32 @@ def run_trade_bot():
                     continue
 
                 # ═══════════════════════════════════════
-                # 2) في السوق (بيع وشراء)
+                # 2) في السوق
                 # ═══════════════════════════════════════
                 state = page.evaluate("""(items) => {
                     let body = document.body.innerText;
                     let loc = null;
                     let cooldownStr = null;
                     
-                    let lines = body.split('\\n');
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                            for (let j = i + 1; j < lines.length; j++) {
-                                if (lines[j].trim()) { loc = lines[j].trim(); break; }
+                    // ✅ اكتشاف المدينة من عنوان الصفحة (أدق بكتير)
+                    if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
+                    else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
+                    else {
+                        // طريقة احتياطية
+                        let lines = body.split('\\n');
+                        for (let i = 0; i < lines.length; i++) {
+                            if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                                for (let j = i + 1; j < lines.length; j++) {
+                                    if (lines[j].trim()) { 
+                                        if (lines[j].includes('San Francisco')) loc = 'San Francisco';
+                                        else if (lines[j].includes('St Louis')) loc = 'St Louis';
+                                        break; 
+                                    }
+                                }
+                                break;
                             }
-                            break;
                         }
                     }
-                    if (loc && loc.includes('San Francisco')) loc = 'San Francisco';
-                    else if (loc && loc.includes('St Louis')) loc = 'St Louis';
 
                     let cdMatch = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i) || body.match(/Travel in\\s*([0-9hms ]+)/i);
                     if (cdMatch) cooldownStr = cdMatch[1];
@@ -373,7 +393,7 @@ def run_trade_bot():
                 }""", ITEMS)
 
                 if state['cd']:
-                    print(f"⏳ [التريد] في كولداون: {state['cd']} - هستنى دقيقة...")
+                    print(f"⏳ [التريد] كولداون سوق: {state['cd']} - هستنى دقيقة...")
                     sleep(60000)
                     continue
 
@@ -384,7 +404,13 @@ def run_trade_bot():
                         if click_sell_all_in_row(page, "Stolen paintings"):
                             sleep(3000)
                             if confirm_modal(page, "SELL ALL"):
-                                print("✅ [التريد] تم بيع اللوحات!")
+                                sleep(4000)
+                                remaining = get_hold_count(page, "Stolen paintings")
+                                if remaining == 0:
+                                    print("✅ [التريد] تم بيع اللوحات (متأكد)!")
+                                else:
+                                    print(f"⚠️ [التريد] لسه فيه {remaining} لوحة! البيع فشل.")
+                                    page.screenshot(path="sell_failed_paintings.png")
                             else:
                                 page.screenshot(path="no_confirm_sell_paintings.png")
                         else:
@@ -403,7 +429,13 @@ def run_trade_bot():
                         if click_max_buy_in_row(page, "Plastic jewelry"):
                             sleep(3000)
                             if confirm_modal(page, "BUY MAX"):
-                                print("✅ [التريد] تم شراء البلاستيك!")
+                                sleep(4000)
+                                new_count = get_hold_count(page, "Plastic jewelry")
+                                if new_count > 0:
+                                    print(f"✅ [التريد] تم شراء البلاستيك ({new_count} حاجة)!")
+                                else:
+                                    print("⚠️ [التريد] الشراء فشل!")
+                                    page.screenshot(path="buy_failed_plastic.png")
                             else:
                                 page.screenshot(path="no_confirm_buy.png")
                         else:
@@ -418,7 +450,13 @@ def run_trade_bot():
                         if click_sell_all_in_row(page, "Plastic jewelry"):
                             sleep(3000)
                             if confirm_modal(page, "SELL ALL"):
-                                print("✅ [التريد] تم بيع البلاستيك!")
+                                sleep(4000)
+                                remaining = get_hold_count(page, "Plastic jewelry")
+                                if remaining == 0:
+                                    print("✅ [التريد] تم بيع البلاستيك (متأكد)!")
+                                else:
+                                    print(f"⚠️ [التريد] لسه فيه {remaining} بلاستيك! البيع فشل.")
+                                    page.screenshot(path="sell_failed_plastic.png")
                             else:
                                 page.screenshot(path="no_confirm_sell_plastic.png")
                         else:
@@ -437,7 +475,13 @@ def run_trade_bot():
                         if click_max_buy_in_row(page, "Stolen paintings"):
                             sleep(3000)
                             if confirm_modal(page, "BUY MAX"):
-                                print("✅ [التريد] تم شراء اللوحات!")
+                                sleep(4000)
+                                new_count = get_hold_count(page, "Stolen paintings")
+                                if new_count > 0:
+                                    print(f"✅ [التريد] تم شراء اللوحات ({new_count} حاجة)!")
+                                else:
+                                    print("⚠️ [التريد] الشراء فشل!")
+                                    page.screenshot(path="buy_failed_paintings.png")
                             else:
                                 page.screenshot(path="no_confirm_buy_paintings.png")
                         else:
@@ -459,30 +503,25 @@ def run_trade_bot():
                 sleep(15000)
             
             sleep(10000)
-        
-        browser.close()
 
 # ═══════════════════════════════════════════════════════════════
-# 🚀 تشغيل البوتين مع بعض
+# 🚀 التشغيل
 # ═══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
-    print("🚀🚀🚀 تشغيل البوتين (تريد + أسهم) في نفس الوقت...")
+    print("🚀🚀🚀 تشغيل البوتين (تريد + أسهم)...")
     print("="*60)
     
-    # إنشاء الخيوط
     trade_thread = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     stocks_thread = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
     
-    # تشغيل الخيوط
     trade_thread.start()
     stocks_thread.start()
     
-    print("✅ التريد بيشتغل في الخيط:", trade_thread.name)
-    print("✅ الأسهم بتشتغل في الخيط:", stocks_thread.name)
+    print("✅ التريد شغال:", trade_thread.name)
+    print("✅ الأسهم شغالة:", stocks_thread.name)
     print("="*60)
     
-    # الخيط الرئيسي يفضل مستني
     try:
         while True:
             time.sleep(60)
