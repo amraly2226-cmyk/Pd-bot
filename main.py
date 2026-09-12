@@ -1,5 +1,6 @@
 from playwright.sync_api import sync_playwright
 import time
+import re
 
 # 🔑 بيانات الدخول والكوكيز
 USERNAME = "amr.aly.2226@gmail.com"
@@ -21,6 +22,20 @@ ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry
 
 def sleep(ms):
     time.sleep(ms / 1000.0)
+
+def parse_cooldown(text):
+    """بتحول نص العداد زي '13m 24s' لعدد الثواني"""
+    total_seconds = 0
+    # ندور على الساعات
+    hours = re.search(r'(\d+)\s*h', text)
+    if hours: total_seconds += int(hours.group(1)) * 3600
+    # ندور على الدقايق
+    minutes = re.search(r'(\d+)\s*m', text)
+    if minutes: total_seconds += int(minutes.group(1)) * 60
+    # ندور على الثواني
+    seconds = re.search(r'(\d+)\s*s', text)
+    if seconds: total_seconds += int(seconds.group(1))
+    return total_seconds
 
 with sync_playwright() as p:
     print("🚀 البوت شغال...")
@@ -55,6 +70,45 @@ with sync_playwright() as p:
             # 1) لو إحنا في صفحة الترافل (نفذ السفر)
             # ═══════════════════════════════════════════════════════════════
             if 'travel' in page.url:
+                # ✅ قراءة العداد وحساب الوقت بالظبط
+                cooldown_text = page.evaluate("""() => {
+                    let body = document.body.innerText;
+                    let cdMatch = body.match(/You cannot travel for:?\\s*([^\\n]+)/i);
+                    if (cdMatch) {
+                        let str = cdMatch[1].trim();
+                        // لو الوقت خلص (00:00:00) أو مش موجود، نرجع null
+                        if (str.includes('00:00') || str.includes('0m') || str.includes('0s')) {
+                            // نتأكد إنه مش صفر حقيقي
+                            if (!/(\d+[hms])/.test(str)) return null;
+                            // لو فيه أرقام غير الصفر، نرجعه
+                            if (str.match(/(\d+)\s*h/) && parseInt(str.match(/(\d+)\s*h/)[1]) > 0) return str;
+                            if (str.match(/(\d+)\s*m/) && parseInt(str.match(/(\d+)\s*m/)[1]) > 0) return str;
+                            if (str.match(/(\d+)\s*s/) && parseInt(str.match(/(\d+)\s*s/)[1]) > 0) return str;
+                            return null;
+                        }
+                        return str;
+                    }
+                    return null;
+                }""")
+
+                if cooldown_text:
+                    # حساب الوقت بالثواني
+                    wait_seconds = parse_cooldown(cooldown_text)
+                    if wait_seconds > 0:
+                        # نضيف 10 ثواني أمان
+                        wait_seconds += 10
+                        print(f"⏳ في كولداون للسفر: {cooldown_text} - البوت هيستنى {wait_seconds} ثانية بالظبط...")
+                        sleep(wait_seconds * 1000)
+                        print("✅ العداد خلص! جاري السفر فوراً...")
+                        # نعمل Refresh ونكمل على طول
+                        page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                        continue
+                    else:
+                        print("✅ مفيش كولداون! جاري تجهيز السفر...")
+                else:
+                    print("✅ مفيش كولداون! جاري تجهيز السفر...")
+
+                # لو مفيش كولداون، نكمل عملية السفر
                 current_city = page.evaluate("""() => {
                     let body = document.body.innerText;
                     let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
@@ -103,13 +157,12 @@ with sync_playwright() as p:
 
                 # 4) انتظار النافذة المنبثقة والضغط على TRAVEL
                 try:
-                    # بنستنى زر TRAVEL يظهر في النافذة
                     page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
                     travel_confirm_btn = page.locator("button:has-text('TRAVEL')").last
                     if travel_confirm_btn.count() > 0:
                         travel_confirm_btn.click(force=True)
                         print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
-                        sleep(7000) # وقت تحميل المدينة الجديدة
+                        sleep(7000) 
                     else:
                         print("⚠️ مش لاقي زر TRAVEL في النافذة")
                 except Exception as e:
@@ -177,12 +230,13 @@ with sync_playwright() as p:
             }""", ITEMS)
 
             if state['cd']:
-                print(f"⏳ في كولداون: {state['cd']} - هستنى دقيقة...")
+                print(f"⏳ في كولداون في السوق: {state['cd']} - هستنى دقيقة...")
                 sleep(60000)
                 continue
 
             # ✅ سان فرانسيسكو: بيع اللوحات أو شراء البلاستيك
             if state['loc'] == "San Francisco":
+                # بيع اللوحات
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - بيع لوحات مسروقة")
                     row = page.locator("tr", has_text="Stolen paintings").first
@@ -191,21 +245,25 @@ with sync_playwright() as p:
                         if sell_btn.count() > 0:
                             sell_btn.click(force=True)
                             sleep(2000)
-                            confirm_btn = page.locator("button:has-text('SELL ALL')").last
-                            if confirm_btn.count() > 0:
+                            try:
+                                confirm_btn = page.locator("button:has-text('SELL ALL')").last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
                                 confirm_btn.click(force=True)
                                 print("✅ تم بيع اللوحات!")
-                            else:
-                                print("⚠️ مفيش زر تأكيد البيع")
+                            except Exception as e:
+                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_sell_paintings.png")
                             sleep(3000)
                     continue
                 
+                # لو معاه بلاستيك، يسافر
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - رايح ST LOUIS (عشان نبيع البلاستيك)")
                     page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
                     sleep(2500)
                     continue
 
+                # شراء البلاستيك لو فاضي
                 if state['hold'] == 0:
                     print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
                     buy_btn = page.locator('tr:has-text("Plastic jewelry") button:has-text("Max Buy")').first
@@ -215,7 +273,6 @@ with sync_playwright() as p:
                         buy_btn.click(force=True)
                         sleep(2000)
                         
-                        # ✅ التعديل: نستنى زر التأكيد BUY MAX يظهر وندوس عليه
                         try:
                             confirm_btn = page.locator('button:has-text("BUY MAX")').last
                             confirm_btn.wait_for(state="visible", timeout=10000)
@@ -233,6 +290,7 @@ with sync_playwright() as p:
 
             # ✅ ST LOUIS: بيع البلاستيك أو شراء اللوحات
             elif state['loc'] == "St Louis":
+                # بيع البلاستيك
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 ST LOUIS - بيع بلاستيك جيلوري")
                     row = page.locator("tr", has_text="Plastic jewelry").first
@@ -241,21 +299,25 @@ with sync_playwright() as p:
                         if sell_btn.count() > 0:
                             sell_btn.click(force=True)
                             sleep(2000)
-                            confirm_btn = page.locator("button:has-text('SELL ALL')").last
-                            if confirm_btn.count() > 0:
+                            try:
+                                confirm_btn = page.locator("button:has-text('SELL ALL')").last
+                                confirm_btn.wait_for(state="visible", timeout=10000)
                                 confirm_btn.click(force=True)
                                 print("✅ تم بيع البلاستيك!")
-                            else:
-                                print("⚠️ مفيش زر تأكيد البيع")
+                            except Exception as e:
+                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
+                                page.screenshot(path="no_confirm_sell_plastic.png")
                             sleep(3000)
                     continue
                 
+                # لو معاه لوحات، يسافر
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 ST LOUIS - رايح سان فرانسيسكو (عشان نبيع اللوحات)")
                     page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
                     sleep(2500)
                     continue
 
+                # شراء اللوحات لو فاضي
                 if state['hold'] == 0:
                     print("📍 ST LOUIS - شراء لوحات مسروقة")
                     buy_btn = page.locator('tr:has-text("Stolen paintings") button:has-text("Max Buy")').first
@@ -265,7 +327,6 @@ with sync_playwright() as p:
                         buy_btn.click(force=True)
                         sleep(2000)
                         
-                        # ✅ التعديل: نستنى زر التأكيد BUY MAX يظهر وندوس عليه
                         try:
                             confirm_btn = page.locator('button:has-text("BUY MAX")').last
                             confirm_btn.wait_for(state="visible", timeout=10000)
