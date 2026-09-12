@@ -24,18 +24,34 @@ def sleep(ms):
     time.sleep(ms / 1000.0)
 
 def parse_cooldown(text):
-    """بتحول نص العداد زي '13m 24s' لعدد الثواني"""
     total_seconds = 0
-    # ندور على الساعات
     hours = re.search(r'(\d+)\s*h', text)
     if hours: total_seconds += int(hours.group(1)) * 3600
-    # ندور على الدقايق
     minutes = re.search(r'(\d+)\s*m', text)
     if minutes: total_seconds += int(minutes.group(1)) * 60
-    # ندور على الثواني
     seconds = re.search(r'(\d+)\s*s', text)
     if seconds: total_seconds += int(seconds.group(1))
     return total_seconds
+
+# ✅ دالة جديدة للضغط على أزرار التأكيد (اللي في النافذة المنبثقة)
+def click_modal_button(page, button_text):
+    """بتحاول تضغط على زر التأكيد اللي جوه النافذة المنبثقة (اللي مش في جدول)"""
+    try:
+        # بندور على الزر اللي مش جوه أي صف (tr)
+        clicked = page.evaluate("""(btnText) => {
+            let buttons = [...document.querySelectorAll('button')];
+            for (let btn of buttons) {
+                if (btn.innerText.trim() === btnText && !btn.closest('tr')) {
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+        }""", button_text)
+        return clicked
+    except Exception as e:
+        print(f"⚠️ مشكلة في الضغط على زر {button_text}: {e}")
+        return False
 
 with sync_playwright() as p:
     print("🚀 البوت شغال...")
@@ -49,41 +65,34 @@ with sync_playwright() as p:
         viewport={"width": 1920, "height": 1080}
     )
     
-    # 🍪 تحميل الكوكيز
     print("🍪 جاري تحميل الكوكيز...")
     context.add_cookies(COOKIES)
     
     page = context.new_page()
     page.set_default_timeout(15000)
 
-    # 🌐 الدخول الأولي
     try:
         page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='networkidle', timeout=60000)
         print("✅ دخلنا بالكوكيز")
     except Exception as e:
         print(f"⚠️ مشكلة في الدخول: {e}")
 
-    # 🔄 الحلقة اللانهائية للبيع والشراء والسفر
     while True:
         try:
             # ═══════════════════════════════════════════════════════════════
             # 1) لو إحنا في صفحة الترافل (نفذ السفر)
             # ═══════════════════════════════════════════════════════════════
             if 'travel' in page.url:
-                # ✅ قراءة العداد وحساب الوقت بالظبط
                 cooldown_text = page.evaluate("""() => {
                     let body = document.body.innerText;
                     let cdMatch = body.match(/You cannot travel for:?\\s*([^\\n]+)/i);
                     if (cdMatch) {
                         let str = cdMatch[1].trim();
-                        // لو الوقت خلص (00:00:00) أو مش موجود، نرجع null
                         if (str.includes('00:00') || str.includes('0m') || str.includes('0s')) {
-                            // نتأكد إنه مش صفر حقيقي
-                            if (!/(\d+[hms])/.test(str)) return null;
-                            // لو فيه أرقام غير الصفر، نرجعه
-                            if (str.match(/(\d+)\s*h/) && parseInt(str.match(/(\d+)\s*h/)[1]) > 0) return str;
-                            if (str.match(/(\d+)\s*m/) && parseInt(str.match(/(\d+)\s*m/)[1]) > 0) return str;
-                            if (str.match(/(\d+)\s*s/) && parseInt(str.match(/(\d+)\s*s/)[1]) > 0) return str;
+                            if (!/(\\d+[hms])/.test(str)) return null;
+                            if (str.match(/(\\d+)\\s*h/) && parseInt(str.match(/(\\d+)\\s*h/)[1]) > 0) return str;
+                            if (str.match(/(\\d+)\\s*m/) && parseInt(str.match(/(\\d+)\\s*m/)[1]) > 0) return str;
+                            if (str.match(/(\\d+)\\s*s/) && parseInt(str.match(/(\\d+)\\s*s/)[1]) > 0) return str;
                             return null;
                         }
                         return str;
@@ -92,15 +101,12 @@ with sync_playwright() as p:
                 }""")
 
                 if cooldown_text:
-                    # حساب الوقت بالثواني
                     wait_seconds = parse_cooldown(cooldown_text)
                     if wait_seconds > 0:
-                        # نضيف 10 ثواني أمان
                         wait_seconds += 10
-                        print(f"⏳ في كولداون للسفر: {cooldown_text} - البوت هيستنى {wait_seconds} ثانية بالظبط...")
+                        print(f"⏳ في كولداون للسفر: {cooldown_text} - البوت هيستنى {wait_seconds} ثانية...")
                         sleep(wait_seconds * 1000)
                         print("✅ العداد خلص! جاري السفر فوراً...")
-                        # نعمل Refresh ونكمل على طول
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
                         continue
                     else:
@@ -108,7 +114,6 @@ with sync_playwright() as p:
                 else:
                     print("✅ مفيش كولداون! جاري تجهيز السفر...")
 
-                # لو مفيش كولداون، نكمل عملية السفر
                 current_city = page.evaluate("""() => {
                     let body = document.body.innerText;
                     let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
@@ -125,51 +130,36 @@ with sync_playwright() as p:
                 dest_city = 'St Louis' if current_city == 'San Francisco' else 'San Francisco'
                 print(f"✈️ {current_city} - جاري تجهيز السفر إلى {dest_city}")
 
-                # 1) اختيار جرايد فيو بالضغط المباشر
-                try:
-                    grid_view_btn = page.locator("text='Grid View'").first
-                    if grid_view_btn.count() > 0:
-                        grid_view_btn.click(force=True)
-                        print("✅ تم الضغط على Grid View")
-                        sleep(2000)
-                except Exception as e:
-                    print(f"⚠️ مشكلة في الضغط على Grid View: {e}")
+                page.evaluate("""() => { 
+                    let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); 
+                    if (grid) grid.click(); 
+                }""")
+                sleep(2000)
 
-                # 2) اختيار البلد من الكارت
-                try:
-                    city_card = page.locator(f"text='{dest_city}'").first
-                    if city_card.count() > 0:
-                        city_card.click(force=True)
-                        print(f"✅ تم الضغط على كارت {dest_city}")
-                        sleep(2000)
-                except Exception as e:
-                    print(f"⚠️ مشكلة في اختيار المدينة: {e}")
+                page.evaluate("""(city) => {
+                    let elements = [...document.querySelectorAll('div, span, a')];
+                    let textEl = elements.find(el => el.innerText.trim().toLowerCase() === city.toLowerCase() && el.offsetParent !== null);
+                    if (textEl) {
+                        let card = textEl.closest('div');
+                        if (card && card.offsetWidth > 100) card.click();
+                        else textEl.click();
+                    }
+                }""", dest_city)
+                sleep(2000)
 
-                # 3) الضغط على Travel to Selected Location
-                try:
-                    travel_selected_btn = page.locator("button:has-text('Travel to Selected Location')").first
-                    if travel_selected_btn.count() > 0:
-                        travel_selected_btn.click(force=True)
-                        print("✅ تم الضغط على Travel to Selected Location")
-                        sleep(2000)
-                except Exception as e:
-                    print(f"⚠️ مشكلة في الضغط على Travel to Selected Location: {e}")
+                page.evaluate("""() => { 
+                    let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
+                    if (btn) btn.click(); 
+                }""")
+                sleep(2000)
 
-                # 4) انتظار النافذة المنبثقة والضغط على TRAVEL
-                try:
-                    page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
-                    travel_confirm_btn = page.locator("button:has-text('TRAVEL')").last
-                    if travel_confirm_btn.count() > 0:
-                        travel_confirm_btn.click(force=True)
-                        print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
-                        sleep(7000) 
-                    else:
-                        print("⚠️ مش لاقي زر TRAVEL في النافذة")
-                except Exception as e:
-                    print(f"⚠️ مشكلة في نافذة تأكيد السفر: {e}")
-                    page.screenshot(path="travel_confirm_error.png")
-
-                # نرجع للسوق بعد السفر
+                page.evaluate("""() => {
+                    let allBtns = [...document.querySelectorAll('button')];
+                    let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+                    if (travelBtn) travelBtn.click();
+                }""")
+                print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
+                sleep(7000) 
                 page.goto('https://www.project-dark.co.uk/blackmarket')
                 continue
 
@@ -234,111 +224,121 @@ with sync_playwright() as p:
                 sleep(60000)
                 continue
 
-            # ✅ سان فرانسيسكو: بيع اللوحات أو شراء البلاستيك
+            # ✅ سان فرانسيسكو
             if state['loc'] == "San Francisco":
                 # بيع اللوحات
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - بيع لوحات مسروقة")
-                    row = page.locator("tr", has_text="Stolen paintings").first
-                    if row.count() > 0:
-                        sell_btn = row.locator("button", has_text="Sell All")
-                        if sell_btn.count() > 0:
-                            sell_btn.click(force=True)
-                            sleep(2000)
-                            try:
-                                confirm_btn = page.locator("button:has-text('SELL ALL')").last
-                                confirm_btn.wait_for(state="visible", timeout=10000)
-                                confirm_btn.click(force=True)
-                                print("✅ تم بيع اللوحات!")
-                            except Exception as e:
-                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
-                                page.screenshot(path="no_confirm_sell_paintings.png")
-                            sleep(3000)
+                    clicked = page.evaluate("""() => {
+                        let rows = [...document.querySelectorAll('tr')];
+                        for (let r of rows) {
+                            if (r.innerText.includes('Stolen paintings')) {
+                                let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    if clicked:
+                        sleep(2000)
+                        if click_modal_button(page, "SELL ALL"):
+                            print("✅ تم بيع اللوحات!")
+                        else:
+                            print("⚠️ مفيش زر تأكيد SELL ALL")
+                            page.screenshot(path="no_confirm_sell_paintings.png")
+                    else:
+                        print("⚠️ مفيش زر Sell All للوحات")
+                    sleep(3000)
                     continue
                 
-                # لو معاه بلاستيك، يسافر
+                # سافر لو معاه بلاستيك
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - رايح ST LOUIS (عشان نبيع البلاستيك)")
                     page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
                     sleep(2500)
                     continue
 
-                # شراء البلاستيك لو فاضي
+                # شراء البلاستيك
                 if state['hold'] == 0:
                     print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
-                    buy_btn = page.locator('tr:has-text("Plastic jewelry") button:has-text("Max Buy")').first
-                    
-                    if buy_btn.count() > 0:
-                        print("🔍 لقيت زر Max Buy، جاري الضغط...")
-                        buy_btn.click(force=True)
+                    clicked = page.evaluate("""() => {
+                        let rows = [...document.querySelectorAll('tr')];
+                        for (let r of rows) {
+                            if (r.innerText.includes('Plastic jewelry')) {
+                                let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max Buy');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    if clicked:
                         sleep(2000)
-                        
-                        try:
-                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
+                        if click_modal_button(page, "BUY MAX"):
                             print("✅ تم شراء البلاستيك بنجاح!")
-                        except Exception as e:
-                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
+                        else:
+                            print("⚠️ مفيش زر تأكيد BUY MAX")
                             page.screenshot(path="no_confirm_buy.png")
                     else:
-                        print("⚠️ مش لاقي زر Max Buy في صف Plastic jewelry")
-                        page.screenshot(path="no_max_buy_btn.png")
-                    
+                        print("⚠️ مفيش زر Max Buy للبلاستيك")
                     sleep(3000)
                     continue
 
-            # ✅ ST LOUIS: بيع البلاستيك أو شراء اللوحات
+            # ✅ ST LOUIS
             elif state['loc'] == "St Louis":
                 # بيع البلاستيك
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 ST LOUIS - بيع بلاستيك جيلوري")
-                    row = page.locator("tr", has_text="Plastic jewelry").first
-                    if row.count() > 0:
-                        sell_btn = row.locator("button", has_text="Sell All")
-                        if sell_btn.count() > 0:
-                            sell_btn.click(force=True)
-                            sleep(2000)
-                            try:
-                                confirm_btn = page.locator("button:has-text('SELL ALL')").last
-                                confirm_btn.wait_for(state="visible", timeout=10000)
-                                confirm_btn.click(force=True)
-                                print("✅ تم بيع البلاستيك!")
-                            except Exception as e:
-                                print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
-                                page.screenshot(path="no_confirm_sell_plastic.png")
-                            sleep(3000)
+                    clicked = page.evaluate("""() => {
+                        let rows = [...document.querySelectorAll('tr')];
+                        for (let r of rows) {
+                            if (r.innerText.includes('Plastic jewelry')) {
+                                let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    if clicked:
+                        sleep(2000)
+                        if click_modal_button(page, "SELL ALL"):
+                            print("✅ تم بيع البلاستيك!")
+                        else:
+                            print("⚠️ مفيش زر تأكيد SELL ALL")
+                            page.screenshot(path="no_confirm_sell_plastic.png")
+                    else:
+                        print("⚠️ مفيش زر Sell All للبلاستيك")
+                    sleep(3000)
                     continue
                 
-                # لو معاه لوحات، يسافر
+                # سافر لو معاه لوحات
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 ST LOUIS - رايح سان فرانسيسكو (عشان نبيع اللوحات)")
                     page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
                     sleep(2500)
                     continue
 
-                # شراء اللوحات لو فاضي
+                # شراء اللوحات
                 if state['hold'] == 0:
                     print("📍 ST LOUIS - شراء لوحات مسروقة")
-                    buy_btn = page.locator('tr:has-text("Stolen paintings") button:has-text("Max Buy")').first
-                    
-                    if buy_btn.count() > 0:
-                        print("🔍 لقيت زر Max Buy للوحات، جاري الضغط...")
-                        buy_btn.click(force=True)
+                    clicked = page.evaluate("""() => {
+                        let rows = [...document.querySelectorAll('tr')];
+                        for (let r of rows) {
+                            if (r.innerText.includes('Stolen paintings')) {
+                                let btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Max Buy');
+                                if (btn) { btn.click(); return true; }
+                            }
+                        }
+                        return false;
+                    }""")
+                    if clicked:
                         sleep(2000)
-                        
-                        try:
-                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
+                        if click_modal_button(page, "BUY MAX"):
                             print("✅ تم شراء اللوحات بنجاح!")
-                        except Exception as e:
-                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
+                        else:
+                            print("⚠️ مفيش زر تأكيد BUY MAX")
                             page.screenshot(path="no_confirm_buy_paintings.png")
                     else:
-                        print("⚠️ مش لاقي زر Max Buy في صف Stolen paintings")
-                        page.screenshot(path="no_max_buy_paintings.png")
-                    
+                        print("⚠️ مفيش زر Max Buy للوحات")
                     sleep(3000)
                     continue
             
@@ -351,7 +351,6 @@ with sync_playwright() as p:
             print(f"حصل خطأ مؤقت، معيد المحاولة: {e}")
             try:
                 page.screenshot(path="error_screenshot.png")
-                print("📸 تم حفظ صورة للخطأ في error_screenshot.png")
             except:
                 pass
             sleep(15000)
