@@ -1,73 +1,70 @@
-import os
 import cloudscraper
 from bs4 import BeautifulSoup
 
-# سحب بيانات الدخول
-username = os.environ.get('PD_USER')
-password = os.environ.get('PD_PASS')
+# 🔑 بيانات الدخول الخاصة بك
+USERNAME = "amr.aly.2226@gmail.com"
+PASSWORD = "Gun@12345"
 
-if not username or not password:
-    print("❌ خطأ: متغيرات PD_USER أو PD_PASS غير موجودة!")
-    exit()
-
-# تجهيز الـ Scraper
+# تجهيز الـ Scraper عشان يبين إنه موبايل أندرويد
 scraper = cloudscraper.create_scraper(
-    browser={'browser': 'chrome', 'platform': 'windows', 'desktop': True}
+    browser={
+        'browser': 'chrome',
+        'platform': 'android',
+        'mobile': True,
+        'desktop': False
+    }
 )
 
 headers = {
     'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
     'Referer': 'https://www.project-dark.co.uk/'
 }
 
-# 1. نروح لصفحة تسجيل الدخول الأول عشان ناخد التوكن
-login_url = 'https://www.project-dark.co.uk/login'
-print("⏳ جاري فتح صفحة تسجيل الدخول...")
+print("⏳ 1. جاري فتح صفحة تسجيل الدخول...")
+login_url = "https://www.project-dark.co.uk/login"
 login_page = scraper.get(login_url, headers=headers)
 
 if login_page.status_code != 200:
-    print(f"❌ فشل فتح صفحة اللوجين. كود: {login_page.status_code}")
+    print(f"❌ فشل فتح صفحة اللوجين. كود الحالة: {login_page.status_code}")
     exit()
 
-# 2. نسحب التوكن (CSRF Token) من الصفحة
+# سحب الـ CSRF Token
 soup = BeautifulSoup(login_page.text, 'lxml')
-csrf_token = None
 token_input = soup.find('input', {'name': '_token'})
-if token_input:
-    csrf_token = token_input.get('value')
 
-if not csrf_token:
-    print("❌ معرفتش ألاقي الـ CSRF Token. ممكن الموقع غير الشكل.")
+if not token_input:
+    print("❌ معرفتش ألاقي التوكن (CSRF Token).")
     exit()
 
-print("🔑 تم سحب التوكن بنجاح. جاري تسجيل الدخول...")
+csrf_token = token_input.get('value')
+print("🔑 2. تم سحب التوكن بنجاح. جاري تسجيل الدخول...")
 
-# 3. نبعت بيانات الدخول
+# تجهيز بيانات الدخول
 login_data = {
     '_token': csrf_token,
-    'email': username, 
-    'password': password
+    'email': USERNAME,
+    'password': PASSWORD
 }
 
-# نعمل POST لصفحة اللوجين
+# إرسال طلب الدخول
 login_response = scraper.post(login_url, data=login_data, headers=headers)
+print(f"📊 3. تم إرسال بيانات الدخول. كود الحالة: {login_response.status_code}")
 
-# 4. نروح لصفحة البلاك ماركت
-blackmarket_url = 'https://www.project-dark.co.uk/blackmarket'
-print("⏳ جاري الدخول للبلاك ماركت...")
+# التوجه لصفحة البلاك ماركت
+print("⏳ 4. جاري الدخول لصفحة البلاك ماركت...")
+blackmarket_url = "https://www.project-dark.co.uk/blackmarket"
 response = scraper.get(blackmarket_url, headers=headers)
 
 print(f"🔗 الرابط النهائي: {response.url}")
 print(f"📊 كود الحالة: {response.status_code}")
 
-# حفظ الصفحة للمراجعة
-with open("response_page.html", "w", encoding="utf-8") as f:
-    f.write(response.text)
-
-# 5. نتأكد إحنا فين
+# التأكد من نجاح الدخول
 if "Black Market" in response.text or "blackmarket" in response.url:
-    print("✅ دخلنا البلاك ماركت بنجاح!")
+    print("\n✅ ✅ ✅ دخلنا البلاك ماركت بنجاح! ✅ ✅ ✅")
     
+    # سحب اللوكيشن
     soup2 = BeautifulSoup(response.text, 'lxml')
     try:
         location = "مش لاقيها"
@@ -79,4 +76,6 @@ if "Black Market" in response.text or "blackmarket" in response.url:
     except Exception as e:
         print(f"⚠️ معرفتش أسحب اللوكيشن: {e}")
 else:
-    print("⚠️ فشل الدخول للبلاك ماركت.")
+    print("\n❌ ❌ ❌ فشل الدخول للبلاك ماركت. لسه بنرجع لصفحة اللوجين. ❌ ❌ ❌")
+    print("السبب: ممكن الكوكي محتاجة تتحدث، أو الموقع فيه تحديث جديد.")
+    print("🔍 تأكد إن الإيميل والباسورد صح، وإن Cloudflare مش بيعمل بلوك.")
