@@ -2,10 +2,11 @@ import os
 import cloudscraper
 from bs4 import BeautifulSoup
 
-raw_cookie = os.environ.get('PROJECT_DARK_COOKIE')
+# تم تعديل اسم المتغير هنا ليكون PD_COOKIE بدل PROJECT_DARK_COOKIE
+raw_cookie = os.environ.get('PD_COOKIE')
 
 if not raw_cookie:
-    print("❌ خطأ: متغير الكوكي غير موجود في Railway!")
+    print("❌ خطأ: متغير الكوكي (PD_COOKIE) غير موجود في Railway!")
     exit()
 
 scraper = cloudscraper.create_scraper(
