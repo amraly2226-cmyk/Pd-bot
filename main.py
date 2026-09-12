@@ -17,7 +17,7 @@ COOKIES = [
     {"name": "XSRF-TOKEN", "value": "eyJpdiI6IkRlbG5MQitsczhUcnVqVFNGSmdwbEE9PSIsInZhbHVlIjoiZTZNSld1SHRiMmRCaWhpb28rc3pyUTg3RjdyY3BzeWVnaHVQVzl5WHB3bFl6b2JqUW1SSXVjb0U3K1R3VU4ydWtlQ3ZIeXV0MzNWMjNtb21JWXI3UGc5UXFNNkdkVzJZQVlOUkxRMTB6YVpyc3BpY05BT01vSEY0NCtmRnFGSWkiLCJtYWMiOiIwOTE2MDgxNDgzYzEwODgzZTM1MTk0ODUzZTk2ZWMxYzJlNWUwODcwY2IyZTZjYWYwM2FlMGRmYmEyNjQwMDI3IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
 ]
 
-# 📦 قائمة العناصر اللي البوت بيتعامل معاها
+# 📦 قائمة العناصر
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
 
 def sleep(ms):
@@ -52,7 +52,8 @@ with sync_playwright() as p:
     page.set_default_timeout(15000)
 
     try:
-        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='networkidle', timeout=60000)
+        # ✅ التعديل: استخدام domcontentloaded بدل networkidle
+        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=60000)
         print("✅ دخلنا بالكوكيز")
     except Exception as e:
         print(f"⚠️ مشكلة في الدخول: {e}")
@@ -87,7 +88,8 @@ with sync_playwright() as p:
                         print(f"⏳ في كولداون للسفر: {cooldown_text} - البوت هيستنى {wait_seconds} ثانية...")
                         sleep(wait_seconds * 1000)
                         print("✅ العداد خلص! جاري السفر فوراً...")
-                        page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                        # ✅ التعديل: استخدام domcontentloaded بدل networkidle
+                        page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                         continue
                     else:
                         print("✅ مفيش كولداون! جاري تجهيز السفر...")
@@ -104,43 +106,55 @@ with sync_playwright() as p:
                 }""")
 
                 if not current_city:
-                    page.goto('https://project-dark.co.uk/travel')
+                    page.goto('https://project-dark.co.uk/travel', wait_until='domcontentloaded')
                     continue
 
                 dest_city = 'St Louis' if current_city == 'San Francisco' else 'San Francisco'
                 print(f"✈️ {current_city} - جاري تجهيز السفر إلى {dest_city}")
 
-                page.evaluate("""() => { 
-                    let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); 
-                    if (grid) grid.click(); 
-                }""")
-                sleep(2000)
+                # ✅ التعديل: استخدام Playwright locators بدل JavaScript
+                try:
+                    grid_btn = page.locator("text='Grid View'").first
+                    if grid_btn.is_visible():
+                        grid_btn.click(force=True)
+                        print("✅ تم الضغط على Grid View")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في Grid View: {e}")
 
-                page.evaluate("""(city) => {
-                    let elements = [...document.querySelectorAll('div, span, a')];
-                    let textEl = elements.find(el => el.innerText.trim().toLowerCase() === city.toLowerCase() && el.offsetParent !== null);
-                    if (textEl) {
-                        let card = textEl.closest('div');
-                        if (card && card.offsetWidth > 100) card.click();
-                        else textEl.click();
-                    }
-                }""", dest_city)
-                sleep(2000)
+                try:
+                    city_card = page.locator(f"text='{dest_city}'").first
+                    if city_card.is_visible():
+                        city_card.click(force=True)
+                        print(f"✅ تم الضغط على كارت {dest_city}")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في اختيار المدينة: {e}")
 
-                page.evaluate("""() => { 
-                    let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
-                    if (btn) btn.click(); 
-                }""")
-                sleep(2000)
+                try:
+                    travel_selected_btn = page.locator("button:has-text('Travel to Selected Location')").first
+                    if travel_selected_btn.is_visible():
+                        travel_selected_btn.click(force=True)
+                        print("✅ تم الضغط على Travel to Selected Location")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في الضغط على Travel to Selected Location: {e}")
 
-                page.evaluate("""() => {
-                    let allBtns = [...document.querySelectorAll('button')];
-                    let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
-                    if (travelBtn) travelBtn.click();
-                }""")
-                print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
-                sleep(7000) 
-                page.goto('https://www.project-dark.co.uk/blackmarket')
+                try:
+                    page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
+                    travel_confirm_btn = page.locator("button:has-text('TRAVEL')").last
+                    if travel_confirm_btn.is_visible():
+                        travel_confirm_btn.click(force=True)
+                        print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
+                        sleep(7000) 
+                    else:
+                        print("⚠️ زر TRAVEL مش ظاهر")
+                except Exception as e:
+                    print(f"⚠️ مشكلة في نافذة تأكيد السفر: {e}")
+                    page.screenshot(path="travel_confirm_error.png")
+
+                # ✅ التعديل: استخدام domcontentloaded
+                page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                 continue
 
             # ═══════════════════════════════════════════════════════════════
@@ -206,7 +220,6 @@ with sync_playwright() as p:
 
             # ✅ سان فرانسيسكو
             if state['loc'] == "San Francisco":
-                # بيع اللوحات
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - بيع لوحات مسروقة")
                     clicked = page.evaluate("""() => {
@@ -220,7 +233,7 @@ with sync_playwright() as p:
                         return false;
                     }""")
                     if clicked:
-                        sleep(3000) # استنى النافذة تظهر
+                        sleep(3000)
                         try:
                             confirm_btn = page.locator('button:has-text("SELL ALL")').last
                             confirm_btn.wait_for(state="visible", timeout=10000)
@@ -234,14 +247,12 @@ with sync_playwright() as p:
                     sleep(3000)
                     continue
                 
-                # سافر لو معاه بلاستيك
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - رايح ST LOUIS (عشان نبيع البلاستيك)")
-                    page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                    page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                     sleep(2500)
                     continue
 
-                # شراء البلاستيك
                 if state['hold'] == 0:
                     print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
                     clicked = page.evaluate("""() => {
@@ -271,7 +282,6 @@ with sync_playwright() as p:
 
             # ✅ ST LOUIS
             elif state['loc'] == "St Louis":
-                # بيع البلاستيك
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 ST LOUIS - بيع بلاستيك جيلوري")
                     clicked = page.evaluate("""() => {
@@ -299,14 +309,12 @@ with sync_playwright() as p:
                     sleep(3000)
                     continue
                 
-                # سافر لو معاه لوحات
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 ST LOUIS - رايح سان فرانسيسكو (عشان نبيع اللوحات)")
-                    page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                    page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                     sleep(2500)
                     continue
 
-                # شراء اللوحات
                 if state['hold'] == 0:
                     print("📍 ST LOUIS - شراء لوحات مسروقة")
                     clicked = page.evaluate("""() => {
