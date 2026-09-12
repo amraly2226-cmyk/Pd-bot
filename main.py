@@ -30,8 +30,8 @@ if login_page.status_code != 200:
     print(f"❌ فشل فتح صفحة اللوجين. كود الحالة: {login_page.status_code}")
     exit()
 
-# سحب الـ CSRF Token
-soup = BeautifulSoup(login_page.text, 'lxml')
+# سحب الـ CSRF Token (استخدام html.parser بدل lxml)
+soup = BeautifulSoup(login_page.text, 'html.parser')
 token_input = soup.find('input', {'name': '_token'})
 
 if not token_input:
@@ -64,8 +64,8 @@ print(f"📊 كود الحالة: {response.status_code}")
 if "Black Market" in response.text or "blackmarket" in response.url:
     print("\n✅ ✅ ✅ دخلنا البلاك ماركت بنجاح! ✅ ✅ ✅")
     
-    # سحب اللوكيشن
-    soup2 = BeautifulSoup(response.text, 'lxml')
+    # سحب اللوكيشن (استخدام html.parser بدل lxml)
+    soup2 = BeautifulSoup(response.text, 'html.parser')
     try:
         location = "مش لاقيها"
         for tag in soup2.find_all(['div', 'span', 'td']):
@@ -77,5 +77,3 @@ if "Black Market" in response.text or "blackmarket" in response.url:
         print(f"⚠️ معرفتش أسحب اللوكيشن: {e}")
 else:
     print("\n❌ ❌ ❌ فشل الدخول للبلاك ماركت. لسه بنرجع لصفحة اللوجين. ❌ ❌ ❌")
-    print("السبب: ممكن الكوكي محتاجة تتحدث، أو الموقع فيه تحديث جديد.")
-    print("🔍 تأكد إن الإيميل والباسورد صح، وإن Cloudflare مش بيعمل بلوك.")
