@@ -2,7 +2,7 @@ import os
 import cloudscraper
 from bs4 import BeautifulSoup
 
-# تم تعديل اسم المتغير هنا ليكون PD_COOKIE بدل PROJECT_DARK_COOKIE
+# تم تعديل اسم المتغير هنا ليكون PD_COOKIE
 raw_cookie = os.environ.get('PD_COOKIE')
 
 if not raw_cookie:
@@ -24,11 +24,18 @@ url = 'https://www.project-dark.co.uk/blackmarket'
 print("⏳ جاري الدخول...")
 response = scraper.get(url, headers=headers, timeout=15)
 
-if response.status_code == 200 and "Black Market" in response.text:
+# طباعة الرابط النهائي اللي وصلنا له
+print(f"🔗 الرابط النهائي: {response.url}")
+print(f"📊 كود الحالة: {response.status_code}")
+
+# حفظ الصفحة عشان نتأكد إحنا فين
+with open("response_page.html", "w", encoding="utf-8") as f:
+    f.write(response.text)
+
+if "Black Market" in response.text or "Black Market" in response.url:
     print("✅ دخلنا الصفحة بنجاح!")
     
     soup = BeautifulSoup(response.text, 'lxml')
-    
     try:
         location = "مش لاقيها"
         for tag in soup.find_all(['div', 'span', 'td']):
@@ -38,9 +45,7 @@ if response.status_code == 200 and "Black Market" in response.text:
         print(f"📍 اللوكيشن الحالي هو: {location}")
     except Exception as e:
         print(f"⚠️ معرفتش أسحب اللوكيشن: {e}")
-
-    with open("blackmarket_page.html", "w", encoding="utf-8") as f:
-        f.write(response.text)
-        print("📁 تم حفظ الصفحة في ملف blackmarket_page.html")
 else:
-    print(f"❌ فشل الدخول. كود الحالة: {response.status_code}")
+    print("⚠️ السيرفر رد بس إحنا مش في البلاك ماركت. غالباً دي صفحة تسجيل الدخول.")
+    if "login" in response.url.lower() or "password" in response.text.lower():
+        print("🔍 الصفحة دي فيها فورم تسجيل دخول! يبقى الكوكي ضربت أو ناقصة.")
