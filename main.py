@@ -71,38 +71,52 @@ with sync_playwright() as p:
                 dest_city = 'St Louis' if current_city == 'San Francisco' else 'San Francisco'
                 print(f"✈️ {current_city} - جاري تجهيز السفر إلى {dest_city}")
 
-                page.evaluate("""() => { 
-                    let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); 
-                    if (grid) grid.click(); 
-                }""")
-                sleep(1500)
+                # 1) اختيار جرايد فيو بالضغط المباشر
+                try:
+                    grid_view_btn = page.locator("text='Grid View'").first
+                    if grid_view_btn.count() > 0:
+                        grid_view_btn.click(force=True)
+                        print("✅ تم الضغط على Grid View")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في الضغط على Grid View: {e}")
 
-                page.evaluate("""(city) => {
-                    let elements = [...document.querySelectorAll('div, span, a')];
-                    let textEl = elements.find(el => el.innerText.trim().toLowerCase() === city.toLowerCase() && el.offsetParent !== null);
-                    if (textEl) {
-                        let card = textEl.closest('div');
-                        if (card && card.offsetWidth > 100) card.click();
-                        else textEl.click();
-                    }
-                }""", dest_city)
-                sleep(1500)
+                # 2) اختيار البلد من الكارت
+                try:
+                    city_card = page.locator(f"text='{dest_city}'").first
+                    if city_card.count() > 0:
+                        city_card.click(force=True)
+                        print(f"✅ تم الضغط على كارت {dest_city}")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في اختيار المدينة: {e}")
 
-                page.evaluate("""() => { 
-                    let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
-                    if (btn) btn.click(); 
-                }""")
-                
-                page.wait_for_function("() => document.body.innerText.includes('Are you sure')", timeout=15000)
-                
-                page.evaluate("""() => {
-                    let allBtns = [...document.querySelectorAll('button')];
-                    let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
-                    if (travelBtn) travelBtn.click();
-                }""")
-                
-                print(f"✈️ تم الضغط على زر TRAVEL في النافذة لـ {dest_city}")
-                sleep(7000)
+                # 3) الضغط على Travel to Selected Location
+                try:
+                    travel_selected_btn = page.locator("button:has-text('Travel to Selected Location')").first
+                    if travel_selected_btn.count() > 0:
+                        travel_selected_btn.click(force=True)
+                        print("✅ تم الضغط على Travel to Selected Location")
+                        sleep(2000)
+                except Exception as e:
+                    print(f"⚠️ مشكلة في الضغط على Travel to Selected Location: {e}")
+
+                # 4) انتظار النافذة المنبثقة والضغط على TRAVEL
+                try:
+                    # بنستنى زر TRAVEL يظهر في النافذة
+                    page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
+                    travel_confirm_btn = page.locator("button:has-text('TRAVEL')").last
+                    if travel_confirm_btn.count() > 0:
+                        travel_confirm_btn.click(force=True)
+                        print(f"🎉 تم تأكيد السفر إلى {dest_city}!")
+                        sleep(7000) # وقت تحميل المدينة الجديدة
+                    else:
+                        print("⚠️ مش لاقي زر TRAVEL في النافذة")
+                except Exception as e:
+                    print(f"⚠️ مشكلة في نافذة تأكيد السفر: {e}")
+                    page.screenshot(path="travel_confirm_error.png")
+
+                # نرجع للسوق بعد السفر
                 page.goto('https://www.project-dark.co.uk/blackmarket')
                 continue
 
@@ -177,7 +191,7 @@ with sync_playwright() as p:
                         if sell_btn.count() > 0:
                             sell_btn.click(force=True)
                             sleep(2000)
-                            confirm_btn = page.locator("button:has-text('SELL ALL')").first
+                            confirm_btn = page.locator("button:has-text('SELL ALL')").last
                             if confirm_btn.count() > 0:
                                 confirm_btn.click(force=True)
                                 print("✅ تم بيع اللوحات!")
@@ -198,27 +212,18 @@ with sync_playwright() as p:
                     
                     if buy_btn.count() > 0:
                         print("🔍 لقيت زر Max Buy، جاري الضغط...")
-                        page.screenshot(path="before_buy_click.png")
-                        
                         buy_btn.click(force=True)
-                        sleep(3000) # زيادة الوقت شوية عشان النافذة تظهر
+                        sleep(2000)
                         
-                        # ✅ التعديل الجديد: نستنى النافذة تظهر الأول
+                        # ✅ التعديل: نستنى زر التأكيد BUY MAX يظهر وندوس عليه
                         try:
-                            page.wait_for_selector("text=Buy the maximum", timeout=5000)
-                            print("✅ نافذة التأكيد ظهرت، جاري الضغط على BUY MAX...")
-                            
-                            # بندور على زر BUY MAX اللي جوه النافذة (آخر زر في الصفحة)
                             confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            if confirm_btn.count() > 0:
-                                confirm_btn.click(force=True)
-                                print("✅ تم شراء البلاستيك بنجاح!")
-                            else:
-                                print("⚠️ مفيش زر تأكيد BUY MAX في النافذة")
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
+                            print("✅ تم شراء البلاستيك بنجاح!")
                         except Exception as e:
-                            print(f"⚠️ النافذة المنبثقة لم تظهر في الوقت المحدد: {e}")
-                            page.screenshot(path="no_confirm_window.png")
-                    
+                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
+                            page.screenshot(path="no_confirm_buy.png")
                     else:
                         print("⚠️ مش لاقي زر Max Buy في صف Plastic jewelry")
                         page.screenshot(path="no_max_buy_btn.png")
@@ -236,7 +241,7 @@ with sync_playwright() as p:
                         if sell_btn.count() > 0:
                             sell_btn.click(force=True)
                             sleep(2000)
-                            confirm_btn = page.locator("button:has-text('SELL ALL')").first
+                            confirm_btn = page.locator("button:has-text('SELL ALL')").last
                             if confirm_btn.count() > 0:
                                 confirm_btn.click(force=True)
                                 print("✅ تم بيع البلاستيك!")
@@ -257,24 +262,17 @@ with sync_playwright() as p:
                     
                     if buy_btn.count() > 0:
                         print("🔍 لقيت زر Max Buy للوحات، جاري الضغط...")
-                        page.screenshot(path="before_buy_paintings.png")
-                        
                         buy_btn.click(force=True)
-                        sleep(3000) # زيادة الوقت شوية عشان النافذة تظهر
+                        sleep(2000)
                         
-                        # ✅ التعديل الجديد: نستنى النافذة تظهر الأول
+                        # ✅ التعديل: نستنى زر التأكيد BUY MAX يظهر وندوس عليه
                         try:
-                            page.wait_for_selector("text=Buy the maximum", timeout=5000)
-                            print("✅ نافذة التأكيد ظهرت، جاري الضغط على BUY MAX...")
-                            
                             confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            if confirm_btn.count() > 0:
-                                confirm_btn.click(force=True)
-                                print("✅ تم شراء اللوحات بنجاح!")
-                            else:
-                                print("⚠️ مفيش زر تأكيد BUY MAX في النافذة")
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
+                            print("✅ تم شراء اللوحات بنجاح!")
                         except Exception as e:
-                            print(f"⚠️ النافذة المنبثقة لم تظهر في الوقت المحدد: {e}")
+                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
                             page.screenshot(path="no_confirm_buy_paintings.png")
                     else:
                         print("⚠️ مش لاقي زر Max Buy في صف Stolen paintings")
