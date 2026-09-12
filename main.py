@@ -1,8 +1,11 @@
 from playwright.sync_api import sync_playwright
 import time
-import re
 
-# 🔑 الكوكيز اللي إنت جبتها من متصفح Kiwi
+# 🔑 بيانات الدخول والكوكيز
+USERNAME = "amr.aly.2226@gmail.com"
+PASSWORD = "Gun@12345"
+
+# 🍪 الكوكيز اللي إنت جبتها من متصفح Kiwi
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
     {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789214101$o8$g1$t1789214137$j24$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
@@ -13,54 +16,269 @@ COOKIES = [
     {"name": "XSRF-TOKEN", "value": "eyJpdiI6IkRlbG5MQitsczhUcnVqVFNGSmdwbEE9PSIsInZhbHVlIjoiZTZNSld1SHRiMmRCaWhpb28rc3pyUTg3RjdyY3BzeWVnaHVQVzl5WHB3bFl6b2JqUW1SSXVjb0U3K1R3VU4ydWtlQ3ZIeXV0MzNWMjNtb21JWXI3UGc5UXFNNkdkVzJZQVlOUkxRMTB6YVpyc3BpY05BT01vSEY0NCtmRnFGSWkiLCJtYWMiOiIwOTE2MDgxNDgzYzEwODgzZTM1MTk0ODUzZTk2ZWMxYzJlNWUwODcwY2IyZTZjYWYwM2FlMGRmYmEyNjQwMDI3IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
 ]
 
+# 📦 قائمة العناصر اللي البوت بيتعامل معاها
+ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
+
+def sleep(ms):
+    time.sleep(ms / 1000.0)
+
 with sync_playwright() as p:
-    print("⏳ 1. جاري تشغيل المتصفح...")
-    browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+    print("🚀 البوت شغال...")
     
+    browser = p.chromium.launch(
+        headless=True, 
+        args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    )
     context = browser.new_context(
-        user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
+        user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36",
+        viewport={"width": 1920, "height": 1080}
     )
     
-    print("🍪 2. جاري تحميل الكوكيز في المتصفح...")
+    # 🍪 تحميل الكوكيز
+    print("🍪 جاري تحميل الكوكيز...")
     context.add_cookies(COOKIES)
     
     page = context.new_page()
+    page.set_default_timeout(15000)
 
-    print("⏳ 3. جاري الدخول لصفحة البلاك ماركت مباشرة...")
-    page.goto("https://www.project-dark.co.uk/blackmarket")
-    
-    page.wait_for_timeout(5000)
+    # 🌐 الدخول الأولي
+    try:
+        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='networkidle', timeout=60000)
+        print("✅ دخلنا بالكوكيز")
+    except Exception as e:
+        print(f"⚠️ مشكلة في الدخول: {e}")
 
-    print(f"🔗 الرابط النهائي: {page.url}")
-
-    if "blackmarket" in page.url.lower():
-        print("\n✅ ✅ ✅ دخلنا البلاك ماركت بنجاح باستخدام الكوكيز! ✅ ✅ ✅")
-        
+    # 🔄 الحلقة اللانهائية للبيع والشراء والسفر
+    while True:
         try:
-            # الطريقة الجديدة: بندور على العنوان اللي فوق "Black Market - San Francisco"
-            # وهنقص اسم المدينة منه
-            header_element = page.locator("text=Black Market").first
-            header_text = header_element.inner_text()
+            # ═══════════════════════════════════════════════════════════════
+            # 1) لو إحنا في صفحة الترافل (نفذ السفر)
+            # ═══════════════════════════════════════════════════════════════
+            if 'travel' in page.url:
+                # معرفة المدينة الحالية
+                current_city = page.evaluate("""() => {
+                    let body = document.body.innerText;
+                    let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
+                    if (m) return m[1];
+                    if (body.includes('Black Market - St Louis')) return 'St Louis';
+                    if (body.includes('Black Market - San Francisco')) return 'San Francisco';
+                    return null;
+                }""")
+
+                if not current_city:
+                    page.goto('https://project-dark.co.uk/travel')
+                    continue
+
+                dest_city = 'St Louis' if current_city == 'San Francisco' else 'San Francisco'
+                print(f"✈️ {current_city} - جاري تجهيز السفر إلى {dest_city}")
+
+                # 1) اختيار جرايد فيو
+                page.evaluate("""() => { 
+                    let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); 
+                    if (grid) grid.click(); 
+                }""")
+                sleep(1500)
+
+                # 2) اختيار البلد من البطاقة
+                page.evaluate("""(city) => {
+                    let elements = [...document.querySelectorAll('div, span, a')];
+                    let textEl = elements.find(el => el.innerText.trim().toLowerCase() === city.toLowerCase() && el.offsetParent !== null);
+                    if (textEl) {
+                        let card = textEl.closest('div');
+                        if (card && card.offsetWidth > 100) card.click();
+                        else textEl.click();
+                    }
+                }""", dest_city)
+                sleep(1500)
+
+                # 3) الضغط على Travel to Selected Location
+                page.evaluate("""() => { 
+                    let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
+                    if (btn) btn.click(); 
+                }""")
+                
+                # 4) انتظار ظهور البوباب
+                page.wait_for_function("() => document.body.innerText.includes('Are you sure')", timeout=15000)
+                
+                # 5) الضغط على زر TRAVEL
+                page.evaluate("""() => {
+                    let allBtns = [...document.querySelectorAll('button')];
+                    let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
+                    if (travelBtn) travelBtn.click();
+                }""")
+                
+                print(f"✈️ تم الضغط على زر TRAVEL في النافذة لـ {dest_city}")
+                sleep(7000)
+                page.goto('https://www.project-dark.co.uk/blackmarket')
+                continue
+
+            # ═══════════════════════════════════════════════════════════════
+            # 2) لو إحنا في السوق (بيع وشراء)
+            # ═══════════════════════════════════════════════════════════════
+            state = page.evaluate("""(items) => {
+                let body = document.body.innerText;
+                let loc = null;
+                let cooldownStr = null;
+                
+                let lines = body.split('\\n');
+                for (let i = 0; i < lines.length; i++) {
+                    if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                        for (let j = i + 1; j < lines.length; j++) {
+                            if (lines[j].trim()) { loc = lines[j].trim(); break; }
+                        }
+                        break;
+                    }
+                }
+                if (loc && loc.includes('San Francisco')) loc = 'San Francisco';
+                else if (loc && loc.includes('St Louis')) loc = 'St Louis';
+
+                let cdMatch = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i) || body.match(/Travel in\\s*([0-9hms ]+)/i);
+                if (cdMatch) cooldownStr = cdMatch[1];
+
+                let hold = 0;
+                let heldItem = null;
+                let rows = [...document.querySelectorAll('tr')];
+
+                for (let r of rows) {
+                    let rText = r.innerText;
+                    if (rText.includes('Sell') && !rText.includes('Confirm')) {
+                        for (let it of items) {
+                            if (rText.toLowerCase().includes(it.toLowerCase())) {
+                                let cells = [...r.querySelectorAll('td')];
+                                if (cells.length >= 3) {
+                                    let youHaveCell = cells[2].innerText;
+                                    let match = youHaveCell.match(/(\\d+)/);
+                                    if (match && +match[1] > 0) {
+                                        heldItem = it;
+                                        hold = +match[1];
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (heldItem === null) {
+                    let m = body.match(/holding (\\d+) items/i);
+                    hold = m ? +m[1] : 0;
+                }
+                
+                return { loc, cd: cooldownStr, hold, heldItem };
+            }""", ITEMS)
+
+            # ✅ لو في كولداون حقيقي، انتظر
+            if state['cd']:
+                print(f"⏳ في كولداون: {state['cd']} - هستنى دقيقة...")
+                sleep(60000)
+                continue
+
+            # ✅ سان فرانسيسكو: بيع اللوحات أو شراء البلاستيك
+            if state['loc'] == "San Francisco":
+                if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
+                    print("📍 سان فرانسيسكو - بيع لوحات مسروقة")
+                    page.evaluate("""() => { 
+                        const rows = [...document.querySelectorAll('tr')]; 
+                        for (let r of rows) { 
+                            const text = r.innerText; 
+                            if (text.includes('Stolen paintings') && text.includes('Sell All') && !text.includes('Confirm')) { 
+                                const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); 
+                                if (btn) { btn.click(); break; } 
+                            } 
+                        } 
+                    }""")
+                    sleep(2000)
+                    page.wait_for_function("() => document.body.innerText.includes('Confirm Sell All')", timeout=5000)
+                    page.evaluate("""() => { 
+                        const allBtns = [...document.querySelectorAll('button')]; 
+                        const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); 
+                        if (confirmBtn) confirmBtn.click(); 
+                    }""")
+                    sleep(3000)
+                    continue
+                
+                if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
+                    print("📍 سان فرانسيسكو - رايح ST LOUIS (عشان نبيع البلاستيك)")
+                    page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                    sleep(2500)
+                    continue
+
+                if state['hold'] == 0:
+                    print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
+                    page.evaluate("""() => { 
+                        let rows = [...document.querySelectorAll('tr')]; 
+                        for (let r of rows) { 
+                            if (r.innerText.includes('Plastic jewelry') && r.innerText.includes('$')) { 
+                                let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); 
+                                if (mb) { mb.click(); break; } 
+                            } 
+                        } 
+                    }""")
+                    sleep(1000)
+                    page.evaluate("""() => { 
+                        let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); 
+                        if (btn) btn.click(); 
+                    }""")
+                    sleep(3000)
+                    continue
+
+            # ✅ ST LOUIS: بيع البلاستيك أو شراء اللوحات
+            elif state['loc'] == "St Louis":
+                if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
+                    print("📍 ST LOUIS - بيع بلاستيك جيلوري")
+                    page.evaluate("""() => { 
+                        const rows = [...document.querySelectorAll('tr')]; 
+                        for (let r of rows) { 
+                            const text = r.innerText; 
+                            if (text.includes('Plastic jewelry') && text.includes('Sell All') && !text.includes('Confirm')) { 
+                                const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); 
+                                if (btn) { btn.click(); break; } 
+                            } 
+                        } 
+                    }""")
+                    sleep(2000)
+                    page.wait_for_function("() => document.body.innerText.includes('Confirm Sell All')", timeout=5000)
+                    page.evaluate("""() => { 
+                        const allBtns = [...document.querySelectorAll('button')]; 
+                        const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); 
+                        if (confirmBtn) confirmBtn.click(); 
+                    }""")
+                    sleep(3000)
+                    continue
+                
+                if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
+                    print("📍 ST LOUIS - رايح سان فرانسيسكو (عشان نبيع اللوحات)")
+                    page.goto('https://www.project-dark.co.uk/travel', wait_until='networkidle')
+                    sleep(2500)
+                    continue
+
+                if state['hold'] == 0:
+                    print("📍 ST LOUIS - شراء لوحات مسروقة")
+                    page.evaluate("""() => { 
+                        let rows = [...document.querySelectorAll('tr')]; 
+                        for (let r of rows) { 
+                            if (r.innerText.includes('Stolen paintings') && r.innerText.includes('$')) { 
+                                let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); 
+                                if (mb) { mb.click(); break; } 
+                            } 
+                        } 
+                    }""")
+                    sleep(1000)
+                    page.evaluate("""() => { 
+                        let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); 
+                        if (btn) btn.click(); 
+                    }""")
+                    sleep(3000)
+                    continue
             
-            location = "مش لاقيها"
-            if "-" in header_text:
-                # هيقص الكلام بعد الشرطة ويخليه هو اللوكيشن
-                location = header_text.split("-")[-1].strip()
             else:
-                location = header_text.strip()
-            
-            print(f"📍 اللوكيشن الحالي هو: {location}")
-            
+                print("⚠️ مش لاقي المدينة، بجرب تاني...")
+                sleep(5000)
+                continue
+
         except Exception as e:
-            print(f"⚠️ معرفتش أسحب اللوكيشن بالطريقة دي، هجرب طريقة تانية...")
-            # طريقة احتياطية: نبحث في كود الصفحة عن كلمة Location
-            html_content = page.content()
-            match = re.search(r'Location[:\s]*([A-Za-z\s]+)', html_content)
-            if match:
-                print(f"📍 اللوكيشن الحالي (طريقة احتياطية): {match.group(1).strip()}")
-            else:
-                print("⚠️ للأسف معرفتش ألاقي اللوكيشن في الصفحة.")
-    else:
-        print("\n❌ ❌ ❌ فشل الدخول بالكوكيز. لسه في صفحة اللوجين.")
-    
-    browser.close()
+            print(f"حصل خطأ مؤقت، معيد المحاولة: {e}")
+            sleep(15000)
+        
+        sleep(10000)
