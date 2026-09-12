@@ -55,7 +55,6 @@ with sync_playwright() as p:
             # 1) لو إحنا في صفحة الترافل (نفذ السفر)
             # ═══════════════════════════════════════════════════════════════
             if 'travel' in page.url:
-                # معرفة المدينة الحالية
                 current_city = page.evaluate("""() => {
                     let body = document.body.innerText;
                     let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
@@ -72,14 +71,12 @@ with sync_playwright() as p:
                 dest_city = 'St Louis' if current_city == 'San Francisco' else 'San Francisco'
                 print(f"✈️ {current_city} - جاري تجهيز السفر إلى {dest_city}")
 
-                # 1) اختيار جرايد فيو
                 page.evaluate("""() => { 
                     let grid = [...document.querySelectorAll('a, span, div, button')].find(el => el.innerText.trim() === 'Grid View' && el.offsetParent !== null); 
                     if (grid) grid.click(); 
                 }""")
                 sleep(1500)
 
-                # 2) اختيار البلد من البطاقة
                 page.evaluate("""(city) => {
                     let elements = [...document.querySelectorAll('div, span, a')];
                     let textEl = elements.find(el => el.innerText.trim().toLowerCase() === city.toLowerCase() && el.offsetParent !== null);
@@ -91,16 +88,13 @@ with sync_playwright() as p:
                 }""", dest_city)
                 sleep(1500)
 
-                # 3) الضغط على Travel to Selected Location
                 page.evaluate("""() => { 
                     let btn = [...document.querySelectorAll('button')].find(b => b.innerText.includes('Travel to Selected Location')); 
                     if (btn) btn.click(); 
                 }""")
                 
-                # 4) انتظار ظهور البوباب
                 page.wait_for_function("() => document.body.innerText.includes('Are you sure')", timeout=15000)
                 
-                # 5) الضغط على زر TRAVEL
                 page.evaluate("""() => {
                     let allBtns = [...document.querySelectorAll('button')];
                     let travelBtn = allBtns.find(b => b.innerText.trim() === 'TRAVEL');
@@ -168,7 +162,6 @@ with sync_playwright() as p:
                 return { loc, cd: cooldownStr, hold, heldItem };
             }""", ITEMS)
 
-            # ✅ لو في كولداون حقيقي، انتظر
             if state['cd']:
                 print(f"⏳ في كولداون: {state['cd']} - هستنى دقيقة...")
                 sleep(60000)
@@ -178,24 +171,19 @@ with sync_playwright() as p:
             if state['loc'] == "San Francisco":
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                     print("📍 سان فرانسيسكو - بيع لوحات مسروقة")
-                    page.evaluate("""() => { 
-                        const rows = [...document.querySelectorAll('tr')]; 
-                        for (let r of rows) { 
-                            const text = r.innerText; 
-                            if (text.includes('Stolen paintings') && text.includes('Sell All') && !text.includes('Confirm')) { 
-                                const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); 
-                                if (btn) { btn.click(); break; } 
-                            } 
-                        } 
-                    }""")
-                    sleep(2000)
-                    page.wait_for_function("() => document.body.innerText.includes('Confirm Sell All')", timeout=5000)
-                    page.evaluate("""() => { 
-                        const allBtns = [...document.querySelectorAll('button')]; 
-                        const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); 
-                        if (confirmBtn) confirmBtn.click(); 
-                    }""")
-                    sleep(3000)
+                    row = page.locator("tr", has_text="Stolen paintings").first
+                    if row.count() > 0:
+                        sell_btn = row.locator("button", has_text="Sell All")
+                        if sell_btn.count() > 0:
+                            sell_btn.click()
+                            sleep(2000)
+                            confirm_btn = page.locator("button:has-text('SELL ALL')").first
+                            if confirm_btn.count() > 0:
+                                confirm_btn.click()
+                                print("✅ تم بيع اللوحات!")
+                            else:
+                                print("⚠️ مفيش زر تأكيد البيع")
+                            sleep(3000)
                     continue
                 
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
@@ -206,20 +194,29 @@ with sync_playwright() as p:
 
                 if state['hold'] == 0:
                     print("📍 سان فرانسيسكو - شراء بلاستيك جيلوري")
-                    page.evaluate("""() => { 
-                        let rows = [...document.querySelectorAll('tr')]; 
-                        for (let r of rows) { 
-                            if (r.innerText.includes('Plastic jewelry') && r.innerText.includes('$')) { 
-                                let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); 
-                                if (mb) { mb.click(); break; } 
-                            } 
-                        } 
-                    }""")
-                    sleep(1000)
-                    page.evaluate("""() => { 
-                        let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); 
-                        if (btn) btn.click(); 
-                    }""")
+                    # ✅ الطريقة الجديدة والأدق: بندور على الصف اللي فيه "Plastic jewelry" وندوس على زر "Max Buy" اللي جواه
+                    buy_btn = page.locator('tr:has-text("Plastic jewelry") button:has-text("Max Buy")').first
+                    
+                    if buy_btn.count() > 0:
+                        print("🔍 لقيت زر Max Buy، جاري الضغط...")
+                        # هناخد صورة قبل الضغط عشان نتأكد
+                        page.screenshot(path="before_buy_click.png")
+                        
+                        buy_btn.click()
+                        sleep(2000) # استنى شوية عشان نافذة التأكيد تظهر
+                        
+                        # بعد الضغط على Max Buy، لازم نضغط على زر التأكيد BUY MAX
+                        confirm_btn = page.locator('button:has-text("BUY MAX")').first
+                        if confirm_btn.count() > 0:
+                            confirm_btn.click()
+                            print("✅ تم شراء البلاستيك بنجاح!")
+                        else:
+                            print("⚠️ مفيش زر تأكيد BUY MAX")
+                            page.screenshot(path="no_confirm_buy.png")
+                    else:
+                        print("⚠️ مش لاقي زر Max Buy في صف Plastic jewelry")
+                        page.screenshot(path="no_max_buy_btn.png")
+                    
                     sleep(3000)
                     continue
 
@@ -227,24 +224,19 @@ with sync_playwright() as p:
             elif state['loc'] == "St Louis":
                 if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                     print("📍 ST LOUIS - بيع بلاستيك جيلوري")
-                    page.evaluate("""() => { 
-                        const rows = [...document.querySelectorAll('tr')]; 
-                        for (let r of rows) { 
-                            const text = r.innerText; 
-                            if (text.includes('Plastic jewelry') && text.includes('Sell All') && !text.includes('Confirm')) { 
-                                const btn = [...r.querySelectorAll('button')].find(b => b.innerText.trim() === 'Sell All'); 
-                                if (btn) { btn.click(); break; } 
-                            } 
-                        } 
-                    }""")
-                    sleep(2000)
-                    page.wait_for_function("() => document.body.innerText.includes('Confirm Sell All')", timeout=5000)
-                    page.evaluate("""() => { 
-                        const allBtns = [...document.querySelectorAll('button')]; 
-                        const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null); 
-                        if (confirmBtn) confirmBtn.click(); 
-                    }""")
-                    sleep(3000)
+                    row = page.locator("tr", has_text="Plastic jewelry").first
+                    if row.count() > 0:
+                        sell_btn = row.locator("button", has_text="Sell All")
+                        if sell_btn.count() > 0:
+                            sell_btn.click()
+                            sleep(2000)
+                            confirm_btn = page.locator("button:has-text('SELL ALL')").first
+                            if confirm_btn.count() > 0:
+                                confirm_btn.click()
+                                print("✅ تم بيع البلاستيك!")
+                            else:
+                                print("⚠️ مفيش زر تأكيد البيع")
+                            sleep(3000)
                     continue
                 
                 if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
@@ -255,20 +247,26 @@ with sync_playwright() as p:
 
                 if state['hold'] == 0:
                     print("📍 ST LOUIS - شراء لوحات مسروقة")
-                    page.evaluate("""() => { 
-                        let rows = [...document.querySelectorAll('tr')]; 
-                        for (let r of rows) { 
-                            if (r.innerText.includes('Stolen paintings') && r.innerText.includes('$')) { 
-                                let mb = [...r.querySelectorAll('button')].find(b => b.innerText.includes('Max Buy')); 
-                                if (mb) { mb.click(); break; } 
-                            } 
-                        } 
-                    }""")
-                    sleep(1000)
-                    page.evaluate("""() => { 
-                        let btn = [...document.querySelectorAll('button')].find(b => b.innerText.trim() === 'BUY MAX'); 
-                        if (btn) btn.click(); 
-                    }""")
+                    buy_btn = page.locator('tr:has-text("Stolen paintings") button:has-text("Max Buy")').first
+                    
+                    if buy_btn.count() > 0:
+                        print("🔍 لقيت زر Max Buy للوحات، جاري الضغط...")
+                        page.screenshot(path="before_buy_paintings.png")
+                        
+                        buy_btn.click()
+                        sleep(2000)
+                        
+                        confirm_btn = page.locator('button:has-text("BUY MAX")').first
+                        if confirm_btn.count() > 0:
+                            confirm_btn.click()
+                            print("✅ تم شراء اللوحات بنجاح!")
+                        else:
+                            print("⚠️ مفيش زر تأكيد BUY MAX")
+                            page.screenshot(path="no_confirm_buy_paintings.png")
+                    else:
+                        print("⚠️ مش لاقي زر Max Buy في صف Stolen paintings")
+                        page.screenshot(path="no_max_buy_paintings.png")
+                    
                     sleep(3000)
                     continue
             
@@ -279,6 +277,11 @@ with sync_playwright() as p:
 
         except Exception as e:
             print(f"حصل خطأ مؤقت، معيد المحاولة: {e}")
+            try:
+                page.screenshot(path="error_screenshot.png")
+                print("📸 تم حفظ صورة للخطأ في error_screenshot.png")
+            except:
+                pass
             sleep(15000)
         
         sleep(10000)
