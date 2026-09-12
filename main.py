@@ -33,26 +33,6 @@ def parse_cooldown(text):
     if seconds: total_seconds += int(seconds.group(1))
     return total_seconds
 
-# ✅ دالة جديدة للضغط على أزرار التأكيد (اللي في النافذة المنبثقة)
-def click_modal_button(page, button_text):
-    """بتحاول تضغط على زر التأكيد اللي جوه النافذة المنبثقة (اللي مش في جدول)"""
-    try:
-        # بندور على الزر اللي مش جوه أي صف (tr)
-        clicked = page.evaluate("""(btnText) => {
-            let buttons = [...document.querySelectorAll('button')];
-            for (let btn of buttons) {
-                if (btn.innerText.trim() === btnText && !btn.closest('tr')) {
-                    btn.click();
-                    return true;
-                }
-            }
-            return false;
-        }""", button_text)
-        return clicked
-    except Exception as e:
-        print(f"⚠️ مشكلة في الضغط على زر {button_text}: {e}")
-        return False
-
 with sync_playwright() as p:
     print("🚀 البوت شغال...")
     
@@ -240,11 +220,14 @@ with sync_playwright() as p:
                         return false;
                     }""")
                     if clicked:
-                        sleep(2000)
-                        if click_modal_button(page, "SELL ALL"):
+                        sleep(3000) # استنى النافذة تظهر
+                        try:
+                            confirm_btn = page.locator('button:has-text("SELL ALL")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
                             print("✅ تم بيع اللوحات!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد SELL ALL")
+                        except Exception as e:
+                            print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
                             page.screenshot(path="no_confirm_sell_paintings.png")
                     else:
                         print("⚠️ مفيش زر Sell All للوحات")
@@ -272,11 +255,14 @@ with sync_playwright() as p:
                         return false;
                     }""")
                     if clicked:
-                        sleep(2000)
-                        if click_modal_button(page, "BUY MAX"):
+                        sleep(3000)
+                        try:
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
                             print("✅ تم شراء البلاستيك بنجاح!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد BUY MAX")
+                        except Exception as e:
+                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
                             page.screenshot(path="no_confirm_buy.png")
                     else:
                         print("⚠️ مفيش زر Max Buy للبلاستيك")
@@ -299,11 +285,14 @@ with sync_playwright() as p:
                         return false;
                     }""")
                     if clicked:
-                        sleep(2000)
-                        if click_modal_button(page, "SELL ALL"):
+                        sleep(3000)
+                        try:
+                            confirm_btn = page.locator('button:has-text("SELL ALL")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
                             print("✅ تم بيع البلاستيك!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد SELL ALL")
+                        except Exception as e:
+                            print(f"⚠️ زر تأكيد البيع مش ظهر: {e}")
                             page.screenshot(path="no_confirm_sell_plastic.png")
                     else:
                         print("⚠️ مفيش زر Sell All للبلاستيك")
@@ -331,11 +320,14 @@ with sync_playwright() as p:
                         return false;
                     }""")
                     if clicked:
-                        sleep(2000)
-                        if click_modal_button(page, "BUY MAX"):
+                        sleep(3000)
+                        try:
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
                             print("✅ تم شراء اللوحات بنجاح!")
-                        else:
-                            print("⚠️ مفيش زر تأكيد BUY MAX")
+                        except Exception as e:
+                            print(f"⚠️ زر التأكيد مش ظهر: {e}")
                             page.screenshot(path="no_confirm_buy_paintings.png")
                     else:
                         print("⚠️ مفيش زر Max Buy للوحات")
