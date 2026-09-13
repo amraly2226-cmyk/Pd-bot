@@ -31,7 +31,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (كله JavaScript - نفس الأسلوب اللي كان شغال)
+# 📈 بوت الأسهم (يشتري الأول، بعدين يبيع)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -60,11 +60,74 @@ def run_stocks_bot():
                 sleep(1000)
                 
                 # ═══════════════════════════════════════
-                # 🔴 1) البيع - JavaScript
+                # 🟢 1) الشراء الأول
                 # ═══════════════════════════════════════
-                print("\n🔴 [الأسهم] [1/2] بيع...")
+                print("\n🟢 [الأسهم] [1/2] شراء...")
+                bought_count = 0
                 
-                # دوس على آخر زر Sell All (اللي تحت خالص)
+                for attempt in range(5):
+                    try:
+                        # 1. بندور على صف فيه سهم أخضر وندوس على زر "Max Buy" في الصف
+                        clicked_max = page.evaluate("""() => {
+                            const rows = [...document.querySelectorAll('tr')];
+                            for (let row of rows) {
+                                const rowText = row.innerText;
+                                // نتأكد إن السهم أخضر (↑ أو ▲)
+                                if (rowText.includes('↑') || rowText.includes('▲')) {
+                                    const btns = [...row.querySelectorAll('button')];
+                                    for (let b of btns) {
+                                        // اسم الزر "Max Buy" في الصف
+                                        if (b.innerText.trim() === 'Max Buy') {
+                                            b.click();
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                            return false;
+                        }""")
+                        
+                        if not clicked_max:
+                            print("ℹ️ [الأسهم] مفيش أسهم خضراء")
+                            break
+                        
+                        bought_count += 1
+                        print(f"✅ [الأسهم] سهم أخضر {bought_count} - داس Max Buy")
+                        sleep(3500)
+                        
+                        # 2. النافذة المنبثقة فيها "BUY MAX" - ندور عليها بأي عنصر
+                        confirmed_buy = page.evaluate("""() => {
+                            const els = [...document.querySelectorAll('button, div, span, a, input')];
+                            for (let el of els) {
+                                const t = (el.innerText || el.value || '').trim().toUpperCase();
+                                if (t === 'BUY MAX' && el.offsetWidth > 0) {
+                                    const evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                    el.dispatchEvent(evt);
+                                    el.click();
+                                    return 'buy_max_' + el.tagName.toLowerCase();
+                                }
+                            }
+                            return false;
+                        }""")
+                        
+                        if confirmed_buy:
+                            print(f"✅ [الأسهم] تم الشراء ({confirmed_buy}) - السهم {bought_count}")
+                            sleep(5000)
+                        else:
+                            print(f"⚠️ [الأسهم] مفيش زر BUY MAX")
+                            page.screenshot(path=f"no_buy_max_{bought_count}.png")
+                            break
+                        
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] مشكلة: {e}")
+                        break
+                
+                # ═══════════════════════════════════════
+                # 🔴 2) البيع بعدين
+                # ═══════════════════════════════════════
+                print("\n🔴 [الأسهم] [2/2] بيع...")
+                
+                # ندوس على زر Sell All اللي تحت
                 page.evaluate("""() => {
                     const btns = [...document.querySelectorAll('button')];
                     for (let i = btns.length - 1; i >= 0; i--) {
@@ -95,70 +158,6 @@ def run_stocks_bot():
                 else:
                     print("⚠️ [الأسهم] مفيش تأكيد بيع")
                 sleep(6000)
-                
-                # ═══════════════════════════════════════
-                # 🟢 2) الشراء - JavaScript
-                # ═══════════════════════════════════════
-                print("\n🟢 [الأسهم] [2/2] شراء...")
-                bought_count = 0
-                
-                for attempt in range(5):
-                    try:
-                        # 1. بندور على صف فيه سهم أخضر وندوس على Max Buy
-                        clicked_max = page.evaluate("""() => {
-                            const rows = [...document.querySelectorAll('tr')];
-                            for (let row of rows) {
-                                const rowText = row.innerText;
-                                if (rowText.includes('↑') || rowText.includes('▲')) {
-                                    const btns = [...row.querySelectorAll('button')];
-                                    for (let b of btns) {
-                                        if (b.innerText.trim() === 'Max Buy') {
-                                            b.click();
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                            return false;
-                        }""")
-                        
-                        if not clicked_max:
-                            break
-                        
-                        bought_count += 1
-                        print(f"✅ [الأسهم] سهم أخضر {bought_count} - داس Max Buy")
-                        sleep(3500)
-                        
-                        # 2. بندور على BUY MAX في أي عنصر (div, button, span) - بـ JavaScript
-                        confirmed_buy = page.evaluate("""() => {
-                            const els = [...document.querySelectorAll('button, div, span, a, input')];
-                            // الأولوية لـ BUY MAX بالظبط
-                            for (let el of els) {
-                                const t = (el.innerText || el.value || '').trim().toUpperCase();
-                                if (t === 'BUY MAX' && el.offsetWidth > 0 && !el.closest('tr')) {
-                                    const evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                    el.dispatchEvent(evt);
-                                    el.click();
-                                    return 'buy_max_' + el.tagName.toLowerCase();
-                                }
-                            }
-                            return false;
-                        }""")
-                        
-                        if confirmed_buy:
-                            print(f"✅ [الأسهم] تم التأكيد ({confirmed_buy}) - السهم {bought_count}")
-                            sleep(5000)
-                        else:
-                            print(f"⚠️ [الأسهم] مفيش زر BUY MAX")
-                            page.screenshot(path=f"no_buy_max_{bought_count}.png")
-                            break
-                        
-                    except Exception as e:
-                        print(f"⚠️ [الأسهم] مشكلة: {e}")
-                        break
-                
-                if bought_count == 0:
-                    print("ℹ️ [الأسهم] مفيش أسهم خضراء")
                 
                 print("⏰ [الأسهم] هستنى 15 دقيقة...")
                 sleep(900000)
