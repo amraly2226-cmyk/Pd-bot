@@ -34,7 +34,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (النسخة النهائية الثابتة)
+# 📈 بوت الأسهم (النسخة النهائية الصح)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -77,40 +77,64 @@ def run_stocks_bot():
                     else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e: print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # 2) شراء الأسهم الخضراء
+                # 2) شراء الأسهم الخضراء - التسلسل الصح:
+                # 1. ندوس على span.stock-fillmax-btn (الأخضر الصغير)
+                # 2. ندوس على #bottomBuyBtn (زر Buy اللي تحت)
+                # 3. ندوس على YES
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 for attempt in range(5):
                     try:
-                        # بندور على السهم الأخضر وندوس على زر Max Buy في نفس الصف
+                        # 1. بندور على السهم الأخضر وندوس على الـ span الصغير
                         found_green = False
                         rows = page.locator('tr')
                         for i in range(rows.count()):
                             row = rows.nth(i)
                             if ('↑' in row.inner_text() or '▲' in row.inner_text()):
-                                max_btn = row.locator('button:has-text("Max Buy")').first
-                                if max_btn.count() > 0:
-                                    max_btn.click(force=True)
+                                max_span = row.locator('span.stock-fillmax-btn').first
+                                if max_span.count() > 0:
+                                    max_span.click(force=True)
                                     found_green = True
                                     break
                         if not found_green: break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
-                        sleep(4000)
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max الصغير")
+                        sleep(2500)
                         
-                        # نستنى زر BUY MAX في النافذة المنبثقة
-                        try:
-                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
-                            print("✅ [الأسهم] تم التأكيد بـ BUY MAX")
+                        # 2. ندوس على زر Buy اللي تحت (bottomBuyBtn)
+                        page.evaluate("""() => {
+                            let buyBtn = document.getElementById('bottomBuyBtn');
+                            if (buyBtn) buyBtn.click();
+                        }""")
+                        print("✅ [الأسهم] داس على زر Buy")
+                        sleep(2500)
+                        
+                        # 3. بندور على زر YES لحد 10 محاولات
+                        yes_clicked = False
+                        for yes_attempt in range(10):
+                            yes_clicked = page.evaluate("""() => {
+                                let elements = [...document.querySelectorAll('button, span, div, a')];
+                                for (let el of elements) {
+                                    if (el.innerText && el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0) {
+                                        el.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if yes_clicked: break
+                            sleep(1000)
+                        
+                        if yes_clicked:
+                            print("✅ [الأسهم] داس على YES")
                             sleep(4000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
-                        except Exception as e:
-                            print(f"⚠️ [الأسهم] مفيش زر تأكيد BUY MAX: {e}")
-                            page.screenshot(path="no_confirm_stock_buy.png")
+                        else:
+                            print("⚠️ [الأسهم] مش لاقي زر YES")
+                            page.screenshot(path="no_yes_button.png")
                             break
+                        
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة في شراء سهم: {e}")
                         break
