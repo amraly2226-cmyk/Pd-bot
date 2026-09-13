@@ -171,7 +171,7 @@ def run_stocks_bot():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (معدل - قراءة المدينة الصح في صفحة الترافل)
+# 🌐 بوت التريد (النسخة البسيطة اللي كانت شغالة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -190,7 +190,6 @@ def run_trade_bot():
         while True:
             try:
                 if 'travel' in page.url:
-                    # 1. اقرا الكولداون
                     cooldown_text = page.evaluate("""() => {
                         let body = document.body.innerText;
                         let cdMatch = body.match(/You cannot travel for:?\\s*([^\\n]+)/i);
@@ -207,7 +206,6 @@ def run_trade_bot():
                         }
                         return null;
                     }""")
-                    
                     if cooldown_text:
                         ws = parse_cooldown(cooldown_text)
                         if ws > 0:
@@ -216,34 +214,30 @@ def run_trade_bot():
                             sleep(ws * 1000)
                             print("✅ [التريد] العداد خلص، refresh...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                            sleep(5000)  # وقت كافي للصفحة تحمل
+                            sleep(4000)
                             continue
                     
-                    # 2. اقرا المدينة الحالية من صفحة الترافل (Location: X)
+                    # قراءة المدينة من صفحة الترافل
                     cc = page.evaluate("""() => {
-                        let body = document.body.innerText;
-                        // الصيغة الأولى: Location:\nSt Louis
-                        let m = body.match(/Location\\s*\\n\\s*(San Francisco|St Louis)/i);
+                        let b = document.body.innerText;
+                        if (b.includes('Black Market - San Francisco')) return 'San Francisco';
+                        if (b.includes('Black Market - St Louis')) return 'St Louis';
+                        if (b.includes('Location\\nSt Louis') || b.includes('Location\\nSt Louis')) return 'St Louis';
+                        if (b.includes('Location\\nSan Francisco')) return 'San Francisco';
+                        let m = b.match(/Location\\s*:?\\s*(San Francisco|St Louis)/i);
                         if (m) return m[1];
-                        // الصيغة التانية: Location: St Louis
-                        m = body.match(/Location\\s*:?\\s*(San Francisco|St Louis)/i);
-                        if (m) return m[1];
-                        // الصيغة التالتة: current location
-                        if (body.includes('ST LOUIS') && body.includes('CURRENT LOCATION')) return 'St Louis';
-                        if (body.includes('SAN FRANCISCO') && body.includes('CURRENT LOCATION')) return 'San Francisco';
                         return null;
                     }""")
                     
                     if not cc:
                         print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                         page.goto('https://project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(5000)
+                        sleep(4000)
                         continue
                     
                     dc = 'St Louis' if cc == 'San Francisco' else 'San Francisco'
                     print(f"✈️ [التريد] {cc} -> {dc}")
                     
-                    # 3. Grid View
                     try:
                         g = page.locator("text='Grid View'").first
                         if g.count() > 0:
@@ -253,7 +247,6 @@ def run_trade_bot():
                     except Exception as e:
                         print(f"⚠️ [التريد] Grid View: {e}")
                     
-                    # 4. كارت المدينة
                     try:
                         c = page.locator(f"text='{dc}'").first
                         if c.count() > 0:
@@ -263,7 +256,6 @@ def run_trade_bot():
                     except Exception as e:
                         print(f"⚠️ [التريد] كارت المدينة: {e}")
                     
-                    # 5. Travel to Selected Location
                     try:
                         t = page.locator("button:has-text('Travel to Selected Location')").first
                         if t.count() > 0:
@@ -273,7 +265,6 @@ def run_trade_bot():
                     except Exception as e:
                         print(f"⚠️ [التريد] Travel Selected: {e}")
                     
-                    # 6. تأكيد TRAVEL
                     try:
                         page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
                         tv = page.locator("button:has-text('TRAVEL')").last
@@ -338,7 +329,7 @@ def run_trade_bot():
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] SF -> STL")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(4000)
+                        sleep(3000)
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] SF - شراء بلاستيك")
@@ -371,7 +362,7 @@ def run_trade_bot():
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] STL -> SF")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(4000)
+                        sleep(3000)
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] STL - شراء لوحات")
