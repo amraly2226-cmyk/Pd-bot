@@ -35,7 +35,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (اتعدل باستخدام JavaScript بس)
+# 📈 بوت الأسهم (اتعدل عشان يتعامل مع النافذة المنبثقة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -98,13 +98,13 @@ def run_stocks_bot():
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # 2) شراء الأسهم الخضراء - كل ده بـ JavaScript
+                # 2) شراء الأسهم الخضراء
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 
                 for attempt in range(5):
                     try:
-                        # 1. بندور على السهم الأخضر وندوس Max Buy - كله بـ JavaScript
+                        # 1. بندور على السهم الأخضر وندوس Max Buy
                         found_and_clicked = page.evaluate("""() => {
                             let rows = [...document.querySelectorAll('tr')];
                             for (let r of rows) {
@@ -127,25 +127,32 @@ def run_stocks_bot():
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max Buy")
-                        sleep(2500) 
+                        sleep(4000) # زيادة الوقت عشان النافذة تظهر
                         
-                        # 2. بندور على زر BUY MAX في النافذة المنبثقة - كله بـ JavaScript
+                        # 2. بندور على زر BUY MAX في النافذة المنبثقة - طريقة أذكى
                         confirm_buy = page.evaluate("""() => {
-                            let allElements = [...document.querySelectorAll('button, span, div, a')];
-                            for (let el of allElements) {
-                                if (el.innerText && el.innerText.trim().toUpperCase() === 'BUY MAX') {
-                                    // نتأكد إنه مش جوه صف (يعني في النافذة المنبثقة)
-                                    if (!el.closest('tr')) {
-                                        el.click();
-                                        return true;
-                                    }
+                            let allButtons = [...document.querySelectorAll('button')];
+                            // بندور على أي زر فيه كلمة BUY MAX
+                            for (let btn of allButtons) {
+                                let btnText = btn.innerText.replace(/\\s+/g, ' ').trim().toUpperCase();
+                                if (btnText === 'BUY MAX') {
+                                    btn.click();
+                                    return "exact_match";
                                 }
                             }
-                            return false;
+                            // لو مش لاقي، بندور على أي زر فيه كلمة BUY
+                            for (let btn of allButtons) {
+                                let btnText = btn.innerText.replace(/\\s+/g, ' ').trim().toUpperCase();
+                                if (btnText.includes('BUY') && btnText.includes('MAX')) {
+                                    btn.click();
+                                    return "partial_match";
+                                }
+                            }
+                            return "not_found";
                         }""")
                         
-                        if confirm_buy:
-                            print("✅ [الأسهم] تم التأكيد بـ BUY MAX")
+                        if confirm_buy != "not_found":
+                            print(f"✅ [الأسهم] تم التأكيد بـ BUY MAX ({confirm_buy})")
                             sleep(3000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                         else:
@@ -170,7 +177,7 @@ def run_stocks_bot():
             time.sleep(STOCKS_INTERVAL)
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو شغال بالظبط)
+# 🌐 بوت التريد (زي ما هو بالظبط، مفيش أي تغيير)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
