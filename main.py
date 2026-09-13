@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (شغال - مش هنلمسه)
+# 📈 بوت الأسهم - بيع الأول، وبعدين شراء (مع screenshots)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -55,29 +55,110 @@ def run_stocks_bot():
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
                 
-                print("🔴 [الأسهم] بدأت عملية البيع...")
+                # ═══════════════════════════════════════════
+                # 🔴 1) البيع الأول
+                # ═══════════════════════════════════════════
+                print("\n🔴 [الأسهم] [1/2] بدأت عملية البيع...")
+                
+                # Screenshot 1: الصفحة قبل ما نبدأ
                 try:
+                    page.screenshot(path="sell_1_before.png", full_page=True)
+                    print("📸 sell_1_before.png")
+                except Exception as e:
+                    print(f"⚠️ مشكلة في الـ screenshot: {e}")
+                
+                try:
+                    # 1. ندوس على زر "Sell All" اللي تحت خالص
                     sell_btns = page.locator('button:has-text("Sell All")')
                     if sell_btns.count() > 0:
                         sell_btns.last.click(force=True)
+                        print("✅ [الأسهم] داس على Sell All (اللي تحت)")
                         sleep(2000)
-                        page.evaluate("""() => {
-                            let btns = [...document.querySelectorAll('button')];
-                            for (let b of btns) {
-                                if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) {
-                                    let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                    b.dispatchEvent(evt);
-                                    b.click();
-                                    return true;
+                        
+                        # Screenshot 2: بعد الضغط على Sell All
+                        try:
+                            page.screenshot(path="sell_2_after_click.png", full_page=True)
+                            print("📸 sell_2_after_click.png")
+                        except: pass
+                        
+                        # 2. نستنى النافذة تظهر
+                        sleep(1500)
+                        
+                        # 3. نضغط على SELL ALL بنفس أسلوب الشراء (flexible)
+                        confirm_clicked = False
+                        
+                        # المحاولة 1: Playwright
+                        try:
+                            btn1 = page.locator('button:has-text("SELL ALL")').last
+                            if btn1.count() > 0:
+                                btn1.click(force=True, timeout=5000)
+                                confirm_clicked = True
+                                print("✅ [الأسهم] داس على SELL ALL (Playwright)")
+                        except:
+                            pass
+                        
+                        # المحاولة 2: JavaScript - أي عنصر فيه SELL و ALL
+                        if not confirm_clicked:
+                            confirm_clicked = page.evaluate("""() => {
+                                let allEls = document.querySelectorAll('button, a, span, div, input');
+                                for (let el of allEls) {
+                                    let t = (el.innerText || el.value || '').trim().toUpperCase();
+                                    if (t.includes('SELL') && t.includes('ALL') && el.offsetWidth > 0 && !el.closest('tr')) {
+                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                        el.dispatchEvent(evt);
+                                        el.click();
+                                        return 'sell_all_' + el.tagName.toLowerCase();
+                                    }
                                 }
-                            }
-                        }""")
-                        sleep(4000)
-                        print("✅ [الأسهم] تم البيع")
-                    else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
-                except Exception as e: print(f"⚠️ مشكلة في البيع: {e}")
+                                return false;
+                            }""")
+                            if confirm_clicked:
+                                print(f"✅ [الأسهم] داس على SELL ALL (JS: {confirm_clicked})")
+                        
+                        # المحاولة 3: أي عنصر فيه SELL ومش جوه صف
+                        if not confirm_clicked:
+                            confirm_clicked = page.evaluate("""() => {
+                                let allEls = document.querySelectorAll('button, a');
+                                for (let el of allEls) {
+                                    let t = (el.innerText || '').trim().toUpperCase();
+                                    if (t.includes('SELL') && !el.closest('tr') && el.offsetWidth > 0) {
+                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                        el.dispatchEvent(evt);
+                                        el.click();
+                                        return 'sell_' + el.tagName.toLowerCase();
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if confirm_clicked:
+                                print(f"✅ [الأسهم] داس على زر فيه SELL (JS: {confirm_clicked})")
+                        
+                        # Screenshot 3: بعد محاولة الضغط على SELL ALL
+                        try:
+                            page.screenshot(path="sell_3_after_confirm.png", full_page=True)
+                            print("📸 sell_3_after_confirm.png")
+                        except: pass
+                        
+                        if confirm_clicked:
+                            sleep(4000)
+                            print("✅ [الأسهم] تم البيع!")
+                        else:
+                            print("⚠️ [الأسهم] مش لاقي زر تأكيد البيع")
+                            # حفظ HTML عشان نشوف إيه اللي ظاهر
+                            try:
+                                with open("sell_page_content.html", "w", encoding="utf-8") as f:
+                                    f.write(page.content())
+                                print("📄 sell_page_content.html")
+                            except: pass
+                    else:
+                        print("ℹ️ [الأسهم] مفيش أسهم للبيع")
+                except Exception as e: 
+                    print(f"⚠️ مشكلة في البيع: {e}")
                 
-                print("🟢 [الأسهم] بدأت عملية الشراء...")
+                # ═══════════════════════════════════════════
+                # 🟢 2) الشراء بعدين
+                # ═══════════════════════════════════════════
+                print("\n🟢 [الأسهم] [2/2] بدأت عملية الشراء...")
                 bought_count = 0
                 
                 for attempt in range(15):
