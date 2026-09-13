@@ -61,7 +61,12 @@ def run_stocks_bot():
                         page.evaluate("""() => {
                             let btns = [...document.querySelectorAll('button')];
                             for (let b of btns) {
-                                if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) { b.click(); return true; }
+                                if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) {
+                                    let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                    b.dispatchEvent(evt);
+                                    b.click();
+                                    return true;
+                                }
                             }
                         }""")
                         sleep(4000)
@@ -69,7 +74,7 @@ def run_stocks_bot():
                     else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e: print(f"⚠️ مشكلة في البيع: {e}")
                 
-                # 2) شراء الأسهم الخضراء - نفس طريقة التريد
+                # 2) شراء الأسهم الخضراء
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 
@@ -83,11 +88,11 @@ def run_stocks_bot():
                                 row = rows.nth(i)
                                 row_text = row.inner_text()
                                 
-                                # نتأكد إن السهم أخضر (فيه ↑ أو ▲)
                                 if ('↑' in row_text or '▲' in row_text):
-                                    # ✅ بندور على زر "Max Buy" في نفس الصف
+                                    # بندوس على Max Buy في نفس الصف
                                     max_buy_btn = row.locator('button:has-text("Max Buy")').first
                                     if max_buy_btn.count() > 0:
+                                        # نستخدم Playwright click العادي
                                         max_buy_btn.click(force=True)
                                         found_green = True
                                         break
@@ -99,19 +104,65 @@ def run_stocks_bot():
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
-                        sleep(3000)  # وقت للنافذة تظهر
+                        sleep(4000)  # وقت كبير للنافذة تظهر
                         
-                        # ✅ نستنى نافذة BUY MAX ونضغط عليها (زي التريد بالظبط)
+                        # ✅ بندور على زر BUY MAX أو أي زر فيه BUY
+                        # المحاولة 1: Playwright locator على BUY MAX
+                        confirm_clicked = False
+                        
                         try:
-                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
-                            print("✅ [الأسهم] داس على BUY MAX")
+                            btn1 = page.locator('button:has-text("BUY MAX")').last
+                            if btn1.count() > 0:
+                                btn1.click(force=True, timeout=5000)
+                                confirm_clicked = True
+                                print("✅ [الأسهم] داس على BUY MAX (Playwright)")
+                        except:
+                            pass
+                        
+                        # المحاولة 2: JavaScript مع dispatchEvent على أي زر فيه BUY MAX
+                        if not confirm_clicked:
+                            confirm_clicked = page.evaluate("""() => {
+                                let allEls = document.querySelectorAll('button, a, span, div, input');
+                                for (let el of allEls) {
+                                    let t = (el.innerText || el.value || '').trim().toUpperCase();
+                                    if (t.includes('BUY') && t.includes('MAX') && el.offsetWidth > 0) {
+                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                        el.dispatchEvent(evt);
+                                        el.click();
+                                        return 'buy_max_' + el.tagName.toLowerCase();
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if confirm_clicked:
+                                print(f"✅ [الأسهم] داس على BUY MAX (JS: {confirm_clicked})")
+                        
+                        # المحاولة 3: أي زر فيه BUY بس (مش داخل صف)
+                        if not confirm_clicked:
+                            confirm_clicked = page.evaluate("""() => {
+                                let allEls = document.querySelectorAll('button, a');
+                                for (let el of allEls) {
+                                    let t = (el.innerText || '').trim().toUpperCase();
+                                    if (t.includes('BUY') && !el.closest('tr') && el.offsetWidth > 0) {
+                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                        el.dispatchEvent(evt);
+                                        el.click();
+                                        return 'buy_' + el.tagName.toLowerCase() + '_' + t;
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if confirm_clicked:
+                                print(f"✅ [الأسهم] داس على زر فيه BUY (JS: {confirm_clicked})")
+                        
+                        if confirm_clicked:
                             sleep(4000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
-                        except Exception as e:
-                            print(f"⚠️ [الأسهم] مفيش زر BUY MAX: {e}")
-                            page.screenshot(path="no_buy_max.png")
+                        else:
+                            print("⚠️ [الأسهم] مش لاقي أي زر تأكيد")
+                            page.screenshot(path="no_confirm_stock.png", full_page=True)
+                            with open("no_confirm_stock.html", "w", encoding="utf-8") as f:
+                                f.write(page.content())
                             break
                         
                     except Exception as e:
