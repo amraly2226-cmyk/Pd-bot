@@ -31,11 +31,11 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم - نفس السكريبت اللي كان شغال بالظبط
+# 📈 بوت الأسهم (Playwright locator - نفس أسلوب التريد)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
-    print("🚀 [الأسهم] بوت الأسهم بيشتغل...")
+    print("🚀 [الأسهم] بدأ التشغيل...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
@@ -45,110 +45,97 @@ def run_stocks_bot():
         
         try:
             page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=120000)
-            print("✅ [الأسهم] دخلنا لصفحة الأسهم بنجاح!")
+            print("✅ [الأسهم] دخلنا لصفحة الأسهم!")
         except Exception as e:
-            print(f"❌ [الأسهم] مشكلة في الدخول: {e}")
+            print(f"❌ [الأسهم] {e}")
             return
         
         while True:
             try:
-                # Refresh قبل كل دورة
                 try: page.reload(wait_until='domcontentloaded', timeout=60000)
                 except: pass
                 sleep(2000)
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
+                sleep(1000)
                 
                 # ═══════════════════════════════════════
-                # 🔴 1) البيع - نفس الطريقة بالظبط
+                # 🔴 1) البيع: Sell All (تحت) + SELL ALL (نافذة)
                 # ═══════════════════════════════════════
-                print("🔴 [الأسهم] [1/2] بدأت عملية البيع...")
-                
-                # دوس على آخر زر Sell All (اللي تحت خالص)
-                page.evaluate("""() => {
-                    const allSellBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
-                    if (allSellBtns.length > 0) {
-                        allSellBtns[allSellBtns.length - 1].click();
-                    }
-                }""")
-                sleep(2000)
-                
-                # استنى النافذة تظهر
+                print("\n🔴 [الأسهم] [1/2] بيع...")
                 try:
-                    page.wait_for_function("() => document.body.innerText.includes('Sell All Holdings') || document.body.innerText.includes('Confirm Sell All')", timeout=5000)
-                except: pass
-                
-                # دوس على SELL ALL اللي ظاهر في النافذة
-                page.evaluate("""() => {
-                    const allBtns = [...document.querySelectorAll('button')];
-                    const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null);
-                    if (confirmBtn) confirmBtn.click();
-                }""")
-                
-                sleep(4000)
-                print("✅ [الأسهم] تم بيع كل الأسهم بنجاح!")
+                    sell_btn = page.locator('button:has-text("Sell All")').last
+                    sell_btn.wait_for(state="visible", timeout=10000)
+                    sell_btn.click(force=True, timeout=5000)
+                    print("✅ [الأسهم] داس على Sell All (تحت)")
+                    sleep(3500)
+                    
+                    confirm_btn = page.locator('button:text-is("SELL ALL")').last
+                    confirm_btn.wait_for(state="visible", timeout=15000)
+                    confirm_btn.click(force=True, timeout=5000)
+                    print("✅ [الأسهم] تم البيع!")
+                    sleep(7000)
+                except Exception as e:
+                    print(f"⚠️ [الأسهم] مشكلة البيع: {e}")
+                    try: page.screenshot(path="no_sell_confirm.png")
+                    except: pass
                 
                 # ═══════════════════════════════════════
-                # 🟢 2) الشراء - نفس الطريقة بالظبط
+                # 🟢 2) الشراء: Max Buy (في الصف) + BUY MAX (نافذة)
                 # ═══════════════════════════════════════
-                print("🟢 [الأسهم] [2/2] بدأت عملية شراء الأسهم الخضراء...")
+                print("\n🟢 [الأسهم] [2/2] شراء...")
                 bought_count = 0
                 
                 for attempt in range(5):
-                    found_green = page.evaluate("""() => {
-                        const rows = document.querySelectorAll('tr');
-                        for (let row of rows) {
-                            const isGreen = [...row.querySelectorAll('td')].some(cell => {
-                                const text = cell.innerText.trim();
-                                return (text.includes('£') || text.includes('$')) && (text.includes('↑') || text.includes('▲'));
-                            });
-                            if (isGreen) {
-                                const maxSpan = row.querySelector('span.stock-fillmax-btn');
-                                if (maxSpan) {
-                                    maxSpan.click();
-                                    return true;
-                                }
-                            }
-                        }
-                        return false;
-                    }""")
-                    
-                    if not found_green:
+                    try:
+                        found_green = False
+                        rows = page.locator('tr')
+                        for i in range(rows.count()):
+                            try:
+                                row = rows.nth(i)
+                                row_text = row.inner_text()
+                                
+                                if ('↑' in row_text or '▲' in row_text):
+                                    max_buy_btn = row.locator('button:has-text("Max Buy")').first
+                                    if max_buy_btn.count() > 0:
+                                        max_buy_btn.click(force=True)
+                                        found_green = True
+                                        break
+                            except:
+                                continue
+                        
+                        if not found_green:
+                            break
+                        
+                        bought_count += 1
+                        print(f"✅ [الأسهم] سهم أخضر {bought_count} - داس Max Buy")
+                        sleep(3500)
+                        
+                        confirm_btn = page.locator('button:text-is("BUY MAX")').last
+                        confirm_btn.wait_for(state="visible", timeout=15000)
+                        confirm_btn.click(force=True, timeout=5000)
+                        print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
+                        sleep(5000)
+                        
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] مشكلة الشراء: {e}")
+                        try: page.screenshot(path=f"no_buy_{bought_count}.png")
+                        except: pass
                         break
-                    
-                    bought_count += 1
-                    print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
-                    sleep(1500)
-                    
-                    # دوس على زر Buy الرئيسي
-                    page.evaluate("""() => {
-                        let buyBtn = document.getElementById('bottomBuyBtn');
-                        if (buyBtn) buyBtn.click();
-                    }""")
-                    sleep(1500)
-                    
-                    # دوس على YES
-                    page.evaluate("""() => {
-                        let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
-                        if (yesBtn) yesBtn.click();
-                    }""")
-                    
-                    sleep(2000)
-                    print(f"✅ [الأسهم] تم شراء السهم الأخضر رقم {bought_count}")
                 
                 if bought_count == 0:
-                    print("⏳ [الأسهم] مفيش أسهم خضراء في الوقت الحالي.")
+                    print("ℹ️ [الأسهم] مفيش أسهم خضراء")
                 
-                print("⏳ [الأسهم] هستنى 15 دقيقة قبل الدورة الجاية...")
+                print("⏰ [الأسهم] هستنى 15 دقيقة...")
                 sleep(900000)
                 
             except Exception as e:
-                print(f"⚠️ [الأسهم] حصل خطأ مؤقت: {e}")
+                print(f"⚠️ [الأسهم] خطأ: {e}")
                 sleep(5000)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو بالظبط)
+# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
