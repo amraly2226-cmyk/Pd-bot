@@ -31,7 +31,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (يشتري الأول - Playwright native click)
+# 📈 بوت الأسهم (الشراء الأول)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -57,7 +57,7 @@ def run_stocks_bot():
                 sleep(2500)
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
-                sleep(1000)
+                sleep(1500)
                 
                 # ═══════════════════════════════════════
                 # 🟢 1) الشراء الأول
@@ -67,14 +67,13 @@ def run_stocks_bot():
                 
                 for attempt in range(5):
                     try:
-                        # بندور على صف فيه سهم أخضر
+                        # 1. بندور على صف فيه سهم أخضر
                         green_row = None
                         rows = page.locator('tr')
                         for i in range(rows.count()):
                             try:
                                 row = rows.nth(i)
-                                row_text = row.inner_text()
-                                if '↑' in row_text or '▲' in row_text:
+                                if '↑' in row.inner_text() or '▲' in row.inner_text():
                                     green_row = row
                                     break
                             except:
@@ -84,25 +83,24 @@ def run_stocks_bot():
                             print("ℹ️ [الأسهم] مفيش أسهم خضراء")
                             break
                         
-                        # نضغط على زر "Max Buy" في الصف - Playwright native
-                        max_buy_btn = green_row.locator('button:has-text("Max Buy")').first
+                        # 2. بندوس على زر "Max Buy" في الصف
+                        max_buy_btn = green_row.locator('text="Max Buy"').first
                         max_buy_btn.click(force=True, timeout=10000)
                         bought_count += 1
                         print(f"✅ [الأسهم] سهم أخضر {bought_count} - داس Max Buy")
                         
-                        # نستنى النافذة تظهر
+                        # 3. نستنى النافذة تظهر وندوس على "BUY MAX"
                         sleep(3000)
                         
-                        # نضغط على زر "BUY MAX" في النافذة - Playwright native
-                        confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                        confirm_btn.wait_for(state="visible", timeout=15000)
-                        confirm_btn.click(force=True, timeout=10000)
-                        print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
+                        buy_max_btn = page.locator('text="BUY MAX"').last
+                        buy_max_btn.wait_for(state="visible", timeout=15000)
+                        buy_max_btn.click(force=True, timeout=10000)
+                        print(f"✅ [الأسهم] تم الشراء - السهم {bought_count}")
                         sleep(5000)
                         
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة في الشراء: {e}")
-                        try: page.screenshot(path=f"buy_error_{bought_count}.png")
+                        try: page.screenshot(path=f"buy_fail_{bought_count}.png")
                         except: pass
                         break
                 
@@ -112,20 +110,23 @@ def run_stocks_bot():
                 print("\n🔴 [الأسهم] [2/2] بيع...")
                 
                 try:
-                    # زر Sell All اللي تحت (مش جوه صف)
-                    sell_all_btn = page.locator('button:has-text("Sell All")').last
+                    # 1. ندوس على زر "Sell All" اللي تحت خالص
+                    sell_all_btn = page.locator('text="Sell All"').last
+                    sell_all_btn.wait_for(state="visible", timeout=10000)
                     sell_all_btn.click(force=True, timeout=10000)
-                    print("✅ [الأسهم] داس على Sell All")
-                    sleep(3000)
+                    print("✅ [الأسهم] داس Sell All")
+                    sleep(3500)
                     
-                    # زر SELL ALL في النافذة
-                    confirm_sell = page.locator('button:has-text("SELL ALL")').last
+                    # 2. نستنى النافذة وندوس على "SELL ALL"
+                    confirm_sell = page.locator('text="SELL ALL"').last
                     confirm_sell.wait_for(state="visible", timeout=15000)
                     confirm_sell.click(force=True, timeout=10000)
                     print("✅ [الأسهم] تم تأكيد البيع!")
                     sleep(6000)
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
+                    try: page.screenshot(path="sell_fail.png")
+                    except: pass
                 
                 print("⏰ [الأسهم] هستنى 15 دقيقة...")
                 sleep(900000)
