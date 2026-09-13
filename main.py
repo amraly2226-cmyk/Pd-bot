@@ -31,11 +31,11 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (نسخة السكريبت الأصلي بتاعك بالظبط)
+# 📈 بوت الأسهم (Playwright - بمحاولات متعددة وأدوات دقيقة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
-    print("🚀 [الأسهم] بوت الأسهم بيشتغل...")
+    print("📈 [الأسهم] بدأ التشغيل...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
@@ -43,120 +43,200 @@ def run_stocks_bot():
         page = context.new_page()
         page.set_default_timeout(60000)
         
+        # نقبل أي dialog native
+        page.on("dialog", lambda d: d.accept())
+        
         try:
             page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=120000)
-            print("✅ [الأسهم] دخلنا لصفحة الأسهم بنجاح!")
+            print("✅ [الأسهم] دخلنا الصفحة")
         except Exception as e:
-            print(f"❌ [الأسهم] مشكلة في الدخول: {e}")
+            print(f"❌ [الأسهم] {e}")
             return
         
         while True:
             try:
-                # 🔄 تحديث الصفحة قبل كل دورة جديدة
+                # Refresh
                 try: page.reload(wait_until='domcontentloaded', timeout=60000)
                 except: pass
                 sleep(2000)
-                
-                # انتظر ظهور الجدول
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
                 
                 # ═══════════════════════════════════════
-                # 🔴 1) البيع
+                # 🔴 الخطوة 1: بيع
                 # ═══════════════════════════════════════
-                print("🔴 [الأسهم] [1/2] بدأت عملية البيع...")
+                print("\n🔴 [الأسهم] [1/2] بيع...")
                 
-                # اضغط على آخر زر Sell All (اللي تحت خالص)
-                page.evaluate("""() => {
-                    const allSellBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
-                    if (allSellBtns.length > 0) {
-                        allSellBtns[allSellBtns.length - 1].click();
-                    }
-                }""")
-                sleep(2000)
-                
-                # استنى ظهور النافذة المنبثقة
+                # 1. دوس على زر Sell All اللي تحت (اللي مش جوه صف)
+                clicked = False
                 try:
-                    page.wait_for_function("() => document.body.innerText.includes('Sell All Holdings') || document.body.innerText.includes('Confirm Sell All')", timeout=5000)
+                    # بندور على الأزرار اللي مش جوه tr
+                    all_sell = page.locator('button:has-text("Sell All")')
+                    count = all_sell.count()
+                    print(f"ℹ️ [الأسهم] لقيت {count} زر Sell All")
+                    
+                    for i in range(count - 1, -1, -1):
+                        btn = all_sell.nth(i)
+                        in_row = btn.evaluate("el => !!el.closest('tr')")
+                        if not in_row:
+                            btn.click(force=True, timeout=5000)
+                            clicked = True
+                            print(f"✅ [الأسهم] داس على Sell All (تحت)")
+                            break
+                except Exception as e:
+                    print(f"⚠️ [الأسهم] {e}")
+                
+                if not clicked:
+                    print("⚠️ [الأسهم] مش لاقي الزر")
+                    page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded')
+                    sleep(3000)
+                    continue
+                
+                # 2. استنى النافذة
+                sleep(4)
+                try: page.screenshot(path="stock_sell_modal.png")
                 except: pass
                 
-                # اضغط على زر SELL ALL في النافذة
-                page.evaluate("""() => {
-                    const allBtns = [...document.querySelectorAll('button')];
-                    const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null);
-                    if (confirmBtn) confirmBtn.click();
-                }""")
+                try:
+                    page.wait_for_function("() => document.body.innerText.includes('Sell All Holdings')", timeout=10000)
+                    print("✅ [الأسهم] النافذة ظهرت")
+                except:
+                    print("⚠️ [الأسهم] مشفتش Sell All Holdings")
                 
-                sleep(4000)
-                try: page.wait_for_load_state('domcontentloaded', timeout=10000)
-                except: pass
-                sleep(1000)
-                print("✅ [الأسهم] تم بيع كل الأسهم بنجاح!")
+                sleep(2)
                 
-                # ═══════════════════════════════════════
-                # 🟢 2) الشراء
-                # ═══════════════════════════════════════
-                print("🟢 [الأسهم] [2/2] بدأت عملية شراء الأسهم الخضراء...")
-                bought_count = 0
+                # 3. دوس على SELL ALL في النافذة - بطرق متعددة
+                confirmed = False
                 
-                for attempt in range(5):
-                    # بندور على السهم الأخضر - بنستخدم £ أو $
-                    found_green = page.evaluate("""() => {
-                        const rows = document.querySelectorAll('tr');
-                        for (let row of rows) {
-                            const isGreen = [...row.querySelectorAll('td')].some(cell => {
-                                const text = cell.innerText.trim();
-                                return (text.includes('£') || text.includes('$')) && (text.includes('↑') || text.includes('▲'));
-                            });
-                            if (isGreen) {
-                                const maxSpan = row.querySelector('span.stock-fillmax-btn');
-                                if (maxSpan) {
-                                    maxSpan.click();
+                # الطريقة 1: Playwright بـ text-is (حساس للأحرف)
+                if not confirmed:
+                    try:
+                        btn = page.locator('button:text-is("SELL ALL")').last
+                        if btn.count() > 0:
+                            btn.click(force=True, timeout=5000)
+                            confirmed = True
+                            print("✅ [الأسهم] SELL ALL (طريقة 1 - Playwright exact)")
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] طريقة 1 فشلت: {e}")
+                
+                # الطريقة 2: JavaScript بـ mousedown/mouseup/click
+                if not confirmed:
+                    try:
+                        result = page.evaluate("""() => {
+                            const btns = [...document.querySelectorAll('button')];
+                            for (let b of btns) {
+                                const text = (b.textContent || '').replace(/\\s+/g, ' ').trim().toUpperCase();
+                                if (text === 'SELL ALL' && !b.closest('tr') && b.offsetWidth > 0) {
+                                    b.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window}));
+                                    b.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window}));
+                                    b.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true, view: window}));
                                     return true;
                                 }
                             }
-                        }
-                        return false;
-                    }""")
-                    
-                    if not found_green:
+                            return false;
+                        }""")
+                        if result:
+                            confirmed = True
+                            print("✅ [الأسهم] SELL ALL (طريقة 2 - JS events)")
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] طريقة 2 فشلت: {e}")
+                
+                # الطريقة 3: parent modal
+                if not confirmed:
+                    try:
+                        # بندور على زر جوه modal container
+                        btn = page.locator('[class*="modal"] button:has-text("SELL ALL"), [role="dialog"] button:has-text("SELL ALL")').last
+                        if btn.count() > 0:
+                            btn.click(force=True, timeout=5000)
+                            confirmed = True
+                            print("✅ [الأسهم] SELL ALL (طريقة 3 - Modal)")
+                    except:
+                        pass
+                
+                if confirmed:
+                    sleep(7)
+                    print("✅ [الأسهم] تم البيع!")
+                else:
+                    print("❌ [الأسهم] مش لاقي SELL ALL")
+                    page.screenshot(path="no_sell_confirm.png")
+                
+                # ═══════════════════════════════════════
+                # 🟢 الخطوة 2: شراء
+                # ═══════════════════════════════════════
+                print("\n🟢 [الأسهم] [2/2] شراء...")
+                bought = 0
+                
+                for attempt in range(5):
+                    try:
+                        # بندور على السهم الأخضر وندوس على span.stock-fillmax-btn
+                        found = page.evaluate("""() => {
+                            const rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                const txt = r.innerText;
+                                if ((txt.includes('↑') || txt.includes('▲')) && (txt.includes('$') || txt.includes('£'))) {
+                                    const maxSpan = r.querySelector('span.stock-fillmax-btn');
+                                    if (maxSpan) {
+                                        maxSpan.click();
+                                        return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        }""")
+                        
+                        if not found:
+                            break
+                        
+                        bought += 1
+                        print(f"✅ [الأسهم] سهم أخضر {bought}")
+                        sleep(2)
+                        
+                        # دوس على زر Buy اللي تحت
+                        page.evaluate("""() => {
+                            const btn = document.getElementById('bottomBuyBtn');
+                            if (btn) btn.click();
+                        }""")
+                        sleep(3)
+                        
+                        # دوس على YES
+                        yes_clicked = page.evaluate("""() => {
+                            const btns = [...document.querySelectorAll('button')];
+                            for (let b of btns) {
+                                const text = (b.textContent || '').trim().toUpperCase();
+                                if (text === 'YES' && !b.closest('tr') && b.offsetWidth > 0) {
+                                    b.dispatchEvent(new MouseEvent('mousedown', {bubbles: true, cancelable: true}));
+                                    b.dispatchEvent(new MouseEvent('mouseup', {bubbles: true, cancelable: true}));
+                                    b.dispatchEvent(new MouseEvent('click', {bubbles: true, cancelable: true}));
+                                    b.click();
+                                    return true;
+                                }
+                            }
+                            return false;
+                        }""")
+                        
+                        if yes_clicked:
+                            print(f"✅ [الأسهم] YES - تم شراء {bought}")
+                            sleep(4)
+                        else:
+                            print(f"❌ [الأسهم] مفيش YES")
+                            page.screenshot(path="no_yes.png")
+                            break
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] {e}")
                         break
-                    
-                    bought_count += 1
-                    print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
-                    sleep(1500)
-                    
-                    # اضغط على زر Buy اللي تحت
-                    page.evaluate("""() => {
-                        let buyBtn = document.getElementById('bottomBuyBtn');
-                        if (buyBtn) buyBtn.click();
-                    }""")
-                    sleep(1500)
-                    
-                    # اضغط على زر YES في النافذة
-                    page.evaluate("""() => {
-                        let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
-                        if (yesBtn) yesBtn.click();
-                    }""")
-                    
-                    try: page.wait_for_load_state('domcontentloaded', timeout=10000)
-                    except: pass
-                    sleep(2000)
-                    print(f"✅ [الأسهم] تم شراء السهم الأخضر رقم {bought_count}")
                 
-                if bought_count == 0:
-                    print("⏳ [الأسهم] مفيش أسهم خضراء في الوقت الحالي.")
+                if bought == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
                 
-                print("⏳ [الأسهم] هستنى 10 دقايق قبل ما نبدأ دورة جديدة...")
-                sleep(600000)
+                print(f"⏰ [الأسهم] هستنى 15 دقيقة...")
+                sleep(900)
                 
             except Exception as e:
-                print(f"⚠️ [الأسهم] حصل خطأ مؤقت: {e}")
-                sleep(5000)
+                print(f"⚠️ [الأسهم] خطأ: {e}")
+                sleep(15)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
+# 🌐 بوت التريد (زي ما هو بالظبط)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
