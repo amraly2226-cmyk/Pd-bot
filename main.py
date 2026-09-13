@@ -17,7 +17,6 @@ COOKIES = [
 ]
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
-STOCKS_INTERVAL = 15 * 60
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
@@ -32,173 +31,132 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (بيع بـ dispatchEvent + JS)
+# 📈 بوت الأسهم (نسخة السكريبت الأصلي بتاعك بالظبط)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
-    print("📈 [الأسهم] بدأ التشغيل...")
+    print("🚀 [الأسهم] بوت الأسهم بيشتغل...")
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
         context.add_cookies(COOKIES)
         page = context.new_page()
-        page.set_default_timeout(15000)
-        time.sleep(5)
+        page.set_default_timeout(60000)
+        
+        try:
+            page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=120000)
+            print("✅ [الأسهم] دخلنا لصفحة الأسهم بنجاح!")
+        except Exception as e:
+            print(f"❌ [الأسهم] مشكلة في الدخول: {e}")
+            return
         
         while True:
             try:
-                print("\n" + "="*50)
-                print("📈 [الأسهم] جاري الدخول...")
-                print("="*50)
-                page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=60000)
-                print("✅ [الأسهم] دخلنا الصفحة")
+                # 🔄 تحديث الصفحة قبل كل دورة جديدة
+                try: page.reload(wait_until='domcontentloaded', timeout=60000)
+                except: pass
+                sleep(2000)
+                
+                # انتظر ظهور الجدول
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
-                sleep(3000)
                 
                 # ═══════════════════════════════════════
-                # 🔴 الخطوة 1: بيع كل الأسهم
+                # 🔴 1) البيع
                 # ═══════════════════════════════════════
-                print("🔴 [الأسهم] الخطوة 1: بيع كل الأسهم...")
+                print("🔴 [الأسهم] [1/2] بدأت عملية البيع...")
                 
-                # 1. ندوس على زر Sell All اللي تحت (مش جوه صف) - بـ JavaScript
-                sell_clicked = page.evaluate("""() => {
-                    let btns = [...document.querySelectorAll('button')];
-                    for (let i = btns.length - 1; i >= 0; i--) {
-                        let t = btns[i].innerText.trim();
-                        if (t === 'Sell All' && !btns[i].closest('tr') && btns[i].offsetWidth > 0) {
-                            btns[i].click();
-                            return true;
-                        }
+                # اضغط على آخر زر Sell All (اللي تحت خالص)
+                page.evaluate("""() => {
+                    const allSellBtns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
+                    if (allSellBtns.length > 0) {
+                        allSellBtns[allSellBtns.length - 1].click();
                     }
-                    return false;
+                }""")
+                sleep(2000)
+                
+                # استنى ظهور النافذة المنبثقة
+                try:
+                    page.wait_for_function("() => document.body.innerText.includes('Sell All Holdings') || document.body.innerText.includes('Confirm Sell All')", timeout=5000)
+                except: pass
+                
+                # اضغط على زر SELL ALL في النافذة
+                page.evaluate("""() => {
+                    const allBtns = [...document.querySelectorAll('button')];
+                    const confirmBtn = allBtns.find(b => b.innerText.trim() === 'SELL ALL' && b.offsetParent !== null);
+                    if (confirmBtn) confirmBtn.click();
                 }""")
                 
-                if sell_clicked:
-                    print("✅ [الأسهم] داس على Sell All (تحت)")
-                    sleep(4000)
-                    try: page.screenshot(path="stock_sell_modal.png")
-                    except: pass
-                    
-                    # 2. تأكيد SELL ALL بـ JavaScript + dispatchEvent
-                    confirmed = False
-                    for ct in range(20):
-                        confirmed = page.evaluate("""() => {
-                            // بندور على أي عنصر (button, a, span) فيه "SELL ALL" مش جوه tr
-                            let allEls = document.querySelectorAll('button, a, span, div, input');
-                            for (let el of allEls) {
-                                let t = (el.innerText || el.value || '').trim().toUpperCase();
-                                if (t === 'SELL ALL' && !el.closest('tr') && el.offsetWidth > 0 && el.offsetHeight > 0) {
-                                    // نجرب dispatchEvent
-                                    let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                    el.dispatchEvent(evt);
-                                    // وكمان click عادي
-                                    el.click();
-                                    return 'clicked_' + el.tagName.toLowerCase();
-                                }
-                            }
-                            return false;
-                        }""")
-                        if confirmed:
-                            print(f"✅ [الأسهم] داس على SELL ALL ({confirmed})")
-                            break
-                        sleep(1000)
-                    
-                    if confirmed:
-                        sleep(7000)
-                        print("✅ [الأسهم] خلص البيع")
-                    else:
-                        print("⚠️ [الأسهم] مفيش زر SELL ALL")
-                        page.screenshot(path="no_stock_sell_confirm.png")
-                else:
-                    print("ℹ️ [الأسهم] مفيش زر Sell All")
+                sleep(4000)
+                try: page.wait_for_load_state('domcontentloaded', timeout=10000)
+                except: pass
+                sleep(1000)
+                print("✅ [الأسهم] تم بيع كل الأسهم بنجاح!")
                 
                 # ═══════════════════════════════════════
-                # 🟢 الخطوة 2: شراء الأسهم الخضراء
+                # 🟢 2) الشراء
                 # ═══════════════════════════════════════
-                print("\n🟢 [الأسهم] الخطوة 2: شراء الأسهم الخضراء...")
+                print("🟢 [الأسهم] [2/2] بدأت عملية شراء الأسهم الخضراء...")
                 bought_count = 0
                 
-                for attempt in range(15):
-                    try:
-                        found_green = False
-                        rows = page.locator('tr')
-                        for i in range(rows.count()):
-                            try:
-                                row = rows.nth(i)
-                                row_text = row.inner_text()
-                                
-                                if ('↑' in row_text or '▲' in row_text):
-                                    max_buy_btn = row.locator('button:has-text("Max Buy")').first
-                                    if max_buy_btn.count() > 0:
-                                        max_buy_btn.click(force=True)
-                                        found_green = True
-                                        break
-                            except:
-                                continue
-                        
-                        if not found_green:
-                            break
-                        
-                        bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
-                        sleep(4000)
-                        
-                        # تأكيد BUY MAX بـ JavaScript + dispatchEvent
-                        confirmed_buy = False
-                        for bt in range(15):
-                            confirmed_buy = page.evaluate("""() => {
-                                let allEls = document.querySelectorAll('button, a, span, div, input');
-                                // الأول BUY MAX
-                                for (let el of allEls) {
-                                    let t = (el.innerText || el.value || '').trim().toUpperCase();
-                                    if (t === 'BUY MAX' && !el.closest('tr') && el.offsetWidth > 0) {
-                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                        el.dispatchEvent(evt);
-                                        el.click();
-                                        return 'buy_max_' + el.tagName.toLowerCase();
-                                    }
+                for attempt in range(5):
+                    # بندور على السهم الأخضر - بنستخدم £ أو $
+                    found_green = page.evaluate("""() => {
+                        const rows = document.querySelectorAll('tr');
+                        for (let row of rows) {
+                            const isGreen = [...row.querySelectorAll('td')].some(cell => {
+                                const text = cell.innerText.trim();
+                                return (text.includes('£') || text.includes('$')) && (text.includes('↑') || text.includes('▲'));
+                            });
+                            if (isGreen) {
+                                const maxSpan = row.querySelector('span.stock-fillmax-btn');
+                                if (maxSpan) {
+                                    maxSpan.click();
+                                    return true;
                                 }
-                                // بعدين أي زر فيه BUY
-                                for (let el of allEls) {
-                                    let t = (el.innerText || el.value || '').trim().toUpperCase();
-                                    if (t.includes('BUY') && !el.closest('tr') && el.offsetWidth > 0) {
-                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                        el.dispatchEvent(evt);
-                                        el.click();
-                                        return 'buy_' + el.tagName.toLowerCase();
-                                    }
-                                }
-                                return false;
-                            }""")
-                            if confirmed_buy:
-                                print(f"✅ [الأسهم] داس على ({confirmed_buy})")
-                                break
-                            sleep(1000)
-                        
-                        if confirmed_buy:
-                            sleep(5000)
-                            print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
-                        else:
-                            print("⚠️ [الأسهم] مش لاقي زر BUY")
-                            page.screenshot(path="no_buy_confirm.png")
-                            break
-                        
-                    except Exception as e:
-                        print(f"⚠️ [الأسهم] مشكلة: {e}")
+                            }
+                        }
+                        return false;
+                    }""")
+                    
+                    if not found_green:
                         break
+                    
+                    bought_count += 1
+                    print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
+                    sleep(1500)
+                    
+                    # اضغط على زر Buy اللي تحت
+                    page.evaluate("""() => {
+                        let buyBtn = document.getElementById('bottomBuyBtn');
+                        if (buyBtn) buyBtn.click();
+                    }""")
+                    sleep(1500)
+                    
+                    # اضغط على زر YES في النافذة
+                    page.evaluate("""() => {
+                        let yesBtn = [...document.querySelectorAll('button, span, div')].find(el => el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0);
+                        if (yesBtn) yesBtn.click();
+                    }""")
+                    
+                    try: page.wait_for_load_state('domcontentloaded', timeout=10000)
+                    except: pass
+                    sleep(2000)
+                    print(f"✅ [الأسهم] تم شراء السهم الأخضر رقم {bought_count}")
                 
-                if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
-                print(f"📊 [الأسهم] خلصنا: اشترينا {bought_count}")
-                print("="*50 + "\n")
-            except Exception as e: print(f"⚠️ خطأ: {e}")
-            
-            print(f"⏰ [الأسهم] هستنى 15 دقيقة...")
-            time.sleep(STOCKS_INTERVAL)
+                if bought_count == 0:
+                    print("⏳ [الأسهم] مفيش أسهم خضراء في الوقت الحالي.")
+                
+                print("⏳ [الأسهم] هستنى 10 دقايق قبل ما نبدأ دورة جديدة...")
+                sleep(600000)
+                
+            except Exception as e:
+                print(f"⚠️ [الأسهم] حصل خطأ مؤقت: {e}")
+                sleep(5000)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو بالظبط)
+# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
