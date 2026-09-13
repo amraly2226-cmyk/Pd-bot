@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم - بيع الأول (بـ dispatchEvent) وبعدين شراء
+# 📈 بوت الأسهم - بيع الأول (بنفس طريقة الشراء) وبعدين شراء
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -66,24 +66,29 @@ def run_stocks_bot():
                 except: pass
                 
                 try:
-                    # 1. ندوس على زر Sell All اللي تحت بـ dispatchEvent
+                    # 1. ندوس على زر "Sell All" اللي تحت (الكبير - اللي مش جوه صف) بـ textContent
                     sold_first = page.evaluate("""() => {
-                        const btns = [...document.querySelectorAll('button')].filter(b => b.innerText.trim() === 'Sell All');
-                        if (btns.length === 0) return 'not_found';
-                        const btn = btns[btns.length - 1];
-                        const e1 = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
-                        const e2 = new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window});
-                        const e3 = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                        btn.dispatchEvent(e1);
-                        btn.dispatchEvent(e2);
-                        btn.dispatchEvent(e3);
-                        btn.click();
-                        return 'js_dispatched';
+                        const btns = [...document.querySelectorAll('button')];
+                        // من الآخر للأول - أول زر فيه textContent === 'Sell All' ونلاقيه
+                        for (let i = btns.length - 1; i >= 0; i--) {
+                            const t = (btns[i].textContent || '').trim();
+                            if (t === 'Sell All' && btns[i].offsetWidth > 0 && btns[i].offsetHeight > 0 && !btns[i].closest('tr')) {
+                                const e1 = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
+                                const e2 = new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window});
+                                const e3 = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                btns[i].dispatchEvent(e1);
+                                btns[i].dispatchEvent(e2);
+                                btns[i].dispatchEvent(e3);
+                                btns[i].click();
+                                return 'bottom_sell_all';
+                            }
+                        }
+                        return 'not_found';
                     }""")
                     
                     if sold_first == 'not_found':
                         try:
-                            s = page.locator('button:has-text("Sell All")').last
+                            s = page.locator('button:text-is("Sell All")').last
                             if s.count() > 0:
                                 s.click(force=True)
                                 sold_first = 'playwright'
@@ -104,47 +109,41 @@ def run_stocks_bot():
                     
                     sleep(2000)
                     
-                    # 3. نضغط على SELL ALL بـ JavaScript (flexible)
-                    confirm_clicked = False
-                    
+                    # 3. ✅ الحل: نضغط على الزر الأحمر (SELL ALL) اللي في النافذة
+                    # بنشوف: <button> فيه textContent === 'SELL ALL' + خلفيته حمراء
                     confirm_clicked = page.evaluate("""() => {
-                        const allEls = document.querySelectorAll('button, a, span, div, input');
-                        for (let el of allEls) {
-                            const t = (el.innerText || el.value || '').trim().toUpperCase();
-                            if (t.includes('SELL') && t.includes('ALL') && el.offsetWidth > 0 && el.offsetHeight > 0 && !el.closest('tr')) {
+                        const buttons = [...document.querySelectorAll('button')];
+                        for (let b of buttons) {
+                            const t = (b.textContent || '').trim().toUpperCase();
+                            if (t === 'SELL ALL' && b.offsetWidth > 0 && b.offsetHeight > 0 && !b.closest('tr')) {
+                                // نجيب لون الخلفية
+                                const bg = window.getComputedStyle(b).backgroundColor;
+                                // نشوف هل فيه أحمر (rgb مع R أكبر من 100)
+                                const rgb = bg.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
+                                const isRed = rgb && parseInt(rgb[1]) > 100 && parseInt(rgb[1]) > parseInt(rgb[2]) + 30 && parseInt(rgb[1]) > parseInt(rgb[3]) + 30;
+                                
                                 const e1 = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
                                 const e2 = new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window});
                                 const e3 = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                el.dispatchEvent(e1);
-                                el.dispatchEvent(e2);
-                                el.dispatchEvent(e3);
-                                el.click();
-                                return 'js_' + el.tagName.toLowerCase() + '_' + t;
+                                b.dispatchEvent(e1);
+                                b.dispatchEvent(e2);
+                                b.dispatchEvent(e3);
+                                b.click();
+                                return isRed ? 'red_button' : 'button_' + bg;
                             }
                         }
-                        return false;
+                        return 'not_found';
                     }""")
-                    if confirm_clicked:
-                        print(f"✅ [الأسهم] داس على SELL ALL (JS: {confirm_clicked})")
                     
-                    # fallback: Playwright
-                    if not confirm_clicked:
-                        try:
-                            btn1 = page.locator('button:has-text("SELL ALL")').last
-                            if btn1.count() > 0:
-                                btn1.click(force=True, timeout=5000)
-                                confirm_clicked = True
-                                print("✅ [الأسهم] داس على SELL ALL (Playwright)")
+                    print(f"✅ [الأسهم] SELL ALL: {confirm_clicked}")
+                    
+                    if confirm_clicked != 'not_found':
+                        try: page.screenshot(path="sell_3_after_confirm.png", full_page=True)
                         except: pass
-                    
-                    try: page.screenshot(path="sell_3_after_confirm.png", full_page=True)
-                    except: pass
-                    
-                    if confirm_clicked:
-                        sleep(4000)
+                        sleep(5000)
                         print("✅ [الأسهم] تم البيع!")
                     else:
-                        print("⚠️ [الأسهم] مش لاقي زر تأكيد البيع")
+                        print("⚠️ [الأسهم] مش لاقي الزر الأحمر")
                         try:
                             with open("sell_page_content.html", "w", encoding="utf-8") as f:
                                 f.write(page.content())
@@ -181,7 +180,7 @@ def run_stocks_bot():
                             break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
+                        print(f"✅ [الأسهم] سهم أخضر {bought_count}")
                         sleep(4000)
                         
                         confirm_buy = False
@@ -191,7 +190,7 @@ def run_stocks_bot():
                             if btn1.count() > 0:
                                 btn1.click(force=True, timeout=5000)
                                 confirm_buy = True
-                                print("✅ [الأسهم] داس على BUY MAX (Playwright)")
+                                print("✅ [الأسهم] BUY MAX (Playwright)")
                         except:
                             pass
                         
@@ -210,7 +209,7 @@ def run_stocks_bot():
                                 return false;
                             }""")
                             if confirm_buy:
-                                print(f"✅ [الأسهم] داس على BUY MAX (JS: {confirm_buy})")
+                                print(f"✅ [الأسهم] BUY MAX (JS: {confirm_buy})")
                         
                         if not confirm_buy:
                             confirm_buy = page.evaluate("""() => {
@@ -227,13 +226,13 @@ def run_stocks_bot():
                                 return false;
                             }""")
                             if confirm_buy:
-                                print(f"✅ [الأسهم] داس على زر فيه BUY (JS: {confirm_buy})")
+                                print(f"✅ [الأسهم] زر BUY (JS: {confirm_buy})")
                         
                         if confirm_buy:
                             sleep(4000)
-                            print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
+                            print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
                         else:
-                            print("⚠️ [الأسهم] مش لاقي أي زر تأكيد")
+                            print("⚠️ [الأسهم] مش لاقي زر تأكيد")
                             break
                         
                     except Exception as e:
