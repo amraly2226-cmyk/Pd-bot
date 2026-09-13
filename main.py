@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (شغال - مش هنلمسه)
+# 📈 بوت الأسهم (يبيع الأول، وبعدين يشتري)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -54,30 +54,116 @@ def run_stocks_bot():
                 print("✅ [الأسهم] دخلنا الصفحة")
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
+                sleep(2000)
                 
-                print("🔴 [الأسهم] بدأت عملية البيع...")
-                try:
-                    sell_btns = page.locator('button:has-text("Sell All")')
-                    if sell_btns.count() > 0:
-                        sell_btns.last.click(force=True)
-                        sleep(2000)
-                        page.evaluate("""() => {
-                            let btns = [...document.querySelectorAll('button')];
-                            for (let b of btns) {
-                                if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) {
-                                    let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                    b.dispatchEvent(evt);
+                # ═══════════════════════════════════════
+                # 🔴 الخطوة 1: بيع كل الأسهم
+                # ═══════════════════════════════════════
+                print("🔴 [الأسهم] الخطوة 1: بيع كل الأسهم...")
+                
+                # نعمل check هل فيه أي أسهم في الجدول
+                has_shares = page.evaluate("""() => {
+                    let rows = [...document.querySelectorAll('tr')];
+                    for (let r of rows) {
+                        let cells = [...r.querySelectorAll('td')];
+                        // لازم يكون فيه خلية فيها كمية أكبر من صفر
+                        for (let c of cells) {
+                            let t = c.innerText.trim();
+                            // بندور على نمط "1000/1000" أو أي رقم/رقم
+                            if (t.match(/\\d+\\s*\\/\\s*\\d+/) || (t.match(/^\\d+$/) && parseInt(t) > 0)) {
+                                let btns = [...r.querySelectorAll('button')];
+                                if (btns.find(b => b.innerText.trim() === 'Sell All')) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                }""")
+                
+                if has_shares:
+                    print("ℹ️ [الأسهم] فيه أسهم، هبدأ أبيع...")
+                    
+                    # ندور على زر Sell All اللي تحت خالص (مش جوه صف)
+                    clicked_bottom = page.evaluate("""() => {
+                        let btns = [...document.querySelectorAll('button')];
+                        for (let b of btns) {
+                            if (b.innerText.trim() === 'Sell All' && !b.closest('tr') && b.offsetWidth > 0) {
+                                let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                b.dispatchEvent(evt);
+                                b.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""")
+                    
+                    if clicked_bottom:
+                        print("✅ [الأسهم] داس على Sell All (تحت)")
+                        sleep(3500)
+                        
+                        # تأكيد SELL ALL
+                        confirmed = False
+                        for try_num in range(10):
+                            confirmed = page.evaluate("""() => {
+                                let btns = [...document.querySelectorAll('button')];
+                                for (let b of btns) {
+                                    let t = b.innerText.trim().toUpperCase();
+                                    if (t === 'SELL ALL' && !b.closest('tr') && b.offsetWidth > 0) {
+                                        let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                        b.dispatchEvent(evt);
+                                        b.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if confirmed:
+                                break
+                            sleep(1000)
+                        
+                        if confirmed:
+                            print("✅ [الأسهم] تم تأكيد البيع")
+                            sleep(6000)
+                        else:
+                            print("⚠️ [الأسهم] مفيش زر تأكيد SELL ALL")
+                    else:
+                        print("⚠️ [الأسهم] مفيش زر Sell All تحت، بجرب جوه الصفوف...")
+                        # fallback: ندور على Sell All جوه أي صف
+                        clicked_row = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Sell All');
+                                if (b && b.offsetWidth > 0) {
                                     b.click();
                                     return true;
                                 }
                             }
+                            return false;
                         }""")
-                        sleep(4000)
-                        print("✅ [الأسهم] تم البيع")
-                    else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
-                except Exception as e: print(f"⚠️ مشكلة في البيع: {e}")
+                        if clicked_row:
+                            print("✅ [الأسهم] داس على Sell All (جوه صف)")
+                            sleep(3000)
+                            confirmed = page.evaluate("""() => {
+                                let btns = [...document.querySelectorAll('button')];
+                                for (let b of btns) {
+                                    if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) {
+                                        b.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if confirmed:
+                                print("✅ [الأسهم] تم تأكيد البيع (fallback)")
+                                sleep(6000)
+                else:
+                    print("ℹ️ [الأسهم] مفيش أسهم للبيع حالياً")
                 
-                print("🟢 [الأسهم] بدأت عملية الشراء...")
+                # ═══════════════════════════════════════
+                # 🟢 الخطوة 2: شراء الأسهم الخضراء
+                # ═══════════════════════════════════════
+                print("\n🟢 [الأسهم] الخطوة 2: شراء الأسهم الخضراء...")
                 bought_count = 0
                 
                 for attempt in range(15):
@@ -162,7 +248,7 @@ def run_stocks_bot():
                         break
                 
                 if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
-                print(f"📊 [الأسهم] خلصنا: {bought_count} سهم")
+                print(f"📊 [الأسهم] خلصنا: اشترينا {bought_count}")
                 print("="*50 + "\n")
             except Exception as e: print(f"⚠️ خطأ: {e}")
             
@@ -171,7 +257,7 @@ def run_stocks_bot():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد
+# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
