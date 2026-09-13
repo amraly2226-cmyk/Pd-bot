@@ -32,6 +32,70 @@ def parse_cooldown(text):
     if seconds: total_seconds += int(seconds.group(1))
     return total_seconds
 
+def click_yes_button(page):
+    """بتدور على زر YES بأكتر من طريقة"""
+    
+    # الطريقة 1: Playwright locator - button بـ YES
+    try:
+        btn = page.locator('button').filter(has_text=re.compile(r'^\s*YES\s*$', re.IGNORECASE)).last
+        if btn.count() > 0:
+            btn.click(force=True, timeout=5000)
+            print("✅ [الأسهم] YES (Playwright button)")
+            return True
+    except Exception as e:
+        pass
+    
+    # الطريقة 2: JavaScript - button فقط (مش a ولا span)
+    result = page.evaluate("""() => {
+        let btns = document.querySelectorAll('button');
+        for (let b of btns) {
+            let t = (b.innerText || b.textContent || '').trim().toUpperCase();
+            if (t === 'YES' && b.offsetWidth > 0 && b.offsetHeight > 0) {
+                b.click();
+                return 'js_button';
+            }
+        }
+        return false;
+    }""")
+    if result:
+        print(f"✅ [الأسهم] YES ({result})")
+        return True
+    
+    # الطريقة 3: JavaScript - أي عنصر ظاهر
+    result = page.evaluate("""() => {
+        let els = document.querySelectorAll('div, span, input[type="submit"], input[type="button"]');
+        for (let el of els) {
+            let t = (el.innerText || el.value || '').trim().toUpperCase();
+            if (t === 'YES' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                el.click();
+                return 'js_' + el.tagName.toLowerCase();
+            }
+        }
+        return false;
+    }""")
+    if result:
+        print(f"✅ [الأسهم] YES ({result})")
+        return True
+    
+    # الطريقة 4: dispatchEvent
+    result = page.evaluate("""() => {
+        let els = document.querySelectorAll('button, span, div');
+        for (let el of els) {
+            let t = (el.innerText || '').trim().toUpperCase();
+            if (t === 'YES' && el.offsetWidth > 0) {
+                let evt = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                el.dispatchEvent(evt);
+                return 'dispatched_' + el.tagName.toLowerCase();
+            }
+        }
+        return false;
+    }""")
+    if result:
+        print(f"✅ [الأسهم] YES ({result})")
+        return True
+    
+    return False
+
 def run_stocks_bot():
     print("📈 [الأسهم] بدأ التشغيل...")
     with sync_playwright() as p:
@@ -52,31 +116,26 @@ def run_stocks_bot():
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
                 
-                # 1) بيع كل الأسهم
                 print("🔴 [الأسهم] بدأت عملية البيع...")
                 try:
                     sell_btns = page.locator('button:has-text("Sell All")')
                     if sell_btns.count() > 0:
                         sell_btns.last.click(force=True)
                         sleep(2000)
-                        confirm_sell = page.evaluate("""() => {
+                        page.evaluate("""() => {
                             let btns = [...document.querySelectorAll('button')];
                             for (let b of btns) {
                                 if (b.innerText.trim().toUpperCase() === 'SELL ALL' && !b.closest('tr')) { b.click(); return true; }
                             }
-                            return false;
                         }""")
-                        if confirm_sell: print("✅ [الأسهم] تم تأكيد البيع")
                         sleep(4000)
                     else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e: print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # 2) شراء الأسهم الخضراء
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 for attempt in range(5):
                     try:
-                        # 1. ندور على سهم أخضر وندوس على الـ span
                         found_green = False
                         rows = page.locator('tr')
                         for i in range(rows.count()):
@@ -90,71 +149,38 @@ def run_stocks_bot():
                         if not found_green: break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max الصغير")
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max")
                         sleep(3000)
                         
-                        # 2. ندوس على زر Buy اللي تحت
-                        page.evaluate("""() => {
-                            let buyBtn = document.getElementById('bottomBuyBtn');
-                            if (buyBtn) buyBtn.click();
-                        }""")
-                        print("✅ [الأسهم] داس على زر Buy")
+                        # اضغط على Buy بالـ Playwright (مضمون أكتر)
+                        try:
+                            page.locator('#bottomBuyBtn').click(force=True, timeout=5000)
+                            print("✅ [الأسهم] داس على Buy (Playwright)")
+                        except:
+                            page.evaluate("document.getElementById('bottomBuyBtn').click()")
+                            print("✅ [الأسهم] داس على Buy (JS)")
+                        
                         sleep(5000)
                         
-                        # ✅ 3. بندور على YES بـ dispatchEvent (اللي بيشتغل مع Livewire)
-                        yes_clicked = False
-                        for yes_attempt in range(15):
-                            yes_clicked = page.evaluate("""() => {
-                                let elements = document.querySelectorAll('*');
-                                for (let el of elements) {
-                                    let text = (el.innerText || el.textContent || '').trim().toUpperCase();
-                                    if (text === 'YES' && el.offsetWidth > 0 && el.offsetHeight > 0) {
-                                        // نستخدم dispatchEvent بدل click عشان Livewire
-                                        try {
-                                            let evt = new MouseEvent('click', {
-                                                bubbles: true,
-                                                cancelable: true,
-                                                view: window
-                                            });
-                                            el.dispatchEvent(evt);
-                                            // كمان نجرب click عادي
-                                            el.click();
-                                            return 'dispatched_' + el.tagName.toLowerCase();
-                                        } catch(e) {
-                                            return 'error_' + e.message;
-                                        }
-                                    }
-                                }
-                                return false;
-                            }""")
-                            if yes_clicked and 'error' not in str(yes_clicked):
-                                print(f"✅ [الأسهم] داس على YES ({yes_clicked})")
-                                break
-                            sleep(1000)
+                        # Screenshot قبل البحث عن YES
+                        try: page.screenshot(path="before_yes_click.png")
+                        except: pass
                         
-                        # ✅ Fallback: لو JavaScript فشل، نستخدم Playwright
-                        if not yes_clicked or 'error' in str(yes_clicked):
-                            print("⚠️ [الأسهم] JavaScript فشل، بجرب Playwright...")
-                            try:
-                                yes_locator = page.locator('button:has-text("YES"), a:has-text("YES"), span:has-text("YES")').last
-                                yes_locator.click(force=True, timeout=5000)
-                                yes_clicked = True
-                                print("✅ [الأسهم] داس على YES (Playwright fallback)")
-                            except Exception as e:
-                                print(f"⚠️ [الأسهم] Playwright fallback فشل: {e}")
-                                page.screenshot(path="no_yes_button.png")
-                                break
-                        
-                        if yes_clicked:
-                            sleep(4000)
+                        # بندور على YES بأكتر من طريقة
+                        if click_yes_button(page):
+                            sleep(5000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
+                        else:
+                            print("⚠️ [الأسهم] مش لاقي زر YES خالص")
+                            page.screenshot(path="no_yes_button.png")
+                            break
                         
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
                 
-                if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء دلوقتي")
-                print(f"📊 [الأسهم] خلصنا: اشترينا {bought_count}")
+                if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
+                print(f"📊 [الأسهم] خلصنا: {bought_count} سهم")
                 print("="*50 + "\n")
             except Exception as e: print(f"⚠️ [الأسهم] خطأ: {e}")
             
