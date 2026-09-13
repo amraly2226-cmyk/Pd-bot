@@ -8,12 +8,12 @@ PASSWORD = "Gun@12345"
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789214101$o8$g1$t1789214137$j24$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
+    {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789314068$o9$g1$t1789314084$j44$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
     {"name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d", "value": "eyJpdiI6IldLaFg3N0dYN2ZkbWZINjBkV2xjdXc9PSIsInZhbHVlIjoiN2hJMEJ6dnQrYUpJb3loQml2TWJ0eUU3dXl4TjNTUWpQNkYzbmVheG9EQ2JHQ2NEaXRaQW5SWjdmL2VKRllFRDlxaVprUGd6bU9pZy9zbEpqaTZLdUpnMHNDY2tCM2YrbkcrRzRwTkhtajNITGxxdkQ5QUhzcmRGUTYxL3lKNERRbTYxdXpnSmQ0N1VaSTU2N3ZOWGNJVEZVcEI2dVFqa3FwMmpzbVlsRDlZZGwxUElNNDZycmV2Z3pTSGpkcTdITkxkcWdmS0w5Rldvb09CUUxFSE9PTDdOaEVDNWc2d3hIODBOcFdNdmRXVT0iLCJtYWMiOiI4ZWVjNmMxMWZkMjQ3NjgwNjhmYTAzMDU2MzM1ODcwZWE2ZjAzY2ZiN2RlNDI4ODU4NzhkMThiNzU5NmRmZmZmIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
     {"name": "device_fp", "value": "00cad2c6896d259a5ecbceded5efe770bb8b3e5407d0d39f4e54990a5f3d9835", "domain": "project-dark.co.uk", "path": "/"},
     {"name": "_ga", "value": "GA1.1.1994605517.1787739453", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "project-dark-session", "value": "eyJpdiI6Ikl1WlIvbHczd2RhS3BKMVlGeHRuSXc9PSIsInZhbHVlIjoicnN3VmEvVkZubE91MzRqcWJGbHlYcloySUgzaXpkVWdHZTdxRTdPakZGdHZvNWFQZ0JYVVRRbFB2YmRmbWtKY1YwcjNGaTB2VWhVMVpFL2pLUFd1cjBoaitVMEJ5NjV2Ny9scE0wankxNGVMRjJDU0Jub0p4bGZRdWlMK1lUbDAiLCJtYWMiOiJiOTk4ZGYwNDQ4MTY5NGFiNGNjODk3ODAxZWZhYzJlOTVhZTE4NzJmNDFkYWQ3M2I2OGM2NTU0YjhkOTI4ZDJjIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "XSRF-TOKEN", "value": "eyJpdiI6IkRlbG5MQitsczhUcnVqVFNGSmdwbEE9PSIsInZhbHVlIjoiZTZNSld1SHRiMmRCaWhpb28rc3pyUTg3RjdyY3BzeWVnaHVQVzl5WHB3bFl6b2JqUW1SSXVjb0U3K1R3VU4ydWtlQ3ZIeXV0MzNWMjNtb21JWXI3UGc5UXFNNkdkVzJZQVlOUkxRMTB6YVpyc3BpY05BT01vSEY0NCtmRnFGSWkiLCJtYWMiOiIwOTE2MDgxNDgzYzEwODgzZTM1MTk0ODUzZTk2ZWMxYzJlNWUwODcwY2IyZTZjYWYwM2FlMGRmYmEyNjQwMDI3IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
+    {"name": "project-dark-session", "value": "eyJpdiI6InQ1b21Jd3BXd09BcE1BMnpZK1M4Tnc9PSIsInZhbHVlIjoiM0JPUnNFNEVrT1dPZTZoQ0R0TXo1aXB6Y2FLMVFwb1lJTEpJMXB6UHFPbitleW1QbGZhamRSMjRtdjZUcjhxbXh3MXNxYmFZUTFDanhTeXFQdDQyV1JUaWhmWTNQQ1BVNFRPNmI4ZlNFMWNSbTlQOWlQOENBQVZZeXpFVlN2NUciLCJtYWMiOiJjNzk1ODJjMGUxNGQ4Yzk5ZTgwNWI2MjNlMGI2OTczZTlhMGI0ZjhjZjYzYWFjYTNhZDNmYzhmMmI1OTUyZWJjIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
+    {"name": "XSRF-TOKEN", "value": "eyJpdiI6IitDVnZSaU8wY0pTeVY5Umg3VjJPQVE9PSIsInZhbHVlIjoicDFJL00zNTlyZU9RQlUzZ3BPZnZhL0R4RHBIZTROc29lVUdrMHorbmk0WDNHYWFhM09iZ1BqUXhzY1ZaOWJxOGVvVitZOUpudGYzbGt4YjgwSXhGMHljK0RoMmNQejRneC9LVkltdi8yRjZ1STR0dUh0TzdjSnhwSFhnMDV1UWIiLCJtYWMiOiIwZDJhMTJmMDQ4NTA0MWQ0YjhmOGFkYWY1M2UwMDAzNTRhZjhiOTJjZWYzMzYxMGFlZmJiYmRmMmY2MzYzNDM0IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
 ]
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
@@ -171,7 +171,7 @@ def run_stocks_bot():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (النسخة البسيطة اللي كانت شغالة)
+# 🌐 بوت التريد
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -214,25 +214,33 @@ def run_trade_bot():
                             sleep(ws * 1000)
                             print("✅ [التريد] العداد خلص، refresh...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                            sleep(4000)
+                            sleep(5000)
                             continue
                     
-                    # قراءة المدينة من صفحة الترافل
                     cc = page.evaluate("""() => {
-                        let b = document.body.innerText;
-                        if (b.includes('Black Market - San Francisco')) return 'San Francisco';
-                        if (b.includes('Black Market - St Louis')) return 'St Louis';
-                        if (b.includes('Location\\nSt Louis') || b.includes('Location\\nSt Louis')) return 'St Louis';
-                        if (b.includes('Location\\nSan Francisco')) return 'San Francisco';
-                        let m = b.match(/Location\\s*:?\\s*(San Francisco|St Louis)/i);
-                        if (m) return m[1];
+                        let body = document.body.innerText;
+                        let lines = body.split('\\n');
+                        for (let i = 0; i < lines.length; i++) {
+                            if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                                for (let j = i + 1; j < lines.length; j++) {
+                                    if (lines[j].trim()) {
+                                        if (lines[j].includes('San Francisco')) return 'San Francisco';
+                                        if (lines[j].includes('St Louis')) return 'St Louis';
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                        if (body.includes('Black Market - San Francisco')) return 'San Francisco';
+                        if (body.includes('Black Market - St Louis')) return 'St Louis';
                         return null;
                     }""")
                     
                     if not cc:
                         print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                         page.goto('https://project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(4000)
+                        sleep(5000)
                         continue
                     
                     dc = 'St Louis' if cc == 'San Francisco' else 'San Francisco'
@@ -279,14 +287,31 @@ def run_trade_bot():
                     sleep(3000)
                     continue
 
-                # في السوق
                 state = page.evaluate("""(items) => {
                     let body = document.body.innerText;
                     let loc = null, cd = null, hold = 0, held = null;
-                    if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
-                    else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
+                    
+                    let lines = body.split('\\n');
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                            for (let j = i + 1; j < lines.length; j++) {
+                                if (lines[j].trim()) {
+                                    if (lines[j].includes('San Francisco')) loc = 'San Francisco';
+                                    else if (lines[j].includes('St Louis')) loc = 'St Louis';
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (!loc) {
+                        if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
+                        else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
+                    }
+                    
                     let m = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i);
                     if (m) cd = m[1];
+                    
                     let rows = [...document.querySelectorAll('tr')];
                     for (let r of rows) {
                         let t = r.innerText;
@@ -329,7 +354,7 @@ def run_trade_bot():
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] SF -> STL")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(3000)
+                        sleep(4000)
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] SF - شراء بلاستيك")
@@ -362,7 +387,7 @@ def run_trade_bot():
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] STL -> SF")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
-                        sleep(3000)
+                        sleep(4000)
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] STL - شراء لوحات")
