@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (بيع بنفس طريقة الشراء بالظبط)
+# 📈 بوت الأسهم (بيع وشراء بنفس الأسلوب مع wait_for)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -57,34 +57,39 @@ def run_stocks_bot():
                 sleep(3000)
                 
                 # ═══════════════════════════════════════
-                # 🔴 الخطوة 1: بيع كل الأسهم (نفس طريقة الشراء)
+                # 🔴 الخطوة 1: بيع كل الأسهم
                 # ═══════════════════════════════════════
                 print("🔴 [الأسهم] الخطوة 1: بيع كل الأسهم...")
                 
                 try:
-                    # زر Sell All اللي تحت خالص (آخر زر)
+                    # 1. بندور على زر Sell All اللي تحت خالص
                     sell_btn = page.locator('button:has-text("Sell All")').last
-                    if sell_btn.count() > 0:
-                        sell_btn.click(force=True, timeout=10000)
-                        print("✅ [الأسهم] داس على Sell All (تحت)")
-                        sleep(4000)  # وقت للنافذة تظهر
-                        
-                        # زر SELL ALL في النافذة (نفس طريقة BUY MAX)
+                    sell_btn.wait_for(state="visible", timeout=10000)
+                    sell_btn.click(force=True, timeout=5000)
+                    print("✅ [الأسهم] داس على Sell All (تحت)")
+                    
+                    # 2. بستنى نافذة التأكيد
+                    sleep(3000)
+                    try: page.screenshot(path="stock_sell_modal.png")
+                    except: pass
+                    
+                    # 3. بستنى زر SELL ALL يظهر في النافذة (لحد 15 ثانية)
+                    try:
                         confirm_btn = page.locator('button:has-text("SELL ALL")').last
-                        if confirm_btn.count() > 0:
-                            confirm_btn.click(force=True, timeout=10000)
-                            print("✅ [الأسهم] داس على SELL ALL")
-                            sleep(5000)
-                            print("✅ [الأسهم] تم البيع!")
-                        else:
-                            print("⚠️ [الأسهم] مفيش زر SELL ALL")
-                    else:
-                        print("ℹ️ [الأسهم] مفيش زر Sell All")
+                        confirm_btn.wait_for(state="visible", timeout=15000)
+                        confirm_btn.click(force=True, timeout=5000)
+                        print("✅ [الأسهم] داس على SELL ALL")
+                        sleep(7000)
+                        print("✅ [الأسهم] تم البيع!")
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] مفيش زر SELL ALL: {e}")
+                        page.screenshot(path="no_stock_sell_confirm.png")
+                        
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
                 # ═══════════════════════════════════════
-                # 🟢 الخطوة 2: شراء الأسهم الخضراء (نفس الطريقة)
+                # 🟢 الخطوة 2: شراء الأسهم الخضراء
                 # ═══════════════════════════════════════
                 print("\n🟢 [الأسهم] الخطوة 2: شراء الأسهم الخضراء...")
                 bought_count = 0
@@ -111,16 +116,22 @@ def run_stocks_bot():
                             break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}")
-                        sleep(4000)
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
                         
-                        confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                        if confirm_btn.count() > 0:
-                            confirm_btn.click(force=True, timeout=10000)
+                        # بستنى نافذة BUY MAX تظهر (لحد 15 ثانية)
+                        sleep(3000)
+                        try: page.screenshot(path="stock_buy_modal.png")
+                        except: pass
+                        
+                        try:
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            confirm_btn.wait_for(state="visible", timeout=15000)
+                            confirm_btn.click(force=True, timeout=5000)
                             print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
-                            sleep(4000)
-                        else:
-                            print("⚠️ [الأسهم] مفيش زر BUY MAX")
+                            sleep(5000)
+                        except Exception as e:
+                            print(f"⚠️ [الأسهم] مفيش زر BUY MAX: {e}")
+                            page.screenshot(path="no_buy_max.png")
                             break
                         
                     except Exception as e:
