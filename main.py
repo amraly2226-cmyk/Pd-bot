@@ -35,7 +35,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (اتعدل عشان يتعامل مع النافذة المنبثقة)
+# 📈 بوت الأسهم (نفس النسخة اللي كانت شغالة + وقت أطول + YES مضمون)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -104,60 +104,60 @@ def run_stocks_bot():
                 
                 for attempt in range(5):
                     try:
-                        # 1. بندور على السهم الأخضر وندوس Max Buy
-                        found_and_clicked = page.evaluate("""() => {
-                            let rows = [...document.querySelectorAll('tr')];
-                            for (let r of rows) {
-                                let rText = r.innerText;
-                                if (rText.includes('↑') || rText.includes('▲')) {
-                                    let btns = [...r.querySelectorAll('button')];
-                                    for (let btn of btns) {
-                                        if (btn.innerText.trim() === 'Max Buy') {
-                                            btn.click();
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                            return false;
-                        }""")
+                        found_green = False
+                        rows = page.locator('tr')
+                        row_count = rows.count()
                         
-                        if not found_and_clicked:
+                        for i in range(row_count):
+                            row = rows.nth(i)
+                            row_text = row.inner_text()
+                            
+                            if ('↑' in row_text or '▲' in row_text):
+                                max_span = row.locator('span.stock-fillmax-btn').first
+                                if max_span.count() > 0:
+                                    max_span.click(force=True)
+                                    found_green = True
+                                    break
+                        
+                        if not found_green:
                             break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max Buy")
-                        sleep(4000) # زيادة الوقت عشان النافذة تظهر
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
+                        sleep(4000)  # ← زودنا الوقت لـ 4 ثواني
                         
-                        # 2. بندور على زر BUY MAX في النافذة المنبثقة - طريقة أذكى
-                        confirm_buy = page.evaluate("""() => {
-                            let allButtons = [...document.querySelectorAll('button')];
-                            // بندور على أي زر فيه كلمة BUY MAX
-                            for (let btn of allButtons) {
-                                let btnText = btn.innerText.replace(/\\s+/g, ' ').trim().toUpperCase();
-                                if (btnText === 'BUY MAX') {
-                                    btn.click();
-                                    return "exact_match";
-                                }
-                            }
-                            // لو مش لاقي، بندور على أي زر فيه كلمة BUY
-                            for (let btn of allButtons) {
-                                let btnText = btn.innerText.replace(/\\s+/g, ' ').trim().toUpperCase();
-                                if (btnText.includes('BUY') && btnText.includes('MAX')) {
-                                    btn.click();
-                                    return "partial_match";
-                                }
-                            }
-                            return "not_found";
+                        # اضغط على زر الشراء الرئيسي
+                        page.evaluate("""() => {
+                            let buyBtn = document.getElementById('bottomBuyBtn');
+                            if (buyBtn) buyBtn.click();
                         }""")
+                        print("✅ [الأسهم] تم الضغط على زر الشراء")
+                        sleep(2500)
                         
-                        if confirm_buy != "not_found":
-                            print(f"✅ [الأسهم] تم التأكيد بـ BUY MAX ({confirm_buy})")
-                            sleep(3000)
+                        # ← الحل: بندور على زر YES لحد 10 محاولات
+                        yes_clicked = False
+                        for yes_attempt in range(10):
+                            yes_clicked = page.evaluate("""() => {
+                                let elements = [...document.querySelectorAll('button, span, div, a')];
+                                for (let el of elements) {
+                                    if (el.innerText && el.innerText.trim().toUpperCase() === 'YES' && el.offsetWidth > 0) {
+                                        el.click();
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            }""")
+                            if yes_clicked:
+                                break
+                            sleep(1000)  # استنى ثانية بين كل محاولة
+                        
+                        if yes_clicked:
+                            print("✅ [الأسهم] تم التأكيد بـ YES")
+                            sleep(4000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                         else:
-                            print("⚠️ [الأسهم] مش لاقي زر تأكيد BUY MAX")
-                            page.screenshot(path="no_confirm_stock_buy.png")
+                            print("⚠️ [الأسهم] مش لاقي زر YES بعد 10 محاولات")
+                            page.screenshot(path="no_yes_button.png")
                             break
                         
                     except Exception as e:
