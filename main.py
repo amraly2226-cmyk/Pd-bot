@@ -34,7 +34,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (نسخة JavaScript للـ YES)
+# 📈 بوت الأسهم (النسخة النهائية: BUY MAX في النافذة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -97,7 +97,7 @@ def run_stocks_bot():
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max الصغير")
-                        sleep(2500)
+                        sleep(3000)
                         
                         # 2. ندوس على زر Buy اللي تحت
                         page.evaluate("""() => {
@@ -107,31 +107,26 @@ def run_stocks_bot():
                         print("✅ [الأسهم] داس على زر Buy")
                         sleep(3000)
                         
-                        # ✅ 3. بندور على زر YES بـ JavaScript المباشر (مش Playwright)
-                        yes_clicked = False
-                        for yes_attempt in range(10):
-                            yes_clicked = page.evaluate("""() => {
-                                let elements = [...document.querySelectorAll('button, span, div, a, input')];
-                                for (let el of elements) {
-                                    let text = (el.innerText || el.value || '').trim().toUpperCase();
-                                    if (text === 'YES' && el.offsetWidth > 0) {
-                                        el.click();
-                                        return true;
-                                    }
+                        # ✅ 3. بندور على زر "BUY MAX" في النافذة (زي التريد بالظبط)
+                        confirm_clicked = page.evaluate("""() => {
+                            let allButtons = [...document.querySelectorAll('button')];
+                            for (let btn of allButtons) {
+                                let text = btn.innerText.trim().toUpperCase();
+                                if (text === 'BUY MAX' && !btn.closest('tr')) {
+                                    btn.click();
+                                    return true;
                                 }
-                                return false;
-                            }""")
-                            if yes_clicked:
-                                break
-                            sleep(1000)
+                            }
+                            return false;
+                        }""")
                         
-                        if yes_clicked:
-                            print("✅ [الأسهم] داس على YES")
+                        if confirm_clicked:
+                            print("✅ [الأسهم] داس على BUY MAX (تأكيد)")
                             sleep(4000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                         else:
-                            print("⚠️ [الأسهم] مش لاقي زر YES")
-                            page.screenshot(path="no_yes_button.png")
+                            print("⚠️ [الأسهم] مش لاقي زر BUY MAX في النافذة")
+                            page.screenshot(path="no_confirm_stock_buy.png")
                             break
                         
                     except Exception as e:
