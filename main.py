@@ -35,7 +35,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (معدل عشان يدوس على BUY MAX في النافذة)
+# 📈 بوت الأسهم (اتعدل باستخدام JavaScript بس)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -79,58 +79,77 @@ def run_stocks_bot():
                         print("✅ [الأسهم] تم الضغط على Sell All")
                         sleep(2000)
                         
-                        try:
-                            confirm_btn = page.locator('button:has-text("SELL ALL")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
+                        confirm_sell = page.evaluate("""() => {
+                            let allBtns = [...document.querySelectorAll('button')];
+                            for (let btn of allBtns) {
+                                if (btn.innerText.trim().toUpperCase() === 'SELL ALL' && !btn.closest('tr')) {
+                                    btn.click(); return true;
+                                }
+                            }
+                            return false;
+                        }""")
+                        if confirm_sell:
                             print("✅ [الأسهم] تم تأكيد البيع")
                             sleep(4000)
-                        except Exception as e:
-                            print(f"⚠️ [الأسهم] مفيش زر تأكيد SELL ALL: {e}")
+                        else:
+                            print("⚠️ [الأسهم] مفيش زر تأكيد SELL ALL")
                     else:
                         print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # 2) شراء الأسهم الخضراء
+                # 2) شراء الأسهم الخضراء - كل ده بـ JavaScript
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 
                 for attempt in range(5):
                     try:
-                        found_green = False
-                        rows = page.locator('tr')
-                        row_count = rows.count()
+                        # 1. بندور على السهم الأخضر وندوس Max Buy - كله بـ JavaScript
+                        found_and_clicked = page.evaluate("""() => {
+                            let rows = [...document.querySelectorAll('tr')];
+                            for (let r of rows) {
+                                let rText = r.innerText;
+                                if (rText.includes('↑') || rText.includes('▲')) {
+                                    let btns = [...r.querySelectorAll('button')];
+                                    for (let btn of btns) {
+                                        if (btn.innerText.trim() === 'Max Buy') {
+                                            btn.click();
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                            return false;
+                        }""")
                         
-                        for i in range(row_count):
-                            row = rows.nth(i)
-                            row_text = row.inner_text()
-                            
-                            if ('↑' in row_text or '▲' in row_text):
-                                # بندور على زر Max Buy في الصف
-                                max_btn = row.locator('button:has-text("Max Buy")').first
-                                if max_btn.count() > 0:
-                                    max_btn.click(force=True)
-                                    found_green = True
-                                    break
-                        
-                        if not found_green:
+                        if not found_and_clicked:
                             break
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max Buy")
-                        sleep(2000) 
+                        sleep(2500) 
                         
-                        # ✅ التعديل الجديد: نستنى زر BUY MAX في النافذة المنبثقة وندوس عليه
-                        try:
-                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
-                            confirm_btn.wait_for(state="visible", timeout=10000)
-                            confirm_btn.click(force=True)
+                        # 2. بندور على زر BUY MAX في النافذة المنبثقة - كله بـ JavaScript
+                        confirm_buy = page.evaluate("""() => {
+                            let allElements = [...document.querySelectorAll('button, span, div, a')];
+                            for (let el of allElements) {
+                                if (el.innerText && el.innerText.trim().toUpperCase() === 'BUY MAX') {
+                                    // نتأكد إنه مش جوه صف (يعني في النافذة المنبثقة)
+                                    if (!el.closest('tr')) {
+                                        el.click();
+                                        return true;
+                                    }
+                                }
+                            }
+                            return false;
+                        }""")
+                        
+                        if confirm_buy:
                             print("✅ [الأسهم] تم التأكيد بـ BUY MAX")
                             sleep(3000)
                             print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
-                        except Exception as e:
-                            print(f"⚠️ [الأسهم] مفيش زر تأكيد BUY MAX: {e}")
+                        else:
+                            print("⚠️ [الأسهم] مش لاقي زر تأكيد BUY MAX")
                             page.screenshot(path="no_confirm_stock_buy.png")
                             break
                         
