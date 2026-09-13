@@ -34,19 +34,17 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (النسخة النهائية - بتدور على BUY MAX)
+# 📈 بوت الأسهم (النسخة النهائية الثابتة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
     print("📈 [الأسهم] بدأ التشغيل...")
-    
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
         context.add_cookies(COOKIES)
         page = context.new_page()
         page.set_default_timeout(15000)
-        
         time.sleep(5)
         
         while True:
@@ -54,13 +52,12 @@ def run_stocks_bot():
                 print("\n" + "="*50)
                 print("📈 [الأسهم] جاري الدخول لصفحة الأسهم...")
                 print("="*50)
-                
                 page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=60000)
                 print("✅ [الأسهم] دخلنا الصفحة")
                 try: page.wait_for_selector('tr', timeout=20000)
                 except: pass
                 
-                # بيع كل الأسهم
+                # 1) بيع كل الأسهم
                 print("🔴 [الأسهم] بدأت عملية البيع...")
                 try:
                     sell_btns = page.locator('button:has-text("Sell All")')
@@ -80,17 +77,18 @@ def run_stocks_bot():
                     else: print("ℹ️ [الأسهم] مفيش أسهم للبيع")
                 except Exception as e: print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # شراء الأسهم الخضراء
+                # 2) شراء الأسهم الخضراء
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
                 for attempt in range(5):
                     try:
+                        # بندور على السهم الأخضر وندوس على زر Max Buy في نفس الصف
                         found_green = False
                         rows = page.locator('tr')
                         for i in range(rows.count()):
                             row = rows.nth(i)
                             if ('↑' in row.inner_text() or '▲' in row.inner_text()):
-                                max_btn = row.locator('span.stock-fillmax-btn').first
+                                max_btn = row.locator('button:has-text("Max Buy")').first
                                 if max_btn.count() > 0:
                                     max_btn.click(force=True)
                                     found_green = True
@@ -98,10 +96,10 @@ def run_stocks_bot():
                         if not found_green: break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داس على Max Buy")
                         sleep(4000)
                         
-                        # الضغط على زر BUY MAX في النافذة المنبثقة (زي التريد)
+                        # نستنى زر BUY MAX في النافذة المنبثقة
                         try:
                             confirm_btn = page.locator('button:has-text("BUY MAX")').last
                             confirm_btn.wait_for(state="visible", timeout=10000)
@@ -126,7 +124,7 @@ def run_stocks_bot():
             time.sleep(STOCKS_INTERVAL)
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (النسخة النهائية الثابتة)
+# 🌐 بوت التريد (زي ما هو بالظبط، مفيش أي تغيير)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
