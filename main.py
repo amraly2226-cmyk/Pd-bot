@@ -35,7 +35,7 @@ def parse_cooldown(text):
     return total_seconds
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (محدث عشان يشتري صح)
+# 📈 بوت الأسهم (معدل عشان يدوس على BUY MAX في النافذة)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -65,26 +65,20 @@ def run_stocks_bot():
                 page.goto('https://project-dark.co.uk/stocks', wait_until='domcontentloaded', timeout=60000)
                 print("✅ [الأسهم] دخلنا الصفحة")
                 
-                # نستنى الجدول يحمل
                 try:
                     page.wait_for_selector('tr', timeout=20000)
                 except:
                     pass
                 
-                # ═══════════════════════════════════════
                 # 1) بيع كل الأسهم
-                # ═══════════════════════════════════════
                 print("🔴 [الأسهم] بدأت عملية البيع...")
                 try:
-                    # نستنى زر Sell All يظهر
                     sell_all_buttons = page.locator('button:has-text("Sell All")')
                     if sell_all_buttons.count() > 0:
-                        # نضغط على آخر زر Sell All
                         sell_all_buttons.last.click(force=True)
                         print("✅ [الأسهم] تم الضغط على Sell All")
                         sleep(2000)
                         
-                        # نستنى زر التأكيد SELL ALL
                         try:
                             confirm_btn = page.locator('button:has-text("SELL ALL")').last
                             confirm_btn.wait_for(state="visible", timeout=10000)
@@ -98,17 +92,13 @@ def run_stocks_bot():
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة في البيع: {e}")
                 
-                # ═══════════════════════════════════════
                 # 2) شراء الأسهم الخضراء
-                # ═══════════════════════════════════════
                 print("🟢 [الأسهم] بدأت عملية الشراء...")
                 bought_count = 0
-                max_attempts = 10
                 
-                for attempt in range(max_attempts):
+                for attempt in range(5):
                     try:
                         found_green = False
-                        # بندور على الصفوف اللي فيها أسهم خضراء
                         rows = page.locator('tr')
                         row_count = rows.count()
                         
@@ -116,10 +106,9 @@ def run_stocks_bot():
                             row = rows.nth(i)
                             row_text = row.inner_text()
                             
-                            # نتأكد إن السهم أخضر (فيه ↑ أو ▲)
                             if ('↑' in row_text or '▲' in row_text):
-                                # بندور على زر Max في الصف ده
-                                max_btn = row.locator('span.stock-fillmax-btn').first
+                                # بندور على زر Max Buy في الصف
+                                max_btn = row.locator('button:has-text("Max Buy")').first
                                 if max_btn.count() > 0:
                                     max_btn.click(force=True)
                                     found_green = True
@@ -129,35 +118,21 @@ def run_stocks_bot():
                             break
                         
                         bought_count += 1
-                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max")
-                        sleep(2000) # نستنى الزر يتفعل
+                        print(f"✅ [الأسهم] لقيت سهم أخضر {bought_count}، داست على Max Buy")
+                        sleep(2000) 
                         
-                        # نضغط على زر الشراء الرئيسي (bottomBuyBtn)
+                        # ✅ التعديل الجديد: نستنى زر BUY MAX في النافذة المنبثقة وندوس عليه
                         try:
-                            bottom_buy = page.locator('#bottomBuyBtn').first
-                            if bottom_buy.count() > 0:
-                                bottom_buy.click(force=True)
-                                print("✅ [الأسهم] تم الضغط على زر الشراء")
-                                sleep(2000)
-                            else:
-                                print("⚠️ [الأسهم] مفيش زر bottomBuyBtn")
-                                break
+                            confirm_btn = page.locator('button:has-text("BUY MAX")').last
+                            confirm_btn.wait_for(state="visible", timeout=10000)
+                            confirm_btn.click(force=True)
+                            print("✅ [الأسهم] تم التأكيد بـ BUY MAX")
+                            sleep(3000)
+                            print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                         except Exception as e:
-                            print(f"⚠️ [الأسهم] مشكلة في bottomBuyBtn: {e}")
+                            print(f"⚠️ [الأسهم] مفيش زر تأكيد BUY MAX: {e}")
+                            page.screenshot(path="no_confirm_stock_buy.png")
                             break
-                        
-                        # نضغط على زر YES
-                        try:
-                            yes_btn = page.locator('button:has-text("YES"), span:has-text("YES"), div:has-text("YES")').last
-                            yes_btn.wait_for(state="visible", timeout=5000)
-                            yes_btn.click(force=True)
-                            print("✅ [الأسهم] تم التأكيد بـ YES")
-                        except Exception as e:
-                            print(f"⚠️ [الأسهم] مشكلة في YES: {e}")
-                            break
-                        
-                        sleep(3000)
-                        print(f"✅ [الأسهم] تم شراء السهم رقم {bought_count}")
                         
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة في شراء سهم: {e}")
@@ -203,9 +178,7 @@ def run_trade_bot():
 
         while True:
             try:
-                # ═══════════════════════════════════════
                 # 1) صفحة الترافل
-                # ═══════════════════════════════════════
                 if 'travel' in page.url:
                     cooldown_text = page.evaluate("""() => {
                         let body = document.body.innerText;
@@ -288,9 +261,7 @@ def run_trade_bot():
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     continue
 
-                # ═══════════════════════════════════════
                 # 2) في السوق
-                # ═══════════════════════════════════════
                 state = page.evaluate("""(items) => {
                     let body = document.body.innerText;
                     let loc = null;
@@ -355,7 +326,6 @@ def run_trade_bot():
                     sleep(60000)
                     continue
 
-                # ✅ سان فرانسيسكو
                 if state['loc'] == "San Francisco":
                     if state['heldItem'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] سان فرانسيسكو - بيع اللوحات")
@@ -411,7 +381,6 @@ def run_trade_bot():
                         sleep(3000)
                         continue
 
-                # ✅ ST LOUIS
                 elif state['loc'] == "St Louis":
                     if state['heldItem'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] ST LOUIS - بيع البلاستيك")
