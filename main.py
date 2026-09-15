@@ -17,7 +17,7 @@ COOKIES = [
 ]
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
-STOCKS_INTERVAL = 15 * 60
+STOCKS_INTERVAL = 30 * 60
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
