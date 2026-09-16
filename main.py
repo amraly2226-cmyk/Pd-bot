@@ -32,11 +32,14 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 🚗 بوت السرقة (Theft) - بيستنى Ready والزر الأخضر
+# 🚗 بوت السرقة (Theft) - بيستنى Ready + refresh كل 30 دقيقة
 # ═══════════════════════════════════════════════════════════════
 
 def run_theft_bot():
     print("🚗 [Theft] بدأ التشغيل...")
+    REFRESH_INTERVAL = 30 * 60  # كل 30 دقيقة refresh
+    last_refresh = time.time()
+    
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
@@ -48,12 +51,25 @@ def run_theft_bot():
         try:
             page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
             print("✅ [Theft] دخلنا الصفحة")
+            last_refresh = time.time()
         except Exception as e:
             print(f"❌ [Theft] فشل الدخول: {e}")
             return
         
         while True:
             try:
+                # refresh كل 30 دقيقة
+                if time.time() - last_refresh >= REFRESH_INTERVAL:
+                    print("🔄 [Theft] مر 30 دقيقة - بعمل refresh...")
+                    try:
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                        last_refresh = time.time()
+                        print("✅ [Theft] تم الـ refresh")
+                    except Exception as e:
+                        print(f"⚠️ [Theft] مشكلة الـ refresh: {e}")
+                    sleep(3)
+                    continue
+                
                 data = page.evaluate("""() => {
                     const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
                         const r = b.getBoundingClientRect();
@@ -92,8 +108,6 @@ def run_theft_bot():
                 
                 if len(steal_btns) == 0:
                     time.sleep(3)
-                    try: page.reload(wait_until='domcontentloaded', timeout=30000)
-                    except: pass
                     continue
                 
                 if len(readies) == 0:
