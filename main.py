@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 🚗 بوت السرقة
+# 🚗 بوت السرقة - قراءة data-expires مباشرة
 # ═══════════════════════════════════════════════════════════════
 
 def run_theft_bot():
@@ -54,11 +54,9 @@ def run_theft_bot():
                 print("✅ [Theft] دخلنا الصفحة")
                 sleep(4000)
                 
-                # دالة داخلية بتقرا حالة الأعمدة كلها
-                def read_columns():
-                    all_btns = page.evaluate("""() => {
-                        const btns = [...document.querySelectorAll('button.theft-steal-btn')];
-                        return btns.map((b, i) => {
+                def read_state():
+                    data = page.evaluate("""() => {
+                        const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
                             const r = b.getBoundingClientRect();
                             return {
                                 idx: i,
@@ -70,10 +68,29 @@ def run_theft_bot():
                                 visible: b.offsetWidth > 0
                             };
                         });
+                        
+                        const now_sec = Math.floor(Date.now() / 1000);
+                        const timers = [...document.querySelectorAll('span.theft-cd')].map(el => {
+                            const r = el.getBoundingClientRect();
+                            const expires = parseInt(el.getAttribute('data-expires') || '0', 10);
+                            const remaining = Math.max(0, expires - now_sec);
+                            return {
+                                x: Math.round(r.left + r.width / 2),
+                                y: Math.round(r.top + r.height / 2),
+                                expires: expires,
+                                remaining: remaining,
+                                text: (el.textContent || '').trim()
+                            };
+                        });
+                        
+                        return {btns, timers, now_sec};
                     }""")
                     
+                    all_btns = data['btns']
+                    timers = data['timers']
+                    
                     if len(all_btns) == 0:
-                        return []
+                        return {'cols': []}
                     
                     all_sorted = sorted(all_btns, key=lambda b: (b['cx'], b['top']))
                     columns = []
@@ -95,17 +112,27 @@ def run_theft_bot():
                         
                         all_available = all(b['isSuccess'] and not b['disabled'] for b in col)
                         
+                        col_timer = None
+                        min_dist = 99999
+                        for t in timers:
+                            if abs(t['x'] - bottom_btn['cx']) < 300:
+                                d = abs(t['y'] - bottom_btn['cy'])
+                                if d < min_dist:
+                                    min_dist = d
+                                    col_timer = t
+                        
                         cols_info.append({
                             'name': col_name,
                             'total': len(col),
                             'bottom_btn': bottom_btn,
-                            'available': all_available
+                            'available': all_available,
+                            'timer': col_timer
                         })
                     
-                    return cols_info
+                    return {'cols': cols_info}
                 
-                # نبص على كل الأعمدة ونطبع حالاتهم
-                cols_info = read_columns()
+                state = read_state()
+                cols_info = state['cols']
                 
                 if len(cols_info) == 0:
                     print("⏰ [Theft] مفيش أزرار، هستنى 30 ث...")
@@ -114,10 +141,14 @@ def run_theft_bot():
                 
                 print(f"\n📋 [Theft] حالة الأعمدة:")
                 for col in cols_info:
-                    status = "✅ جاهز" if col['available'] else "⏳ كولداون"
+                    if col['timer']:
+                        rem = col['timer']['remaining']
+                        cd_text = col['timer']['text']
+                        status = f"⏳ كولداون ({cd_text} = {rem}s)" if rem > 0 else "✅ جاهز"
+                    else:
+                        status = "✅ جاهز" if col['available'] else "⏳ كولداون"
                     print(f"  {col['name']}: آخر زر (idx={col['bottom_btn']['idx']}) - {status}")
                 
-                # ندور على أول عمود جاهز ندوس عليه
                 clicked_any = False
                 for col in cols_info:
                     if not col['available']:
@@ -153,19 +184,29 @@ def run_theft_bot():
                         sleep(3000)
                         page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                         sleep(4000)
-                        
-                        # نعيد قراءة الأعمدة
-                        cols_info_after = read_columns()
-                        print(f"\n📋 [Theft] حالة الأعمدة بعد الضغط على {col['name']}:")
-                        for c in cols_info_after:
-                            st = "✅ جاهز" if c['available'] else "⏳ كولداون"
-                            print(f"  {c['name']}: آخر زر (idx={c['bottom_btn']['idx']}) - {st}")
-                        
                         break
                 
                 if not clicked_any:
-                    print("⏰ [Theft] كل الأعمدة في كولداون، هستنى 30 ث...")
-                    time.sleep(30)
+                    cd_times = []
+                    for col in cols_info:
+                        if col['timer'] and col['timer']['remaining'] > 0:
+                            cd_times.append((col['timer']['remaining'], col['timer']['text'], col['name']))
+                    
+                    if cd_times:
+                        cd_times.sort()
+                        min_sec, min_text, min_col = cd_times[0]
+                        wait_sec = min_sec + 15
+                        print(f"\n⏰ [Theft] كل الأعمدة في كولداون.")
+                        print(f"   أقصر واحد: {min_col} ({min_text} = {min_sec}s)")
+                        print(f"   هستنى {wait_sec} ث بالظبط...")
+                        time.sleep(wait_sec)
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                        sleep(4000)
+                    else:
+                        print(f"\n⏰ [Theft] مفيش كولداون مقروء، هستنى 60 ث...")
+                        time.sleep(60)
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                        sleep(4000)
                 
                 print(f"📊 [Theft] خلصنا الدورة")
                 print("="*50 + "\n")
