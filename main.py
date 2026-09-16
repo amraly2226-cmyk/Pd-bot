@@ -32,20 +32,11 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 🚗 بوت السرقة (Theft) - فترات ثابتة لكل عمود
+# 🚗 بوت السرقة (Theft) - بيستنى Ready والزر الأخضر
 # ═══════════════════════════════════════════════════════════════
 
 def run_theft_bot():
     print("🚗 [Theft] بدأ التشغيل...")
-    
-    # ⏰ فترات الانتظار لكل عمود بالثواني
-    INTERVALS = {
-        'Cars': 10 * 60,   # 10 دقايق
-        'Bikes': 5 * 60,   # 5 دقايق
-        'Vans': 15 * 60,   # 15 دقيقة
-    }
-    last_click = {'Cars': 0, 'Bikes': 0, 'Vans': 0}
-    
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
@@ -73,19 +64,43 @@ def run_theft_bot():
                             top: Math.round(r.top),
                             isSuccess: b.classList.contains('game-button--success'),
                             disabled: b.disabled,
-                            visible: b.offsetWidth > 0
+                            visible: b.offsetWidth > 0 && b.offsetHeight > 0
                         };
                     }).filter(b => b.visible);
-                    return btns;
+                    
+                    const readies = [];
+                    const seen = new Set();
+                    document.querySelectorAll('*').forEach(el => {
+                        if (el.children.length === 0 && !seen.has(el)) {
+                            const t = (el.textContent || '').trim();
+                            if (t === 'Ready' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                                const r = el.getBoundingClientRect();
+                                readies.push({
+                                    x: Math.round(r.left + r.width / 2),
+                                    y: Math.round(r.top + r.height / 2)
+                                });
+                                seen.add(el);
+                            }
+                        }
+                    });
+                    
+                    return {btns, readies};
                 }""")
                 
-                if len(data) == 0:
-                    time.sleep(30)
+                steal_btns = data['btns']
+                readies = data['readies']
+                
+                if len(steal_btns) == 0:
+                    time.sleep(3)
                     try: page.reload(wait_until='domcontentloaded', timeout=30000)
                     except: pass
                     continue
                 
-                all_sorted = sorted(data, key=lambda b: (b['cx'], b['top']))
+                if len(readies) == 0:
+                    time.sleep(3)
+                    continue
+                
+                all_sorted = sorted(steal_btns, key=lambda b: (b['cx'], b['top']))
                 columns = []
                 current = [all_sorted[0]]
                 for i in range(1, len(all_sorted)):
@@ -97,70 +112,68 @@ def run_theft_bot():
                 columns.append(current)
                 
                 col_names = ['Cars', 'Bikes', 'Vans']
-                cols_info = []
-                for col_idx, col in enumerate(columns):
-                    col_sorted = sorted(col, key=lambda b: b['top'])
-                    bottom_btn = col_sorted[-1]
-                    col_name = col_names[col_idx] if col_idx < 3 else f'Col{col_idx+1}'
-                    cols_info.append({
-                        'name': col_name,
-                        'bottom_btn': bottom_btn
-                    })
-                
-                now = time.time()
                 clicked_any = False
-                for col in cols_info:
-                    col_name = col['name']
-                    interval = INTERVALS.get(col_name, 60)
-                    elapsed = now - last_click[col_name]
+                
+                for ready in readies:
+                    col_btns = [b for b in steal_btns if abs(b['cx'] - ready['x']) < 100]
+                    if not col_btns:
+                        continue
                     
-                    if elapsed >= interval:
-                        bottom = col['bottom_btn']
-                        if bottom['isSuccess'] and not bottom['disabled']:
-                            print(f"🎯 [Theft] {col_name} جاهز - بدوس على آخر زر Steal")
-                            
-                            success = False
-                            try:
-                                loc = page.locator('button.theft-steal-btn').nth(bottom['idx'])
-                                loc.scroll_into_view_if_needed()
-                                sleep(300)
-                                loc.click(force=True, timeout=5000)
-                                success = True
-                            except:
-                                try:
-                                    page.mouse.move(bottom['cx'], bottom['cy'])
-                                    sleep(200)
-                                    page.mouse.click(bottom['cx'], bottom['cy'])
-                                    success = True
-                                except: pass
-                            
-                            if success:
-                                print(f"✅ [Theft] تم الضغط على {col_name}")
-                                last_click[col_name] = time.time()
-                                clicked_any = True
-                                sleep(5)
-                                break
-                
-                if clicked_any:
-                    continue
-                
-                now = time.time()
-                next_waits = []
-                for col_name, interval in INTERVALS.items():
-                    remaining = interval - (now - last_click[col_name])
-                    if remaining > 0:
-                        next_waits.append((remaining, col_name))
-                
-                if next_waits:
-                    next_waits.sort()
-                    next_sec, next_col = next_waits[0]
-                    wait_sec = min(next_sec + 2, 30)
-                    time.sleep(wait_sec)
+                    col_btns.sort(key=lambda b: b['top'])
+                    bottom_btn = col_btns[-1]
+                    
+                    if not (bottom_btn['isSuccess'] and not bottom_btn['disabled']):
+                        continue
+                    
+                    col_idx = 0
+                    for ci, col in enumerate(columns):
+                        if bottom_btn in col:
+                            col_idx = ci
+                            break
+                    col_name = col_names[col_idx] if col_idx < len(col_names) else f'Col{col_idx+1}'
+                    
+                    print(f"🎯 [Theft] {col_name} جاهز - بدوس على آخر زر Steal...")
+                    
+                    success = False
                     try:
-                        page.reload(wait_until='domcontentloaded', timeout=30000)
-                    except: pass
-                else:
-                    time.sleep(10)
+                        loc = page.locator('button.theft-steal-btn').nth(bottom_btn['idx'])
+                        loc.scroll_into_view_if_needed()
+                        sleep(500)
+                        loc.click(timeout=5000)
+                        print(f"✅ [Theft] Playwright click - {col_name}")
+                        success = True
+                    except Exception as e1:
+                        pass
+                    
+                    if not success:
+                        try:
+                            loc = page.locator('button.theft-steal-btn').nth(bottom_btn['idx'])
+                            loc.click(force=True, timeout=5000)
+                            print(f"✅ [Theft] Playwright force - {col_name}")
+                            success = True
+                        except:
+                            pass
+                    
+                    if not success:
+                        try:
+                            page.mouse.move(bottom_btn['cx'], bottom_btn['cy'])
+                            sleep(300)
+                            page.mouse.click(bottom_btn['cx'], bottom_btn['cy'])
+                            print(f"✅ [Theft] mouse.click - {col_name}")
+                            success = True
+                        except:
+                            pass
+                    
+                    if success:
+                        clicked_any = True
+                        sleep(3)
+                        try: page.reload(wait_until='domcontentloaded', timeout=30000)
+                        except: pass
+                        sleep(3)
+                        break
+                
+                if not clicked_any:
+                    time.sleep(3)
                 
             except Exception as e:
                 print(f"⚠️ [Theft] خطأ: {e}")
