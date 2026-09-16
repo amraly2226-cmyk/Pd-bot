@@ -32,7 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 🚗 بوت السرقة - قراءة data-expires مباشرة
+# 🚗 بوت السرقة - بيستنى الكولداون يوصل 0 (مش 17 ثانية)
 # ═══════════════════════════════════════════════════════════════
 
 def run_theft_bot():
@@ -121,11 +121,19 @@ def run_theft_bot():
                                     min_dist = d
                                     col_timer = t
                         
+                        # ✅ الشرط الأساسي: الكولداون خلص (remaining <= 1) + الأزرار متاحة
+                        if col_timer:
+                            timer_ready = col_timer['remaining'] <= 1
+                        else:
+                            timer_ready = True
+                        
+                        col_available = all_available and timer_ready
+                        
                         cols_info.append({
                             'name': col_name,
                             'total': len(col),
                             'bottom_btn': bottom_btn,
-                            'available': all_available,
+                            'available': col_available,
                             'timer': col_timer
                         })
                     
@@ -144,9 +152,14 @@ def run_theft_bot():
                     if col['timer']:
                         rem = col['timer']['remaining']
                         cd_text = col['timer']['text']
-                        status = f"⏳ كولداون ({cd_text} = {rem}s)" if rem > 0 else "✅ جاهز"
+                        if rem > 1:
+                            status = f"⏳ كولداون ({cd_text} = {rem}s)"
+                        elif col['available']:
+                            status = "✅ جاهز (كولداون خلص)"
+                        else:
+                            status = f"⚠️ الأزرار مش متاحة ({cd_text})"
                     else:
-                        status = "✅ جاهز" if col['available'] else "⏳ كولداون"
+                        status = "✅ جاهز" if col['available'] else "⚠️ غير متاح"
                     print(f"  {col['name']}: آخر زر (idx={col['bottom_btn']['idx']}) - {status}")
                 
                 clicked_any = False
@@ -155,7 +168,7 @@ def run_theft_bot():
                         continue
                     
                     bottom = col['bottom_btn']
-                    print(f"\n🎯 [Theft] بدوس على {col['name']} (idx={bottom['idx']}, pos=({bottom['cx']},{bottom['cy']}))...")
+                    print(f"\n🎯 [Theft] بدوس على {col['name']} (idx={bottom['idx']})...")
                     
                     success = False
                     try:
@@ -187,6 +200,7 @@ def run_theft_bot():
                         break
                 
                 if not clicked_any:
+                    # نستنى أقصر كولداون (حتى لو مش جاهز)
                     cd_times = []
                     for col in cols_info:
                         if col['timer'] and col['timer']['remaining'] > 0:
