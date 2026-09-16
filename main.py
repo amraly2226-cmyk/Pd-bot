@@ -17,7 +17,11 @@ COOKIES = [
 ]
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
-STOCKS_INTERVAL = 30 * 60   # 30 دقيقة للأسهم
+STOCKS_INTERVAL = 30 * 60
+THEFT_INTERVAL_CHECK = 30  # يبص على الصفحة كل 30 ثانية للتأكد
+
+# أسماء آخر مستوى في كل عمود
+THEFT_TARGET_TEXTS = ["Showroom", "Showroom Floor", "Haulage Compound"]
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
@@ -32,7 +36,176 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم - بيع بـ Playwright native (زي التريد بالظبط)
+# 🚗 بوت السرقة (Theft) - بيدور على الزر اللي تحت النص بالظبط
+# ═══════════════════════════════════════════════════════════════
+
+def run_theft_bot():
+    print("🚗 [Theft] بدأ التشغيل...")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
+        context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
+        context.add_cookies(COOKIES)
+        page = context.new_page()
+        page.set_default_timeout(15000)
+        time.sleep(5)
+        
+        while True:
+            try:
+                print("\n" + "="*50)
+                print("🚗 [Theft] جاري الدخول لصفحة السرقة...")
+                print("="*50)
+                page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                print("✅ [Theft] دخلنا الصفحة")
+                sleep(3500)
+                
+                # 1. ندور على الهدف (Steal تحت Showroom / Showroom Floor / Haulage Compound)
+                result = page.evaluate("""(targets) => {
+                    // نجمع كل النصوص الهدف
+                    const targetEls = [];
+                    document.querySelectorAll('*').forEach(el => {
+                        if (el.children.length === 0) {
+                            const t = (el.textContent || '').trim();
+                            if (targets.includes(t) && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                                const r = el.getBoundingClientRect();
+                                targetEls.push({
+                                    name: t,
+                                    x: r.left + r.width / 2,
+                                    bottom: r.bottom
+                                });
+                            }
+                        }
+                    });
+                    
+                    // نجمع كل أزرار Steal
+                    const stealBtns = [];
+                    document.querySelectorAll('button').forEach(b => {
+                        if ((b.textContent || '').trim() === 'Steal' && b.offsetWidth > 0 && b.offsetHeight > 0) {
+                            const r = b.getBoundingClientRect();
+                            stealBtns.push({
+                                x: r.left + r.width / 2,
+                                y: r.top + r.height / 2
+                            });
+                        }
+                    });
+                    
+                    // لكل هدف، ندور على أقرب زر Steal تحته في نفس العمود
+                    const matches = [];
+                    for (const target of targetEls) {
+                        let best = null;
+                        let bestDist = 99999;
+                        for (const btn of stealBtns) {
+                            if (Math.abs(btn.x - target.x) < 150 && btn.y > target.bottom) {
+                                const d = btn.y - target.bottom;
+                                if (d < bestDist) {
+                                    bestDist = d;
+                                    best = btn;
+                                }
+                            }
+                        }
+                        if (best) {
+                            matches.push({
+                                name: target.name,
+                                x: best.x,
+                                y: best.y
+                            });
+                        }
+                    }
+                    
+                    return matches;
+                }""", THEFT_TARGET_TEXTS)
+                
+                print(f"🔍 [Theft] لقيت {len(result)} هدف: {[r['name'] for r in result]}")
+                
+                if len(result) == 0:
+                    print("ℹ️ [Theft] مفيش أهداف، هستنى...")
+                    time.sleep(THEFT_INTERVAL_CHECK)
+                    continue
+                
+                # 2. ندوس على كل زر من الأزرار اللي لقيناها
+                clicked_count = 0
+                for target in result:
+                    print(f"\n🎯 [Theft] بدوس على Steal تحت ({target['name']})...")
+                    clicked = page.evaluate("""(coords) => {
+                        const allBtns = document.querySelectorAll('button');
+                        for (let b of allBtns) {
+                            if ((b.textContent || '').trim() === 'Steal' && b.offsetWidth > 0) {
+                                const r = b.getBoundingClientRect();
+                                const cx = r.left + r.width / 2;
+                                const cy = r.top + r.height / 2;
+                                if (Math.abs(cx - coords.x) < 10 && Math.abs(cy - coords.y) < 10) {
+                                    const e1 = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
+                                    const e2 = new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window});
+                                    const e3 = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
+                                    b.dispatchEvent(e1);
+                                    b.dispatchEvent(e2);
+                                    b.dispatchEvent(e3);
+                                    b.click();
+                                    return true;
+                                }
+                            }
+                        }
+                        return false;
+                    }""", target)
+                    if clicked:
+                        clicked_count += 1
+                        print(f"✅ [Theft] تم الضغط على Steal تحت ({target['name']})")
+                    else:
+                        print(f"⚠️ [Theft] فشل الضغط على ({target['name']})")
+                    sleep(2500)
+                
+                # 3. نعمل refresh
+                print(f"\n🔄 [Theft] خلصنا {clicked_count} ضغطة، بعمل refresh...")
+                page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                sleep(3500)
+                
+                # 4. نقرا الكولداونات الجديدة بعد الدوس
+                cooldowns = page.evaluate("""() => {
+                    const result = [];
+                    const seen = new Set();
+                    document.querySelectorAll('*').forEach(el => {
+                        if (el.children.length === 0) {
+                            const t = (el.textContent || '').trim();
+                            if (/^\\d{1,2}:\\d{2}$/.test(t) && !seen.has(el)) {
+                                seen.add(el);
+                                const r = el.getBoundingClientRect();
+                                if (r.width > 0) {
+                                    result.push({text: t, x: Math.round(r.left), y: Math.round(r.top)});
+                                }
+                            }
+                        }
+                    });
+                    return result;
+                }""")
+                
+                # 5. نحدد أقصر كولداون
+                min_sec = 99999
+                min_text = "?"
+                for cd in cooldowns:
+                    try:
+                        parts = cd['text'].split(':')
+                        sec = int(parts[0]) * 60 + int(parts[1])
+                        if sec > 0 and sec < min_sec:
+                            min_sec = sec
+                            min_text = cd['text']
+                    except: pass
+                
+                if min_sec > 0 and min_sec < 99999:
+                    wait_sec = min(min_sec + 15, 900)
+                    print(f"⏰ [Theft] هستنى {wait_sec} ث (أقصر كولداون: {min_text})...")
+                    time.sleep(wait_sec)
+                else:
+                    print(f"⏰ [Theft] مفيش كولداون واضح، هستنى {THEFT_INTERVAL_CHECK} ث...")
+                    time.sleep(THEFT_INTERVAL_CHECK)
+                
+                print(f"📊 [Theft] خلصنا الدورة")
+                print("="*50 + "\n")
+            except Exception as e:
+                print(f"⚠️ [Theft] خطأ: {e}")
+                time.sleep(15)
+
+
+# ═══════════════════════════════════════════════════════════════
+# 📈 بوت الأسهم (زي كود رقم واحد)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -56,9 +229,7 @@ def run_stocks_bot():
                 except: pass
                 sleep(1500)
                 
-                # 🔴 1) البيع - بنفس طريقة التريد (JS لفتح النافذة + Playwright للضغط)
                 print("\n🔴 [الأسهم] [1/2] بيع...")
-                
                 page.evaluate("""() => {
                     const btns = [...document.querySelectorAll('button')];
                     for (let i = btns.length - 1; i >= 0; i--) {
@@ -70,25 +241,19 @@ def run_stocks_bot():
                     }
                     return false;
                 }""")
-                print("✅ [الأسهم] داس على Sell All (تحت)")
+                print("✅ [الأسهم] داس على Sell All")
                 sleep(3000)
-                
                 try:
                     cf = page.locator('button:has-text("SELL ALL")').last
                     cf.wait_for(state="visible", timeout=10000)
                     cf.click(force=True, timeout=10000)
-                    print("✅ [الأسهم] داس على SELL ALL (Playwright)")
-                    sleep(7000)
                     print("✅ [الأسهم] تم البيع!")
+                    sleep(7000)
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة البيع: {e}")
-                    try: page.screenshot(path="sell_fail.png")
-                    except: pass
                 
-                # 🟢 2) الشراء - بنفس طريقة التريد
                 print("\n🟢 [الأسهم] [2/2] شراء...")
                 bought_count = 0
-                
                 for attempt in range(15):
                     try:
                         found_green = False
@@ -97,7 +262,6 @@ def run_stocks_bot():
                             try:
                                 row = rows.nth(i)
                                 row_text = row.inner_text()
-                                
                                 if ('↑' in row_text or '▲' in row_text):
                                     c = page.evaluate("""(idx) => {
                                         const rows = [...document.querySelectorAll('tr')];
@@ -115,16 +279,13 @@ def run_stocks_bot():
                                     if c:
                                         found_green = True
                                         break
-                            except:
-                                continue
+                            except: continue
                         
-                        if not found_green:
-                            break
+                        if not found_green: break
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] سهم أخضر {bought_count}")
                         sleep(3500)
-                        
                         try:
                             cf = page.locator('button:has-text("BUY MAX")').last
                             cf.wait_for(state="visible", timeout=10000)
@@ -132,9 +293,8 @@ def run_stocks_bot():
                             print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
                             sleep(5000)
                         except Exception as e:
-                            print(f"⚠️ [الأسهم] مشكلة في تأكيد الشراء: {e}")
+                            print(f"⚠️ [الأسهم] مشكلة: {e}")
                             break
-                        
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
@@ -149,7 +309,7 @@ def run_stocks_bot():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
+# 🌐 بوت التريد (زي كود رقم واحد)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -189,7 +349,7 @@ def run_trade_bot():
                         if ws > 0:
                             ws += 10
                             print(f"⏳ [التريد] كولداون: {cooldown_text} - هستنى {ws} ث...")
-                            sleep(ws * 1000)
+                            time.sleep(ws)
                             print("✅ [التريد] العداد خلص، refresh...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                             sleep(5000)
@@ -268,7 +428,6 @@ def run_trade_bot():
                 state = page.evaluate("""(items) => {
                     let body = document.body.innerText;
                     let loc = null, cd = null, hold = 0, held = null;
-                    
                     let lines = body.split('\\n');
                     for (let i = 0; i < lines.length; i++) {
                         if (lines[i].trim().toUpperCase() === 'LOCATION') {
@@ -286,10 +445,8 @@ def run_trade_bot():
                         if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
                         else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
                     }
-                    
                     let m = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i);
                     if (m) cd = m[1];
-                    
                     let rows = [...document.querySelectorAll('tr')];
                     for (let r of rows) {
                         let t = r.innerText;
@@ -391,13 +548,15 @@ def run_trade_bot():
             sleep(10000)
 
 if __name__ == "__main__":
-    print("🚀🚀🚀 تشغيل بوتين (تريد + أسهم)...")
+    print("🚀🚀🚀 تشغيل 3 بوتات (تريد + أسهم + سرقة)...")
     print("="*60)
     t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
-    t1.start(); t2.start()
+    t3 = threading.Thread(target=run_theft_bot, daemon=True, name="TheftBot")
+    t1.start(); t2.start(); t3.start()
     print("✅ التريد:", t1.name)
     print("✅ الأسهم:", t2.name)
+    print("✅ السرقة:", t3.name)
     print("="*60)
     try:
         while True: time.sleep(60)
