@@ -54,35 +54,29 @@ def run_theft_bot():
                 print("✅ [Theft] دخلنا الصفحة")
                 sleep(4000)
                 
-                all_btns = page.evaluate("""() => {
-                    const btns = [...document.querySelectorAll('button.theft-steal-btn')];
-                    return btns.map((b, i) => {
-                        const r = b.getBoundingClientRect();
-                        return {
-                            idx: i,
-                            cx: Math.round(r.left + r.width / 2),
-                            cy: Math.round(r.top + r.height / 2),
-                            top: Math.round(r.top),
-                            disabled: b.disabled,
-                            isSuccess: b.classList.contains('game-button--success'),
-                            visible: b.offsetWidth > 0
-                        };
-                    });
-                }""")
-                
-                print(f"🔍 [Theft] إجمالي أزرار Steal: {len(all_btns)}")
-                for b in all_btns:
-                    status = "✅ متاح" if b['isSuccess'] and not b['disabled'] else "⏳ كولداون"
-                    print(f"  idx={b['idx']}, pos=({b['cx']},{b['cy']}), {status}")
-                
-                if len(all_btns) == 0:
-                    print("⏰ [Theft] مفيش أزرار، هستنى 30 ث...")
-                    time.sleep(30)
-                    continue
-                
-                all_sorted = sorted(all_btns, key=lambda b: (b['cx'], b['top']))
-                columns = []
-                if len(all_sorted) > 0:
+                # دالة داخلية بتقرا حالة الأعمدة كلها
+                def read_columns():
+                    all_btns = page.evaluate("""() => {
+                        const btns = [...document.querySelectorAll('button.theft-steal-btn')];
+                        return btns.map((b, i) => {
+                            const r = b.getBoundingClientRect();
+                            return {
+                                idx: i,
+                                cx: Math.round(r.left + r.width / 2),
+                                cy: Math.round(r.top + r.height / 2),
+                                top: Math.round(r.top),
+                                disabled: b.disabled,
+                                isSuccess: b.classList.contains('game-button--success'),
+                                visible: b.offsetWidth > 0
+                            };
+                        });
+                    }""")
+                    
+                    if len(all_btns) == 0:
+                        return []
+                    
+                    all_sorted = sorted(all_btns, key=lambda b: (b['cx'], b['top']))
+                    columns = []
                     current = [all_sorted[0]]
                     for i in range(1, len(all_sorted)):
                         if abs(all_sorted[i]['cx'] - current[0]['cx']) < 50:
@@ -91,27 +85,50 @@ def run_theft_bot():
                             columns.append(current)
                             current = [all_sorted[i]]
                     columns.append(current)
-                
-                print(f"📋 [Theft] عدد العواميد: {len(columns)}")
-                
-                clicked = 0
-                for col_idx, col in enumerate(columns):
-                    col_sorted = sorted(col, key=lambda b: b['top'])
-                    bottom_btn = col_sorted[-1]
-                    col_name = ['Cars', 'Bikes', 'Vans'][col_idx] if col_idx < 3 else f'Col{col_idx+1}'
                     
-                    status = "✅ متاح" if bottom_btn['isSuccess'] and not bottom_btn['disabled'] else "⏳ كولداون"
-                    print(f"\n📌 [Theft] {col_name}: آخر زر (idx={bottom_btn['idx']}) - {status}")
+                    cols_info = []
+                    col_names = ['Cars', 'Bikes', 'Vans']
+                    for col_idx, col in enumerate(columns):
+                        col_sorted = sorted(col, key=lambda b: b['top'])
+                        bottom_btn = col_sorted[-1]
+                        col_name = col_names[col_idx] if col_idx < 3 else f'Col{col_idx+1}'
+                        
+                        all_available = all(b['isSuccess'] and not b['disabled'] for b in col)
+                        
+                        cols_info.append({
+                            'name': col_name,
+                            'total': len(col),
+                            'bottom_btn': bottom_btn,
+                            'available': all_available
+                        })
                     
-                    if not (bottom_btn['isSuccess'] and not bottom_btn['disabled'] and bottom_btn['visible']):
-                        print(f"⏭️ [Theft] {col_name} في كولداون، بنتخطاه")
+                    return cols_info
+                
+                # نبص على كل الأعمدة ونطبع حالاتهم
+                cols_info = read_columns()
+                
+                if len(cols_info) == 0:
+                    print("⏰ [Theft] مفيش أزرار، هستنى 30 ث...")
+                    time.sleep(30)
+                    continue
+                
+                print(f"\n📋 [Theft] حالة الأعمدة:")
+                for col in cols_info:
+                    status = "✅ جاهز" if col['available'] else "⏳ كولداون"
+                    print(f"  {col['name']}: آخر زر (idx={col['bottom_btn']['idx']}) - {status}")
+                
+                # ندور على أول عمود جاهز ندوس عليه
+                clicked_any = False
+                for col in cols_info:
+                    if not col['available']:
                         continue
                     
-                    print(f"🎯 [Theft] بدوس على {col_name}...")
-                    success = False
+                    bottom = col['bottom_btn']
+                    print(f"\n🎯 [Theft] بدوس على {col['name']} (idx={bottom['idx']}, pos=({bottom['cx']},{bottom['cy']}))...")
                     
+                    success = False
                     try:
-                        loc = page.locator('button.theft-steal-btn').nth(bottom_btn['idx'])
+                        loc = page.locator('button.theft-steal-btn').nth(bottom['idx'])
                         loc.scroll_into_view_if_needed()
                         sleep(300)
                         loc.click(force=True, timeout=5000)
@@ -122,24 +139,32 @@ def run_theft_bot():
                     
                     if not success:
                         try:
-                            page.mouse.move(bottom_btn['cx'], bottom_btn['cy'])
+                            page.mouse.move(bottom['cx'], bottom['cy'])
                             sleep(200)
-                            page.mouse.click(bottom_btn['cx'], bottom_btn['cy'])
+                            page.mouse.click(bottom['cx'], bottom['cy'])
                             print(f"✅ [Theft] mouse.click نجح")
                             success = True
                         except Exception as e:
                             print(f"⚠️ [Theft] mouse فشل: {e}")
                     
                     if success:
-                        clicked += 1
-                    sleep(3000)
+                        clicked_any = True
+                        print(f"🔄 [Theft] refresh بعد الضغط على {col['name']}...")
+                        sleep(3000)
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                        sleep(4000)
+                        
+                        # نعيد قراءة الأعمدة
+                        cols_info_after = read_columns()
+                        print(f"\n📋 [Theft] حالة الأعمدة بعد الضغط على {col['name']}:")
+                        for c in cols_info_after:
+                            st = "✅ جاهز" if c['available'] else "⏳ كولداون"
+                            print(f"  {c['name']}: آخر زر (idx={c['bottom_btn']['idx']}) - {st}")
+                        
+                        break
                 
-                if clicked > 0:
-                    print(f"\n🔄 [Theft] خلصنا {clicked} ضغطة، refresh...")
-                    page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
-                    sleep(4000)
-                else:
-                    print(f"\n⏰ [Theft] مفيش ضغطات، هستنى 30 ث...")
+                if not clicked_any:
+                    print("⏰ [Theft] كل الأعمدة في كولداون، هستنى 30 ث...")
                     time.sleep(30)
                 
                 print(f"📊 [Theft] خلصنا الدورة")
