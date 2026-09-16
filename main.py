@@ -32,180 +32,7 @@ def parse_cooldown(text):
     return t
 
 # ═══════════════════════════════════════════════════════════════
-# 🚗 بوت السرقة (Theft) - 3 عواميد (Cars, Bikes, Vans)
-# ═══════════════════════════════════════════════════════════════
-
-def parse_mmss(t):
-    """يحول 'M:SS' أو 'MM:SS' لثواني"""
-    try:
-        parts = t.split(':')
-        if len(parts) == 2:
-            return int(parts[0]) * 60 + int(parts[1])
-    except: pass
-    return 0
-
-def run_theft_bot():
-    print("🚗 [Theft] بدأ التشغيل...")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
-        context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
-        context.add_cookies(COOKIES)
-        page = context.new_page()
-        page.set_default_timeout(15000)
-        time.sleep(5)
-        
-        while True:
-            try:
-                print("\n" + "="*50)
-                print("🚗 [Theft] جاري الدخول لصفحة السرقة...")
-                print("="*50)
-                page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
-                print("✅ [Theft] دخلنا الصفحة")
-                sleep(3500)
-                
-                # 1. نجمع كل أزرار "Steal" والكولداونات
-                data = page.evaluate("""() => {
-                    const buttons = [];
-                    const timers = [];
-                    
-                    // كل أزرار "Steal" الظاهرة
-                    document.querySelectorAll('button').forEach(b => {
-                        if ((b.textContent || '').trim() === 'Steal' && b.offsetWidth > 0 && b.offsetHeight > 0) {
-                            const r = b.getBoundingClientRect();
-                            buttons.push({
-                                x: Math.round(r.left + r.width / 2),
-                                y: Math.round(r.top + r.height / 2)
-                            });
-                        }
-                    });
-                    
-                    // كل النصوص اللي شكلها M:SS أو MM:SS (كولداونات)
-                    const seen = new Set();
-                    document.querySelectorAll('*').forEach(el => {
-                        if (el.children.length === 0) {
-                            const t = (el.textContent || '').trim();
-                            if (/^\\d{1,2}:\\d{2}$/.test(t) && !seen.has(el)) {
-                                seen.add(el);
-                                const r = el.getBoundingClientRect();
-                                if (r.width > 0 && r.height > 0) {
-                                    timers.push({
-                                        text: t,
-                                        x: Math.round(r.left + r.width / 2),
-                                        y: Math.round(r.top + r.height / 2)
-                                    });
-                                }
-                            }
-                        }
-                    });
-                    
-                    return {buttons, timers};
-                }""")
-                
-                buttons = data['buttons']
-                timers = data['timers']
-                
-                print(f"🔍 [Theft] لقيت {len(buttons)} زر Steal، و {len(timers)} كولداون")
-                
-                if len(buttons) == 0:
-                    print("ℹ️ [Theft] مفيش أزرار متاحة، هستنى دقيقة...")
-                    sleep(60000)
-                    continue
-                
-                # 2. نقسم الأزرار على عواميد بناءً على X
-                columns = {}
-                for b in buttons:
-                    col_key = round(b['x'] / 300) * 300
-                    if col_key not in columns:
-                        columns[col_key] = []
-                    columns[col_key].append(b)
-                
-                sorted_col_keys = sorted(columns.keys())
-                col_names = ['Cars', 'Bikes', 'Vans']
-                print(f"📊 [Theft] عدد العواميد: {len(sorted_col_keys)}")
-                
-                # 3. لكل عمود، نحدد الكولداون بتاعه
-                ready_columns = []  # الأعمدة الجاهزة
-                min_wait = 99999
-                min_wait_col = None
-                
-                for idx, col_key in enumerate(sorted_col_keys):
-                    col_buttons = sorted(columns[col_key], key=lambda b: b['y'])
-                    last_btn = col_buttons[-1]  # آخر زر (تحت خالص)
-                    col_name = col_names[idx] if idx < len(col_names) else f'Col{idx+1}'
-                    
-                    # ندور على الكولداون الأقرب لنفس العمود
-                    col_timer = None
-                    min_dist = 99999
-                    for t in timers:
-                        if abs(t['x'] - last_btn['x']) < 200:  # نفس العمود
-                            d = abs(t['y'] - last_btn['y'])
-                            if d < min_dist:
-                                min_dist = d
-                                col_timer = t
-                    
-                    cd_sec = 0
-                    cd_text = "0:00"
-                    if col_timer:
-                        cd_text = col_timer['text']
-                        cd_sec = parse_mmss(cd_text)
-                    
-                    if cd_sec > 0:
-                        print(f"⏳ [Theft] {col_name}: كولداون {cd_text} ({cd_sec}s)")
-                        if cd_sec < min_wait:
-                            min_wait = cd_sec
-                            min_wait_col = col_name
-                    else:
-                        print(f"✅ [Theft] {col_name}: جاهز (كولداون = 0)")
-                        ready_columns.append((idx, last_btn, col_name))
-                
-                # 4. لو فيه أعمدة جاهزة → ادوس عليها
-                if ready_columns:
-                    for idx, last_btn, col_name in ready_columns:
-                        print(f"\n🎯 [Theft] بدوس على {col_name} (آخر زر Steal)...")
-                        clicked = page.evaluate("""(coords) => {
-                            const allBtns = document.querySelectorAll('button');
-                            for (let b of allBtns) {
-                                if ((b.textContent || '').trim() === 'Steal' && b.offsetWidth > 0) {
-                                    const r = b.getBoundingClientRect();
-                                    const cx = r.left + r.width / 2;
-                                    const cy = r.top + r.height / 2;
-                                    if (Math.abs(cx - coords.x) < 5 && Math.abs(cy - coords.y) < 5) {
-                                        const e1 = new MouseEvent('mousedown', {bubbles: true, cancelable: true, view: window});
-                                        const e2 = new MouseEvent('mouseup', {bubbles: true, cancelable: true, view: window});
-                                        const e3 = new MouseEvent('click', {bubbles: true, cancelable: true, view: window});
-                                        b.dispatchEvent(e1);
-                                        b.dispatchEvent(e2);
-                                        b.dispatchEvent(e3);
-                                        b.click();
-                                        return true;
-                                    }
-                                }
-                            }
-                            return false;
-                        }""", last_btn)
-                        print(f"{'✅' if clicked else '⚠️'} [Theft] {col_name}: {'تم الضغط' if clicked else 'فشل الضغط'}")
-                        sleep(2500)
-                    
-                    print("🔄 [Theft] بعمل refresh بعد الدوس...")
-                    page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
-                    sleep(3000)
-                else:
-                    # مفيش أعمدة جاهزة → استنى الأقصر
-                    wait_sec = min(min_wait + 5, 600) if min_wait > 0 else 60
-                    print(f"\n⏰ [Theft] كل الأعمدة في كولداون. هستنى {wait_sec} ثانية (أقصر واحد: {min_wait_col} - {min_wait}s)...")
-                    sleep(wait_sec)
-                    page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
-                    sleep(3000)
-                
-                print(f"📊 [Theft] خلصنا الدورة")
-                print("="*50 + "\n")
-            except Exception as e:
-                print(f"⚠️ [Theft] خطأ: {e}")
-                sleep(10000)
-
-
-# ═══════════════════════════════════════════════════════════════
-# 📈 بوت الأسهم (زي ما هو)
+# 📈 بوت الأسهم - بيع بـ Playwright native (زي التريد بالظبط)
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
@@ -229,8 +56,9 @@ def run_stocks_bot():
                 except: pass
                 sleep(1500)
                 
-                # 🔴 1) البيع
+                # 🔴 1) البيع - بنفس طريقة التريد (JS لفتح النافذة + Playwright للضغط)
                 print("\n🔴 [الأسهم] [1/2] بيع...")
+                
                 page.evaluate("""() => {
                     const btns = [...document.querySelectorAll('button')];
                     for (let i = btns.length - 1; i >= 0; i--) {
@@ -242,19 +70,22 @@ def run_stocks_bot():
                     }
                     return false;
                 }""")
-                print("✅ [الأسهم] داس على Sell All")
+                print("✅ [الأسهم] داس على Sell All (تحت)")
                 sleep(3000)
                 
                 try:
                     cf = page.locator('button:has-text("SELL ALL")').last
                     cf.wait_for(state="visible", timeout=10000)
                     cf.click(force=True, timeout=10000)
-                    print("✅ [الأسهم] تم البيع!")
+                    print("✅ [الأسهم] داس على SELL ALL (Playwright)")
                     sleep(7000)
+                    print("✅ [الأسهم] تم البيع!")
                 except Exception as e:
                     print(f"⚠️ [الأسهم] مشكلة البيع: {e}")
+                    try: page.screenshot(path="sell_fail.png")
+                    except: pass
                 
-                # 🟢 2) الشراء
+                # 🟢 2) الشراء - بنفس طريقة التريد
                 print("\n🟢 [الأسهم] [2/2] شراء...")
                 bought_count = 0
                 
@@ -266,6 +97,7 @@ def run_stocks_bot():
                             try:
                                 row = rows.nth(i)
                                 row_text = row.inner_text()
+                                
                                 if ('↑' in row_text or '▲' in row_text):
                                     c = page.evaluate("""(idx) => {
                                         const rows = [...document.querySelectorAll('tr')];
@@ -283,9 +115,11 @@ def run_stocks_bot():
                                     if c:
                                         found_green = True
                                         break
-                            except: continue
+                            except:
+                                continue
                         
-                        if not found_green: break
+                        if not found_green:
+                            break
                         
                         bought_count += 1
                         print(f"✅ [الأسهم] سهم أخضر {bought_count}")
@@ -300,6 +134,7 @@ def run_stocks_bot():
                         except Exception as e:
                             print(f"⚠️ [الأسهم] مشكلة في تأكيد الشراء: {e}")
                             break
+                        
                     except Exception as e:
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
@@ -309,12 +144,12 @@ def run_stocks_bot():
                 print("="*50 + "\n")
             except Exception as e: print(f"⚠️ خطأ: {e}")
             
-            print(f"⏰ [الأسهم] هستنى {STOCKS_INTERVAL // 60} دقيقة...")
+            print(f"⏰ [الأسهم] هستنى 30 دقيقة...")
             time.sleep(STOCKS_INTERVAL)
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (زي ما هو)
+# 🌐 بوت التريد (زي ما هو بالظبط - مش هنلمسه)
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -556,15 +391,13 @@ def run_trade_bot():
             sleep(10000)
 
 if __name__ == "__main__":
-    print("🚀🚀🚀 تشغيل 3 بوتات (تريد + أسهم + سرقة)...")
+    print("🚀🚀🚀 تشغيل بوتين (تريد + أسهم)...")
     print("="*60)
     t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
-    t3 = threading.Thread(target=run_theft_bot, daemon=True, name="TheftBot")
-    t1.start(); t2.start(); t3.start()
+    t1.start(); t2.start()
     print("✅ التريد:", t1.name)
     print("✅ الأسهم:", t2.name)
-    print("✅ السرقة:", t3.name)
     print("="*60)
     try:
         while True: time.sleep(60)
