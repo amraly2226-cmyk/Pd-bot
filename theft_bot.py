@@ -15,8 +15,10 @@ def sleep(ms): time.sleep(ms / 1000.0)
 
 def run_theft_bot():
     print("🚗 [Theft] بدأ التشغيل...")
-    REFRESH_INTERVAL = 30 * 60
+    REFRESH_INTERVAL = 30 * 60  # 30 دقيقة
+    JAIL_WAIT = 5 * 60  # 5 دقايق لو في السجن
     last_refresh = time.time()
+    empty_count = 0  # عداد المرات اللي مفيش فيها أزرار
     
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
@@ -36,11 +38,13 @@ def run_theft_bot():
         
         while True:
             try:
+                # refresh دوري كل 30 دقيقة
                 if time.time() - last_refresh >= REFRESH_INTERVAL:
                     print("🔄 [Theft] مر 30 دقيقة - بعمل refresh...")
                     try:
                         page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                         last_refresh = time.time()
+                        empty_count = 0
                         print("✅ [Theft] تم الـ refresh")
                     except Exception as e:
                         print(f"⚠️ [Theft] مشكلة الـ refresh: {e}")
@@ -77,13 +81,40 @@ def run_theft_bot():
                         }
                     });
                     
-                    return {btns, readies};
+                    // نشوف لو فيه كلمة "jail" أو "prison" في الصفحة
+                    const bodyText = document.body.innerText.toLowerCase();
+                    const isJailed = bodyText.includes('jail') || bodyText.includes('prison') || bodyText.includes('in custody');
+                    
+                    return {btns, readies, isJailed};
                 }""")
                 
                 steal_btns = data['btns']
                 readies = data['readies']
+                is_jailed = data['isJailed']
                 
-                if len(steal_btns) == 0 or len(readies) == 0:
+                # ✅ لو في السجن أو مفيش أزرار خالص
+                if is_jailed or len(steal_btns) == 0:
+                    empty_count += 1
+                    # لو مفيش أزرار لمدة 3 مرات متتالية (9 ثواني)
+                    if empty_count >= 3:
+                        print(f"🚔 [Theft] مفيش أزرار - غالباً في السجن. هستنى {JAIL_WAIT // 60} دقايق...")
+                        time.sleep(JAIL_WAIT)
+                        try:
+                            page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                            last_refresh = time.time()
+                        except: pass
+                        empty_count = 0
+                        sleep(3)
+                        continue
+                    else:
+                        time.sleep(3)
+                        continue
+                else:
+                    # رجعنا من السجن
+                    empty_count = 0
+                
+                # لو مفيش Ready، نستنى
+                if len(readies) == 0:
                     time.sleep(3)
                     continue
                 
