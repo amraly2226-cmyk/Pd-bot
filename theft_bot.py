@@ -14,8 +14,20 @@ COOKIES = [
 def sleep(ms): time.sleep(ms / 1000.0)
 
 
+def check_if_jailed(page):
+    """بترجع True لو إحنا في السجن (بالـ URL بس)"""
+    try:
+        current_url = page.url
+        if '/jail' in current_url.lower():
+            return True
+        return False
+    except:
+        return False
+
+
 def run_session():
     SESSION_MAX = 90 * 60
+    JAIL_WAIT = 5 * 60  # 5 دقايق في السجن
     session_start = time.time()
     
     print("🚗 [Theft] جلسة جديدة بدأت...")
@@ -37,55 +49,90 @@ def run_session():
             except: pass
             return
         
-        # ✅ عشان نتجنب الدوس على نفس العمود مرتين
         last_clicked_col = ""
         last_click_time = 0
         
         while True:
-            if time.time() - session_start >= SESSION_MAX:
-                print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
-                try: browser.close()
-                except: pass
-                return
-            
             try:
-                data = page.evaluate("""() => {
-                    const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
-                        const r = b.getBoundingClientRect();
-                        return {
-                            idx: i,
-                            cx: Math.round(r.left + r.width / 2),
-                            cy: Math.round(r.top + r.height / 2),
-                            top: Math.round(r.top),
-                            isSuccess: b.classList.contains('game-button--success'),
-                            disabled: b.disabled,
-                            visible: b.offsetWidth > 0 && b.offsetHeight > 0
-                        };
-                    }).filter(b => b.visible);
-                    
-                    const readies = [];
-                    const seen = new Set();
-                    document.querySelectorAll('*').forEach(el => {
-                        if (el.children.length === 0 && !seen.has(el)) {
-                            const t = (el.textContent || '').trim();
-                            if (t === 'Ready' && el.offsetWidth > 0 && el.offsetHeight > 0) {
-                                const r = el.getBoundingClientRect();
-                                readies.push({
-                                    x: Math.round(r.left + r.width / 2),
-                                    y: Math.round(r.top + r.height / 2)
-                                });
-                                seen.add(el);
+                # ✅ لو عدت 90 دقيقة
+                if time.time() - session_start >= SESSION_MAX:
+                    print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
+                    try: browser.close()
+                    except: pass
+                    return
+                
+                # ✅ نشوف لو في السجن
+                if check_if_jailed(page):
+                    print(f"🚔 [Theft] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    time.sleep(JAIL_WAIT)
+                    try:
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                        print("✅ [Theft] حاولت أرجع لصفحة السرقة")
+                    except Exception as e:
+                        print(f"⚠️ [Theft] مشكلة الرجوع: {e}")
+                    sleep(3)
+                    continue
+                
+                # ✅ لو مش في صفحة السرقة
+                if '/theft' not in page.url:
+                    print(f"⚠️ [Theft] الصفحة اتغيرت لـ {page.url}، هرجع لصفحة السرقة...")
+                    try:
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
+                    except: pass
+                    sleep(3)
+                    continue
+                
+                # ✅ نقرا البيانات
+                try:
+                    data = page.evaluate("""() => {
+                        const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
+                            const r = b.getBoundingClientRect();
+                            return {
+                                idx: i,
+                                cx: Math.round(r.left + r.width / 2),
+                                cy: Math.round(r.top + r.height / 2),
+                                top: Math.round(r.top),
+                                isSuccess: b.classList.contains('game-button--success'),
+                                disabled: b.disabled,
+                                visible: b.offsetWidth > 0 && b.offsetHeight > 0
+                            };
+                        }).filter(b => b.visible);
+                        
+                        const readies = [];
+                        const seen = new Set();
+                        document.querySelectorAll('*').forEach(el => {
+                            if (el.children.length === 0 && !seen.has(el)) {
+                                const t = (el.textContent || '').trim();
+                                if (t === 'Ready' && el.offsetWidth > 0 && el.offsetHeight > 0) {
+                                    const r = el.getBoundingClientRect();
+                                    readies.push({
+                                        x: Math.round(r.left + r.width / 2),
+                                        y: Math.round(r.top + r.height / 2)
+                                    });
+                                    seen.add(el);
+                                }
                             }
-                        }
-                    });
-                    
-                    return {btns, readies};
-                }""")
+                        });
+                        
+                        return {btns, readies};
+                    }""")
+                except Exception as eval_err:
+                    err_str = str(eval_err)
+                    if 'Execution context was destroyed' in err_str or 'navigation' in err_str.lower():
+                        print("🚔 [Theft] الصفحة اتنقلت فجأة، هستنى ثانية...")
+                        sleep(3)
+                        continue
+                    else:
+                        raise eval_err
                 
                 steal_btns = data['btns']
                 readies = data['readies']
                 
-                if len(steal_btns) == 0 or len(readies) == 0:
+                if len(steal_btns) == 0:
+                    time.sleep(3)
+                    continue
+                
+                if len(readies) == 0:
                     time.sleep(3)
                     continue
                 
@@ -121,7 +168,6 @@ def run_session():
                             break
                     col_name = col_names[col_idx] if col_idx < len(col_names) else f'Col{col_idx+1}'
                     
-                    # ✅ لو نفس العمود اتداس عليه قبل أقل من 15 ثانية، نتخطاه
                     if col_name == last_clicked_col and (time.time() - last_click_time) < 15:
                         continue
                     
@@ -158,8 +204,11 @@ def run_session():
                         clicked_any = True
                         last_clicked_col = col_name
                         last_click_time = time.time()
-                        # ✅ نستنى 5 ثواني ونعمل reload كامل للصفحة
                         sleep(5)
+                        # ✅ نتشيك لو دخلنا السجن بعد الضغط
+                        if check_if_jailed(page):
+                            print("🚔 [Theft] دخلنا السجن بعد الضغط!")
+                            continue
                         try:
                             page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                         except: pass
@@ -170,9 +219,17 @@ def run_session():
                     time.sleep(3)
                 
             except Exception as e:
+                err_str = str(e)
+                if 'Execution context was destroyed' in err_str or 'navigation' in err_str.lower():
+                    print("🚔 [Theft] الصفحة اتنقلت، هستنى 3 ثواني...")
+                    sleep(3)
+                    continue
+                
                 print(f"⚠️ [Theft] مشكلة مؤقتة: {e}")
                 time.sleep(3)
-                try: page.reload(wait_until='domcontentloaded', timeout=30000)
+                try:
+                    if '/theft' not in page.url:
+                        page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                 except: pass
         
         try: browser.close()
