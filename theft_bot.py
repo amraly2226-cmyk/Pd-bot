@@ -15,8 +15,7 @@ def sleep(ms): time.sleep(ms / 1000.0)
 
 
 def run_session():
-    """جلسة واحدة - بتشتغل لحد 90 دقيقة وتقفل"""
-    SESSION_MAX = 90 * 60  # 90 دقيقة
+    SESSION_MAX = 90 * 60
     session_start = time.time()
     
     print("🚗 [Theft] جلسة جديدة بدأت...")
@@ -38,8 +37,11 @@ def run_session():
             except: pass
             return
         
+        # ✅ عشان نتجنب الدوس على نفس العمود مرتين
+        last_clicked_col = ""
+        last_click_time = 0
+        
         while True:
-            # ✅ لو عدت 90 دقيقة → اطلع من الجلسة
             if time.time() - session_start >= SESSION_MAX:
                 print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
                 try: browser.close()
@@ -119,6 +121,10 @@ def run_session():
                             break
                     col_name = col_names[col_idx] if col_idx < len(col_names) else f'Col{col_idx+1}'
                     
+                    # ✅ لو نفس العمود اتداس عليه قبل أقل من 15 ثانية، نتخطاه
+                    if col_name == last_clicked_col and (time.time() - last_click_time) < 15:
+                        continue
+                    
                     print(f"🎯 [Theft] {col_name} جاهز - بدوس على آخر زر Steal...")
                     
                     success = False
@@ -150,8 +156,12 @@ def run_session():
                     
                     if success:
                         clicked_any = True
-                        sleep(3)
-                        try: page.reload(wait_until='domcontentloaded', timeout=30000)
+                        last_clicked_col = col_name
+                        last_click_time = time.time()
+                        # ✅ نستنى 5 ثواني ونعمل reload كامل للصفحة
+                        sleep(5)
+                        try:
+                            page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                         except: pass
                         sleep(3)
                         break
@@ -160,7 +170,6 @@ def run_session():
                     time.sleep(3)
                 
             except Exception as e:
-                # إيرور عادي - نستنى 3 ثواني ونكمل
                 print(f"⚠️ [Theft] مشكلة مؤقتة: {e}")
                 time.sleep(3)
                 try: page.reload(wait_until='domcontentloaded', timeout=30000)
@@ -182,7 +191,6 @@ def run_theft_bot():
             break
         except Exception as e:
             print(f"⚠️ [Theft] مشكلة كبيرة: {e}")
-            print("⏰ هستنى 30 ثانية وأحاول تاني...")
             time.sleep(30)
 
 
