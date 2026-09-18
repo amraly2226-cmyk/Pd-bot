@@ -1,10 +1,17 @@
 from playwright.sync_api import sync_playwright
+from datetime import datetime
 import time
 import re
 import threading
+import os
+import sys
 
 USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
+
+# ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
+# خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
+STOP_TIME = "03:00"  # 3 الفجر
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
@@ -18,7 +25,7 @@ COOKIES = [
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
 STOCKS_INTERVAL = 30 * 60
-JAIL_WAIT = 5 * 60  # 5 دقايق في السجن
+JAIL_WAIT = 5 * 60
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
@@ -33,11 +40,25 @@ def parse_cooldown(text):
     return t
 
 def check_if_jailed(page):
-    """بترجع True لو إحنا في السجن"""
     try:
         return '/jail' in page.url.lower()
     except:
         return False
+
+# ⏰ دالة التحقق من وقت الإيقاف (بتوقيت مصر)
+def should_stop():
+    if not STOP_TIME:
+        return False
+    now = datetime.now().strftime("%H:%M")
+    return now >= STOP_TIME
+
+# ⏰ دالة الإيقاف
+def stop_bot():
+    print(f"\n🛑 وصلنا للوقت المحدد ({STOP_TIME}) - بيقفل البرنامج...")
+    print("💤 هنام كويس، باي باي! 👋")
+    sys.stdout.flush()
+    time.sleep(2)
+    os._exit(0)
 
 # ═══════════════════════════════════════════════════════════════
 # 📈 بوت الأسهم
@@ -55,6 +76,9 @@ def run_stocks_bot():
         
         while True:
             try:
+                if should_stop():
+                    stop_bot()
+                
                 print("\n" + "="*50)
                 print("📈 [الأسهم] جاري الدخول...")
                 print("="*50)
@@ -64,7 +88,6 @@ def run_stocks_bot():
                 except: pass
                 sleep(1500)
                 
-                # ✅ نشيك لو في السجن
                 if check_if_jailed(page):
                     print(f"🚔 [الأسهم] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     time.sleep(JAIL_WAIT)
@@ -99,7 +122,6 @@ def run_stocks_bot():
                         print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى...")
                         continue
                 
-                # ✅ نشيك تاني بعد البيع
                 if check_if_jailed(page):
                     print(f"🚔 [الأسهم] دخلنا السجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
                     time.sleep(JAIL_WAIT)
@@ -109,7 +131,9 @@ def run_stocks_bot():
                 bought_count = 0
                 for attempt in range(15):
                     try:
-                        # ✅ نشيك لو في السجن قبل كل محاولة
+                        if should_stop():
+                            stop_bot()
+                        
                         if check_if_jailed(page):
                             print(f"🚔 [الأسهم] دخلنا السجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
                             time.sleep(JAIL_WAIT)
@@ -174,8 +198,12 @@ def run_stocks_bot():
                     continue
                 print(f"⚠️ خطأ: {e}")
             
+            # ✅ الانتظار 30 دقيقة مع فحص وقت الإيقاف كل دقيقة
             print(f"⏰ [الأسهم] هستنى 30 دقيقة...")
-            time.sleep(STOCKS_INTERVAL)
+            for _ in range(30):
+                time.sleep(60)
+                if should_stop():
+                    stop_bot()
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -197,7 +225,9 @@ def run_trade_bot():
 
         while True:
             try:
-                # ✅ أهم خطوة: نشيك لو في السجن الأول
+                if should_stop():
+                    stop_bot()
+                
                 if check_if_jailed(page):
                     print(f"🚔 [التريد] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     time.sleep(JAIL_WAIT)
@@ -228,7 +258,11 @@ def run_trade_bot():
                         if ws > 0:
                             ws += 10
                             print(f"⏳ [التريد] كولداون: {cooldown_text} - هستنى {ws} ث...")
-                            time.sleep(ws)
+                            # ✅ نستنى مع فحص وقت الإيقاف كل ثانية
+                            for _ in range(int(ws)):
+                                time.sleep(1)
+                                if should_stop():
+                                    stop_bot()
                             print("✅ [التريد] العداد خلص، refresh...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                             sleep(5000)
@@ -255,7 +289,6 @@ def run_trade_bot():
                     }""")
                     
                     if not cc:
-                        print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                         page.goto('https://project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(5000)
                         continue
@@ -341,7 +374,7 @@ def run_trade_bot():
 
                 if state['cd']:
                     print(f"⏳ [التريد] كولداون سوق")
-                    sleep(60000)
+                    time.sleep(60)
                     continue
 
                 if state['loc'] == "San Francisco":
@@ -374,7 +407,6 @@ def run_trade_bot():
                             print("✅ [التريد] شراء بلاستيك!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                            # ✅ لو الشراء فشل، نشيك على السجن
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 time.sleep(JAIL_WAIT)
@@ -411,22 +443,19 @@ def run_trade_bot():
                             print("✅ [التريد] شراء لوحات!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                            # ✅ لو الشراء فشل، نشيك على السجن
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 time.sleep(JAIL_WAIT)
                         sleep(3000)
                         continue
                 else:
-                    print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     sleep(3000)
                     continue
             except Exception as e:
                 err = str(e)
-                # ✅ لو الصفحة اتنقلت (غالباً للسجن)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [التريد] الصفحة اتنقلت (سجن محتمل)، هستنى وأشوف...")
+                    print("🚔 [التريد] الصفحة اتنقلت (سجن محتمل)، هستنى...")
                     sleep(3)
                     continue
                 print(f"⚠️ [التريد] خطأ: {e}")
@@ -435,6 +464,7 @@ def run_trade_bot():
 
 if __name__ == "__main__":
     print("🚀🚀🚀 تشغيل بوتين (تريد + أسهم)...")
+    print(f"⏰ وقت الإيقاف: {STOP_TIME if STOP_TIME else 'بدون إيقاف'} (بتوقيت مصر)")
     print("="*60)
     t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
