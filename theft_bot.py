@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import os
 import sys
@@ -7,6 +7,20 @@ import sys
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
 # خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
 STOP_TIME = "03:00"  # 3 الفجر
+
+# ⏰ حساب الوقت المستهدف للـ STOP_TIME
+def calculate_stop_datetime():
+    if not STOP_TIME:
+        return None
+    now = datetime.now()
+    hour, minute = map(int, STOP_TIME.split(':'))
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # لو الوقت المستهدف عدى النهاردة → نخليه بكرة
+    if now >= target:
+        target += timedelta(days=1)
+    return target
+
+STOP_DATETIME = calculate_stop_datetime()
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
@@ -22,10 +36,9 @@ def sleep(ms): time.sleep(ms / 1000.0)
 
 
 def should_stop():
-    if not STOP_TIME:
+    if not STOP_DATETIME:
         return False
-    now = datetime.now().strftime("%H:%M")
-    return now >= STOP_TIME
+    return datetime.now() >= STOP_DATETIME
 
 
 def stop_bot():
@@ -72,11 +85,9 @@ def run_session():
         
         while True:
             try:
-                # ✅ نشيك على وقت الإيقاف
                 if should_stop():
                     stop_bot()
                 
-                # ✅ لو عدت 90 دقيقة
                 if time.time() - session_start >= SESSION_MAX:
                     print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
                     try: browser.close()
@@ -85,7 +96,6 @@ def run_session():
                 
                 if check_if_jailed(page):
                     print(f"🚔 [Theft] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
-                    # ✅ نستنى مع فحص وقت الإيقاف كل دقيقة
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
                         if should_stop():
@@ -256,12 +266,14 @@ def run_session():
 
 def run_theft_bot():
     print("🚗 [Theft] بدأ التشغيل...")
-    print(f"⏰ وقت الإيقاف: {STOP_TIME if STOP_TIME else 'بدون إيقاف'} (بتوقيت مصر)")
+    if STOP_DATETIME:
+        print(f"⏰ وقت الإيقاف: {STOP_DATETIME.strftime('%Y-%m-%d %H:%M')} (بتوقيت مصر)")
+    else:
+        print("⏰ بدون إيقاف")
     while True:
         try:
             run_session()
             print("😴 [Theft] بستنى 10 ثواني قبل الجلسة الجديدة...")
-            # ✅ نستنى مع فحص وقت الإيقاف
             for _ in range(10):
                 time.sleep(1)
                 if should_stop():
