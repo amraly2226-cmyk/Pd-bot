@@ -1,5 +1,12 @@
 from playwright.sync_api import sync_playwright
+from datetime import datetime
 import time
+import os
+import sys
+
+# ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
+# خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
+STOP_TIME = "03:00"  # 3 الفجر
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
@@ -14,20 +21,31 @@ COOKIES = [
 def sleep(ms): time.sleep(ms / 1000.0)
 
 
-def check_if_jailed(page):
-    """بترجع True لو إحنا في السجن (بالـ URL بس)"""
-    try:
-        current_url = page.url
-        if '/jail' in current_url.lower():
-            return True
+def should_stop():
+    if not STOP_TIME:
         return False
+    now = datetime.now().strftime("%H:%M")
+    return now >= STOP_TIME
+
+
+def stop_bot():
+    print(f"\n🛑 وصلنا للوقت المحدد ({STOP_TIME}) - بيقفل البرنامج...")
+    print("💤 هنام كويس، باي باي! 👋")
+    sys.stdout.flush()
+    time.sleep(2)
+    os._exit(0)
+
+
+def check_if_jailed(page):
+    try:
+        return '/jail' in page.url.lower()
     except:
         return False
 
 
 def run_session():
     SESSION_MAX = 90 * 60
-    JAIL_WAIT = 5 * 60  # 5 دقايق في السجن
+    JAIL_WAIT = 5 * 60
     session_start = time.time()
     
     print("🚗 [Theft] جلسة جديدة بدأت...")
@@ -54,6 +72,10 @@ def run_session():
         
         while True:
             try:
+                # ✅ نشيك على وقت الإيقاف
+                if should_stop():
+                    stop_bot()
+                
                 # ✅ لو عدت 90 دقيقة
                 if time.time() - session_start >= SESSION_MAX:
                     print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
@@ -61,10 +83,13 @@ def run_session():
                     except: pass
                     return
                 
-                # ✅ نشوف لو في السجن
                 if check_if_jailed(page):
                     print(f"🚔 [Theft] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
-                    time.sleep(JAIL_WAIT)
+                    # ✅ نستنى مع فحص وقت الإيقاف كل دقيقة
+                    for _ in range(JAIL_WAIT // 60):
+                        time.sleep(60)
+                        if should_stop():
+                            stop_bot()
                     try:
                         page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                         print("✅ [Theft] حاولت أرجع لصفحة السرقة")
@@ -73,7 +98,6 @@ def run_session():
                     sleep(3)
                     continue
                 
-                # ✅ لو مش في صفحة السرقة
                 if '/theft' not in page.url:
                     print(f"⚠️ [Theft] الصفحة اتغيرت لـ {page.url}، هرجع لصفحة السرقة...")
                     try:
@@ -82,7 +106,6 @@ def run_session():
                     sleep(3)
                     continue
                 
-                # ✅ نقرا البيانات
                 try:
                     data = page.evaluate("""() => {
                         const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
@@ -128,11 +151,7 @@ def run_session():
                 steal_btns = data['btns']
                 readies = data['readies']
                 
-                if len(steal_btns) == 0:
-                    time.sleep(3)
-                    continue
-                
-                if len(readies) == 0:
+                if len(steal_btns) == 0 or len(readies) == 0:
                     time.sleep(3)
                     continue
                 
@@ -205,7 +224,6 @@ def run_session():
                         last_clicked_col = col_name
                         last_click_time = time.time()
                         sleep(5)
-                        # ✅ نتشيك لو دخلنا السجن بعد الضغط
                         if check_if_jailed(page):
                             print("🚔 [Theft] دخلنا السجن بعد الضغط!")
                             continue
@@ -238,11 +256,16 @@ def run_session():
 
 def run_theft_bot():
     print("🚗 [Theft] بدأ التشغيل...")
+    print(f"⏰ وقت الإيقاف: {STOP_TIME if STOP_TIME else 'بدون إيقاف'} (بتوقيت مصر)")
     while True:
         try:
             run_session()
             print("😴 [Theft] بستنى 10 ثواني قبل الجلسة الجديدة...")
-            time.sleep(10)
+            # ✅ نستنى مع فحص وقت الإيقاف
+            for _ in range(10):
+                time.sleep(1)
+                if should_stop():
+                    stop_bot()
         except KeyboardInterrupt:
             print("🛑 [Theft] تم الإيقاف")
             break
