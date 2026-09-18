@@ -18,6 +18,7 @@ COOKIES = [
 
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
 STOCKS_INTERVAL = 30 * 60
+JAIL_WAIT = 5 * 60  # 5 دقايق في السجن
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
@@ -30,6 +31,13 @@ def parse_cooldown(text):
     s = re.search(r'(\d+)\s*s', text)
     if s: t += int(s.group(1))
     return t
+
+def check_if_jailed(page):
+    """بترجع True لو إحنا في السجن"""
+    try:
+        return '/jail' in page.url.lower()
+    except:
+        return False
 
 # ═══════════════════════════════════════════════════════════════
 # 📈 بوت الأسهم
@@ -56,33 +64,57 @@ def run_stocks_bot():
                 except: pass
                 sleep(1500)
                 
+                # ✅ نشيك لو في السجن
+                if check_if_jailed(page):
+                    print(f"🚔 [الأسهم] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    time.sleep(JAIL_WAIT)
+                    continue
+                
                 print("\n🔴 [الأسهم] [1/2] بيع...")
-                page.evaluate("""() => {
-                    const btns = [...document.querySelectorAll('button')];
-                    for (let i = btns.length - 1; i >= 0; i--) {
-                        const t = (btns[i].textContent || '').trim();
-                        if (t === 'Sell All' && btns[i].offsetWidth > 0 && !btns[i].closest('tr')) {
-                            btns[i].click();
-                            return true;
-                        }
-                    }
-                    return false;
-                }""")
-                print("✅ [الأسهم] داس على Sell All")
-                sleep(3000)
                 try:
-                    cf = page.locator('button:has-text("SELL ALL")').last
-                    cf.wait_for(state="visible", timeout=10000)
-                    cf.click(force=True, timeout=10000)
-                    print("✅ [الأسهم] تم البيع!")
-                    sleep(7000)
+                    page.evaluate("""() => {
+                        const btns = [...document.querySelectorAll('button')];
+                        for (let i = btns.length - 1; i >= 0; i--) {
+                            const t = (btns[i].textContent || '').trim();
+                            if (t === 'Sell All' && btns[i].offsetWidth > 0 && !btns[i].closest('tr')) {
+                                btns[i].click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""")
+                    print("✅ [الأسهم] داس على Sell All")
+                    sleep(3000)
+                    try:
+                        cf = page.locator('button:has-text("SELL ALL")').last
+                        cf.wait_for(state="visible", timeout=10000)
+                        cf.click(force=True, timeout=10000)
+                        print("✅ [الأسهم] تم البيع!")
+                        sleep(7000)
+                    except Exception as e:
+                        print(f"⚠️ [الأسهم] مشكلة البيع: {e}")
                 except Exception as e:
-                    print(f"⚠️ [الأسهم] مشكلة البيع: {e}")
+                    err = str(e)
+                    if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                        print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى...")
+                        continue
+                
+                # ✅ نشيك تاني بعد البيع
+                if check_if_jailed(page):
+                    print(f"🚔 [الأسهم] دخلنا السجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
+                    time.sleep(JAIL_WAIT)
+                    continue
                 
                 print("\n🟢 [الأسهم] [2/2] شراء...")
                 bought_count = 0
                 for attempt in range(15):
                     try:
+                        # ✅ نشيك لو في السجن قبل كل محاولة
+                        if check_if_jailed(page):
+                            print(f"🚔 [الأسهم] دخلنا السجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
+                            time.sleep(JAIL_WAIT)
+                            break
+                        
                         found_green = False
                         rows = page.locator('tr')
                         for i in range(rows.count()):
@@ -113,6 +145,7 @@ def run_stocks_bot():
                         bought_count += 1
                         print(f"✅ [الأسهم] سهم أخضر {bought_count}")
                         sleep(3500)
+                        
                         try:
                             cf = page.locator('button:has-text("BUY MAX")').last
                             cf.wait_for(state="visible", timeout=10000)
@@ -123,13 +156,23 @@ def run_stocks_bot():
                             print(f"⚠️ [الأسهم] مشكلة: {e}")
                             break
                     except Exception as e:
+                        err = str(e)
+                        if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                            print("🚔 [الأسهم] الصفحة اتنقلت، هستنى...")
+                            break
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
                 
                 if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
                 print(f"📊 [الأسهم] خلصنا: {bought_count} سهم")
                 print("="*50 + "\n")
-            except Exception as e: print(f"⚠️ خطأ: {e}")
+            except Exception as e: 
+                err = str(e)
+                if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                    print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى ثانية...")
+                    sleep(3)
+                    continue
+                print(f"⚠️ خطأ: {e}")
             
             print(f"⏰ [الأسهم] هستنى 30 دقيقة...")
             time.sleep(STOCKS_INTERVAL)
@@ -154,6 +197,15 @@ def run_trade_bot():
 
         while True:
             try:
+                # ✅ أهم خطوة: نشيك لو في السجن الأول
+                if check_if_jailed(page):
+                    print(f"🚔 [التريد] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    time.sleep(JAIL_WAIT)
+                    try:
+                        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
+                    except: pass
+                    continue
+                
                 if 'travel' in page.url:
                     cooldown_text = page.evaluate("""() => {
                         let body = document.body.innerText;
@@ -215,28 +267,22 @@ def run_trade_bot():
                         g = page.locator("text='Grid View'").first
                         if g.count() > 0:
                             g.click(force=True)
-                            print("✅ [التريد] Grid View")
                             sleep(2000)
-                    except Exception as e:
-                        print(f"⚠️ [التريد] Grid View: {e}")
+                    except: pass
                     
                     try:
                         c = page.locator(f"text='{dc}'").first
                         if c.count() > 0:
                             c.click(force=True)
-                            print(f"✅ [التريد] كارت {dc}")
                             sleep(2000)
-                    except Exception as e:
-                        print(f"⚠️ [التريد] كارت المدينة: {e}")
+                    except: pass
                     
                     try:
                         t = page.locator("button:has-text('Travel to Selected Location')").first
                         if t.count() > 0:
                             t.click(force=True)
-                            print("✅ [التريد] Travel to Selected")
                             sleep(2500)
-                    except Exception as e:
-                        print(f"⚠️ [التريد] Travel Selected: {e}")
+                    except: pass
                     
                     try:
                         page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
@@ -245,8 +291,7 @@ def run_trade_bot():
                             tv.click(force=True)
                             print(f"🎉 [التريد] تم السفر إلى {dc}!")
                             sleep(7000)
-                    except Exception as e:
-                        print(f"⚠️ [التريد] تأكيد السفر: {e}")
+                    except: pass
                     
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     sleep(3000)
@@ -302,15 +347,15 @@ def run_trade_bot():
                 if state['loc'] == "San Francisco":
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] SF - بيع اللوحات")
-                        c = page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Stolen paintings')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Sell All'); if (b) { b.click(); return true; } } } return false; }""")
-                        if c:
+                        try:
+                            page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Stolen paintings')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Sell All'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            try:
-                                cf = page.locator('button:has-text("SELL ALL")').last
-                                cf.wait_for(state="visible", timeout=10000)
-                                cf.click(force=True)
-                                print("✅ [التريد] بيع اللوحات!")
-                            except: pass
+                            cf = page.locator('button:has-text("SELL ALL")').last
+                            cf.wait_for(state="visible", timeout=10000)
+                            cf.click(force=True)
+                            print("✅ [التريد] بيع اللوحات!")
+                        except Exception as e:
+                            print(f"⚠️ [التريد] {e}")
                         sleep(3000)
                         continue
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
@@ -320,30 +365,34 @@ def run_trade_bot():
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] SF - شراء بلاستيك")
-                        c = page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Plastic jewelry')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
-                        if c:
+                        try:
+                            page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Plastic jewelry')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            try:
-                                cf = page.locator('button:has-text("BUY MAX")').last
-                                cf.wait_for(state="visible", timeout=10000)
-                                cf.click(force=True)
-                                print("✅ [التريد] شراء بلاستيك!")
-                            except: pass
+                            cf = page.locator('button:has-text("BUY MAX")').last
+                            cf.wait_for(state="visible", timeout=10000)
+                            cf.click(force=True)
+                            print("✅ [التريد] شراء بلاستيك!")
+                        except Exception as e:
+                            print(f"⚠️ [التريد] {e}")
+                            # ✅ لو الشراء فشل، نشيك على السجن
+                            if check_if_jailed(page):
+                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
+                                time.sleep(JAIL_WAIT)
                         sleep(3000)
                         continue
 
                 elif state['loc'] == "St Louis":
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] STL - بيع البلاستيك")
-                        c = page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Plastic jewelry')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Sell All'); if (b) { b.click(); return true; } } } return false; }""")
-                        if c:
+                        try:
+                            page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Plastic jewelry')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Sell All'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            try:
-                                cf = page.locator('button:has-text("SELL ALL")').last
-                                cf.wait_for(state="visible", timeout=10000)
-                                cf.click(force=True)
-                                print("✅ [التريد] بيع البلاستيك!")
-                            except: pass
+                            cf = page.locator('button:has-text("SELL ALL")').last
+                            cf.wait_for(state="visible", timeout=10000)
+                            cf.click(force=True)
+                            print("✅ [التريد] بيع البلاستيك!")
+                        except Exception as e:
+                            print(f"⚠️ [التريد] {e}")
                         sleep(3000)
                         continue
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
@@ -353,15 +402,19 @@ def run_trade_bot():
                         continue
                     if state['hold'] == 0:
                         print("📍 [التريد] STL - شراء لوحات")
-                        c = page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Stolen paintings')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
-                        if c:
+                        try:
+                            page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Stolen paintings')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            try:
-                                cf = page.locator('button:has-text("BUY MAX")').last
-                                cf.wait_for(state="visible", timeout=10000)
-                                cf.click(force=True)
-                                print("✅ [التريد] شراء لوحات!")
-                            except: pass
+                            cf = page.locator('button:has-text("BUY MAX")').last
+                            cf.wait_for(state="visible", timeout=10000)
+                            cf.click(force=True)
+                            print("✅ [التريد] شراء لوحات!")
+                        except Exception as e:
+                            print(f"⚠️ [التريد] {e}")
+                            # ✅ لو الشراء فشل، نشيك على السجن
+                            if check_if_jailed(page):
+                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
+                                time.sleep(JAIL_WAIT)
                         sleep(3000)
                         continue
                 else:
@@ -370,6 +423,12 @@ def run_trade_bot():
                     sleep(3000)
                     continue
             except Exception as e:
+                err = str(e)
+                # ✅ لو الصفحة اتنقلت (غالباً للسجن)
+                if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                    print("🚔 [التريد] الصفحة اتنقلت (سجن محتمل)، هستنى وأشوف...")
+                    sleep(3)
+                    continue
                 print(f"⚠️ [التريد] خطأ: {e}")
                 sleep(15000)
             sleep(10000)
