@@ -1,5 +1,5 @@
 from playwright.sync_api import sync_playwright
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import re
 import threading
@@ -12,6 +12,20 @@ PASSWORD = "Gun@12345"
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
 # خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
 STOP_TIME = "03:00"  # 3 الفجر
+
+# ⏰ حساب الوقت المستهدف للـ STOP_TIME
+def calculate_stop_datetime():
+    if not STOP_TIME:
+        return None
+    now = datetime.now()
+    hour, minute = map(int, STOP_TIME.split(':'))
+    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # لو الوقت المستهدف عدى النهاردة → نخليه بكرة
+    if now >= target:
+        target += timedelta(days=1)
+    return target
+
+STOP_DATETIME = calculate_stop_datetime()
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
@@ -45,14 +59,11 @@ def check_if_jailed(page):
     except:
         return False
 
-# ⏰ دالة التحقق من وقت الإيقاف (بتوقيت مصر)
 def should_stop():
-    if not STOP_TIME:
+    if not STOP_DATETIME:
         return False
-    now = datetime.now().strftime("%H:%M")
-    return now >= STOP_TIME
+    return datetime.now() >= STOP_DATETIME
 
-# ⏰ دالة الإيقاف
 def stop_bot():
     print(f"\n🛑 وصلنا للوقت المحدد ({STOP_TIME}) - بيقفل البرنامج...")
     print("💤 هنام كويس، باي باي! 👋")
@@ -90,7 +101,10 @@ def run_stocks_bot():
                 
                 if check_if_jailed(page):
                     print(f"🚔 [الأسهم] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
-                    time.sleep(JAIL_WAIT)
+                    for _ in range(JAIL_WAIT // 60):
+                        time.sleep(60)
+                        if should_stop():
+                            stop_bot()
                     continue
                 
                 print("\n🔴 [الأسهم] [1/2] بيع...")
@@ -124,7 +138,10 @@ def run_stocks_bot():
                 
                 if check_if_jailed(page):
                     print(f"🚔 [الأسهم] دخلنا السجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
-                    time.sleep(JAIL_WAIT)
+                    for _ in range(JAIL_WAIT // 60):
+                        time.sleep(60)
+                        if should_stop():
+                            stop_bot()
                     continue
                 
                 print("\n🟢 [الأسهم] [2/2] شراء...")
@@ -136,7 +153,10 @@ def run_stocks_bot():
                         
                         if check_if_jailed(page):
                             print(f"🚔 [الأسهم] دخلنا السجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
-                            time.sleep(JAIL_WAIT)
+                            for _ in range(JAIL_WAIT // 60):
+                                time.sleep(60)
+                                if should_stop():
+                                    stop_bot()
                             break
                         
                         found_green = False
@@ -198,7 +218,6 @@ def run_stocks_bot():
                     continue
                 print(f"⚠️ خطأ: {e}")
             
-            # ✅ الانتظار 30 دقيقة مع فحص وقت الإيقاف كل دقيقة
             print(f"⏰ [الأسهم] هستنى 30 دقيقة...")
             for _ in range(30):
                 time.sleep(60)
@@ -230,7 +249,10 @@ def run_trade_bot():
                 
                 if check_if_jailed(page):
                     print(f"🚔 [التريد] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
-                    time.sleep(JAIL_WAIT)
+                    for _ in range(JAIL_WAIT // 60):
+                        time.sleep(60)
+                        if should_stop():
+                            stop_bot()
                     try:
                         page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     except: pass
@@ -258,7 +280,6 @@ def run_trade_bot():
                         if ws > 0:
                             ws += 10
                             print(f"⏳ [التريد] كولداون: {cooldown_text} - هستنى {ws} ث...")
-                            # ✅ نستنى مع فحص وقت الإيقاف كل ثانية
                             for _ in range(int(ws)):
                                 time.sleep(1)
                                 if should_stop():
@@ -409,7 +430,10 @@ def run_trade_bot():
                             print(f"⚠️ [التريد] {e}")
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
-                                time.sleep(JAIL_WAIT)
+                                for _ in range(JAIL_WAIT // 60):
+                                    time.sleep(60)
+                                    if should_stop():
+                                        stop_bot()
                         sleep(3000)
                         continue
 
@@ -445,7 +469,10 @@ def run_trade_bot():
                             print(f"⚠️ [التريد] {e}")
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
-                                time.sleep(JAIL_WAIT)
+                                for _ in range(JAIL_WAIT // 60):
+                                    time.sleep(60)
+                                    if should_stop():
+                                        stop_bot()
                         sleep(3000)
                         continue
                 else:
@@ -464,7 +491,10 @@ def run_trade_bot():
 
 if __name__ == "__main__":
     print("🚀🚀🚀 تشغيل بوتين (تريد + أسهم)...")
-    print(f"⏰ وقت الإيقاف: {STOP_TIME if STOP_TIME else 'بدون إيقاف'} (بتوقيت مصر)")
+    if STOP_DATETIME:
+        print(f"⏰ وقت الإيقاف: {STOP_DATETIME.strftime('%Y-%m-%d %H:%M')} (بتوقيت مصر)")
+    else:
+        print("⏰ بدون إيقاف")
     print("="*60)
     t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
