@@ -6,7 +6,7 @@ import sys
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
 # خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
-STOP_TIME = "02:39"  # 3 الفجر
+STOP_TIME = "03:00"  # 3 الفجر
 
 # ⏰ حساب الوقت المستهدف للـ STOP_TIME
 def calculate_stop_datetime():
@@ -15,7 +15,6 @@ def calculate_stop_datetime():
     now = datetime.now()
     hour, minute = map(int, STOP_TIME.split(':'))
     target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    # لو الوقت المستهدف عدى النهاردة → نخليه بكرة
     if now >= target:
         target += timedelta(days=1)
     return target
@@ -24,12 +23,13 @@ STOP_DATETIME = calculate_stop_datetime()
 
 COOKIES = [
     {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789511161$o11$g1$t1789511179$j42$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
+    {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789558989$o12$g1$t1789559027$j22$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
     {"name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d", "value": "eyJpdiI6IldLaFg3N0dYN2ZkbWZINjBkV2xjdXc9PSIsInZhbHVlIjoiN2hJMEJ6dnQrYUpJb3loQml2TWJ0eUU3dXl4TjNTUWpQNkYzbmVheG9EQ2JHQ2NEaXRaQW5SWjdmL2VKRllFRDlxaVprUGd6bU9pZy9zbEpqaTZLdUpnMHNDY2tCM2YrbkcrRzRwTkhtajNITGxxdkQ5QUhzcmRGUTYxL3lKNERRbTYxdXpnSmQ0N1VaSTU2N3ZOWGNJVEZVcEI2dVFqa3FwMmpzbVlsRDlZZGwxUElNNDZycmV2Z3pTSGpkcTdITkxkcWdmS0w5Rldvb09CUUxFSE9PTDdOaEVDNWc2d3hIODBOcFdNdmRXVT0iLCJtYWMiOiI4ZWVjNmMxMWZkMjQ3NjgwNjhmYTAzMDU2MzM1ODcwZWE2ZjAzY2ZiN2RlNDI4ODU4NzhkMThiNzU5NmRmZmZmIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
     {"name": "device_fp", "value": "00cad2c6896d259a5ecbceded5efe770bb8b3e5407d0d39f4e54990a5f3d9835", "domain": "project-dark.co.uk", "path": "/"},
     {"name": "_ga", "value": "GA1.1.1994605517.1787739453", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "project-dark-session", "value": "eyJpdiI6IkUySy9XdU1DUlAwVmtNZCt4R0IxYmc9PSIsInZhbHVlIjoiZ1BnamxYUDY2c3MwT0x3YnVnS1pkVW1tbzNoSVd6ZkVFa0Z3ck4wRVphV2hRdUtWL1g5bXB2YVVkNkJOdmtuenFFSXdoLzRRSFdHb1c0ZkxONmZpWXl2cVV0N0FZOTF0V2hmazlQUk5MOEFnbFhaaGpBbyt4WjNKM3I4UTlMMmYiLCJtYWMiOiJlMmJmNWY2MmMyNjRlMWI4NjhhYmMzZWNlODhiZjRhYmU0MmNjNTlhYmMzYjA1NjkyN2FhZjExNjg1NWNmOTg0IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "XSRF-TOKEN", "value": "eyJpdiI6IkhXeGhVVExPaGV5OHVmWFN1RGZXVUE9PSIsInZhbHVlIjoiSjR3cjNSQ1JzMGVZa0dSMHlPSG40RVBSRnA2VHJ1N0M1TzlIaWE4Z0EvNGM3TmtvbEhCV2w2cDVWRUxYekR2VUhubnlicVhoQzZrNkJvQ2JmY1FTb1BtcnNkVTQxWjlTQlBOTFRlWHBSUTZ4enZqQkpyUU1PTWxaNkI3RERXQjAiLCJtYWMiOiIxN2ZhNzgxZGJkOGE0YTg3MGYzOTQ4ODM1MTIxNTA4MDU5MmE1NTkzMjI2MTQ2NGExYmM0ZGUzNzAzMTAzYmJiIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
+    {"name": "pd_did", "value": "bf7b685500b8b651cae5e2927fa456a0", "domain": "project-dark.co.uk", "path": "/"},
+    {"name": "project-dark-session", "value": "eyJpdiI6Ikt5Ym9ycXVVVSt6dkFsWUk3M2cxVnc9PSIsInZhbHVlIjoieEhubFBkR0lxUzhMQVNVMWpvd1ZrdFFYU1JCODFhN2MvVjR6bTZaeXAvZ0pZcmdKcTk3RndpaUhmK0RoMTVsSFNlemNRTDlPREowRDVya1FhWUFRWFo0WkxIWEV5d2pzaVJUcTNzN0llWmNEd0lGbmF4TWZuWk9aTGloOWRWak4iLCJtYWMiOiJhNmNkZjRhZmFmNDNhMDY0YWQ0NWI2YzgxOWFlOWQzZDMwMTE1YTAzMGNlNWVmNThlMTEyZWJhMjY0ZWMzYWY2IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
+    {"name": "XSRF-TOKEN", "value": "eyJpdiI6Iit1K2tvMm9UWUE5cFFmblczZEpsVVE9PSIsInZhbHVlIjoiV2VZYUwrQy9Ya3pNVjBmbERkVGNMUmhFK0hzaXhyRmpWRmY4am9rUEZ1MnF2aWVQLzQwSmFPcncyd214dkJicXd5bFhjN3MvdUVtcklQOGxxeFN5NGN6a0t4VVVUMVl2WG5vMmMxckpZNUtLSkJnR0VzemhtVmc0dm82LytXUDIiLCJtYWMiOiI2MjhmZTIzMzY3ODAxOGIyNjJmNTQ1ODA4YzFhZTk0MjBkNTdkNzVjM2U1Zjk5MTVmNWZkNDlhYzUwYmQ1ZDM4IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
 ]
 
 def sleep(ms): time.sleep(ms / 1000.0)
