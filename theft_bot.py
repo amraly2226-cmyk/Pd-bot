@@ -5,10 +5,8 @@ import os
 import sys
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-# خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
-STOP_TIME = "05:00"  # 3 الفجر
+STOP_TIME = "03:00"
 
-# ⏰ حساب الوقت المستهدف للـ STOP_TIME
 def calculate_stop_datetime():
     if not STOP_TIME:
         return None
@@ -28,8 +26,8 @@ COOKIES = [
     {"name": "device_fp", "value": "00cad2c6896d259a5ecbceded5efe770bb8b3e5407d0d39f4e54990a5f3d9835", "domain": "project-dark.co.uk", "path": "/"},
     {"name": "_ga", "value": "GA1.1.1994605517.1787739453", "domain": ".project-dark.co.uk", "path": "/"},
     {"name": "pd_did", "value": "bf7b685500b8b651cae5e2927fa456a0", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "project-dark-session", "value": "eyJpdiI6Ikt5Ym9ycXVVVSt6dkFsWUk3M2cxVnc9PSIsInZhbHVlIjoieEhubFBkR0lxUzhMQVNVMWpvd1ZrdFFYU1JCODFhN2MvVjR6bTZaeXAvZ0pZcmdKcTk3RndpaUhmK0RoMTVsSFNlemNRTDlPREowRDVya1FhWUFRWFo0WkxIWEV5d2pzaVJUcTNzN0llWmNEd0lGbmF4TWZuWk9aTGloOWRWak4iLCJtYWMiOiJhNmNkZjRhZmFmNDNhMDY0YWQ0NWI2YzgxOWFlOWQzZDMwMTE1YTAzMGNlNWVmNThlMTEyZWJhMjY0ZWMzYWY2IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "XSRF-TOKEN", "value": "eyJpdiI6Iit1K2tvMm9UWUE5cFFmblczZEpsVVE9PSIsInZhbHVlIjoiV2VZYUwrQy9Ya3pNVjBmbERkVGNMUmhFK0hzaXhyRmpWRmY4am9rUEZ1MnF2aWVQLzQwSmFPcncyd214dkJicXd5bFhjN3MvdUVtcklQOGxxeFN5NGN6a0t4VVVUMVl2WG5vMmMxckpZNUtLSkJnR0VzemhtVmc0dm82LytXUDIiLCJtYWMiOiI2MjhmZTIzMzY3ODAxOGIyNjJmNTQ1ODA4YzFhZTk0MjBkNTdkNzVjM2U1Zjk5MTVmNWZkNDlhYzUwYmQ1ZDM4IiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
+    {"name": "project-dark-session", "value": "eyJpdiI6IitSbWQvWEJyRkRENE90ZmhkU0kxQ3c9PSIsInZhbHVlIjoiNnV3UG1ncmVmQTZGVHBFYWxlOFFMa2o0Zm4yV1dpbjhhVkx6U0ExdW1yb1ZsM2tTZ1dMRFUrdjEzazY5SnhaUzdadFgveG5kb3RPQzhTbUU1Y2g2SUtOb01nOEFzNnlrSElIN1llaHdvNGRJSWloMmtPOW0wZGpkMzVDcjFQeVAiLCJtYWMiOiJlZGMzNWI2NjEyMjcxZTIyZjYyYTdiN2Q0ZGVlOGYyYTVlODgzMjJhMTlkYzIwZjZkZGUzMDFhOTI0Yzg1N2JhIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
+    {"name": "XSRF-TOKEN", "value": "eyJpdiI6ImgrSm9FWm80azN3WUhmUTBHVjA5YUE9PSIsInZhbHVlIjoiRzg0NkMvZFplUDl5dWZEbHF6L094eVdGSFNqLzJMVzN1NjM1WlNYTU9mME5vNHp4YjdpR3VwTFVNNVIwMm9uQnZZbm5zWDlpdzVIQzlQL3NmRUpnSU8wM2lubCtMK1BjYzIzSkE3ZTkrSXhvbUYrNWUwZmY5SXF0dUFpWStHTmkiLCJtYWMiOiIzYzViZDlhYWI3ZTkwOTI0OTRjNjYwNWIwOGU3ZGI2ZjgzYzE2OTU5Y2JkZDlmN2IzMGVkMTRjNTU0NGU2ODFkIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
 ]
 
 def sleep(ms): time.sleep(ms / 1000.0)
