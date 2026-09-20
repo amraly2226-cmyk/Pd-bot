@@ -10,7 +10,7 @@ USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-STOP_TIME = "06:00"
+STOP_TIME = "03:00"
 
 def calculate_stop_datetime():
     if not STOP_TIME:
@@ -214,3 +214,13 @@ def run_stocks_bot():
                     print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى ثانية...")
                     sleep(3)
                     continue
+                print(f"⚠️ خطأ: {e}")
+            
+            print(f"⏰ [الأسهم] هستنى 30 دقيقة...")
+            for _ in range(30):
+                time.sleep(60)
+                if should_stop():
+                    stop_bot()
+
+
+#
