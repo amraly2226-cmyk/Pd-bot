@@ -142,4 +142,75 @@ def run_stocks_bot():
                             stop_bot()
                     continue
                 
-                print("\n
+                print("\n🟢 [الأسهم] [2/2] شراء...")
+                bought_count = 0
+                for attempt in range(15):
+                    try:
+                        if should_stop():
+                            stop_bot()
+                        
+                        if check_if_jailed(page):
+                            print(f"🚔 [الأسهم] دخلنا السجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
+                            for _ in range(JAIL_WAIT // 60):
+                                time.sleep(60)
+                                if should_stop():
+                                    stop_bot()
+                            break
+                        
+                        found_green = False
+                        rows = page.locator('tr')
+                        for i in range(rows.count()):
+                            try:
+                                row = rows.nth(i)
+                                row_text = row.inner_text()
+                                if ('↑' in row_text or '▲' in row_text):
+                                    c = page.evaluate("""(idx) => {
+                                        const rows = [...document.querySelectorAll('tr')];
+                                        const row = rows[idx];
+                                        if (!row) return false;
+                                        const btns = [...row.querySelectorAll('button')];
+                                        for (let b of btns) {
+                                            if ((b.textContent || '').trim() === 'Max Buy') {
+                                                b.click();
+                                                return true;
+                                            }
+                                        }
+                                        return false;
+                                    }""", i)
+                                    if c:
+                                        found_green = True
+                                        break
+                            except: continue
+                        
+                        if not found_green: break
+                        
+                        bought_count += 1
+                        print(f"✅ [الأسهم] سهم أخضر {bought_count}")
+                        sleep(3500)
+                        
+                        try:
+                            cf = page.locator('button:has-text("BUY MAX")').last
+                            cf.wait_for(state="visible", timeout=10000)
+                            cf.click(force=True, timeout=10000)
+                            print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
+                            sleep(5000)
+                        except Exception as e:
+                            print(f"⚠️ [الأسهم] مشكلة: {e}")
+                            break
+                    except Exception as e:
+                        err = str(e)
+                        if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                            print("🚔 [الأسهم] الصفحة اتنقلت، هستنى...")
+                            break
+                        print(f"⚠️ [الأسهم] مشكلة: {e}")
+                        break
+                
+                if bought_count == 0: print("ℹ️ [الأسهم] مفيش أسهم خضراء")
+                print(f"📊 [الأسهم] خلصنا: {bought_count} سهم")
+                print("="*50 + "\n")
+            except Exception as e: 
+                err = str(e)
+                if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                    print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى ثانية...")
+                    sleep(3)
+                    continue
