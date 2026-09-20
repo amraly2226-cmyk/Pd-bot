@@ -10,10 +10,8 @@ USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-# خليها "" لو عايز البوت يشتغل للأبد بدون إيقاف
-STOP_TIME = "05:00"  # 3 الفجر
+STOP_TIME = "03:00"
 
-# ⏰ حساب الوقت المستهدف للـ STOP_TIME
 def calculate_stop_datetime():
     if not STOP_TIME:
         return None
@@ -310,6 +308,7 @@ def run_trade_bot():
                     }""")
                     
                     if not cc:
+                        print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                         page.goto('https://project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(5000)
                         continue
@@ -321,22 +320,28 @@ def run_trade_bot():
                         g = page.locator("text='Grid View'").first
                         if g.count() > 0:
                             g.click(force=True)
+                            print("✅ [التريد] Grid View")
                             sleep(2000)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ Grid View: {e}")
                     
                     try:
                         c = page.locator(f"text='{dc}'").first
                         if c.count() > 0:
                             c.click(force=True)
+                            print(f"✅ [التريد] كارت {dc}")
                             sleep(2000)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ كارت المدينة: {e}")
                     
                     try:
                         t = page.locator("button:has-text('Travel to Selected Location')").first
                         if t.count() > 0:
                             t.click(force=True)
+                            print("✅ [التريد] Travel to Selected")
                             sleep(2500)
-                    except: pass
+                    except Exception as e:
+                        print(f"⚠️ Travel Selected: {e}")
                     
                     try:
                         page.wait_for_selector("button:has-text('TRAVEL')", timeout=10000)
@@ -345,7 +350,10 @@ def run_trade_bot():
                             tv.click(force=True)
                             print(f"🎉 [التريد] تم السفر إلى {dc}!")
                             sleep(7000)
-                    except: pass
+                        else:
+                            print("⚠️ مش لاقي زر TRAVEL")
+                    except Exception as e:
+                        print(f"⚠️ تأكيد السفر: {e}")
                     
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     sleep(3000)
@@ -476,6 +484,7 @@ def run_trade_bot():
                         sleep(3000)
                         continue
                 else:
+                    print("⚠️ [التريد] مش لاقي المدينة، refresh...")
                     page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
                     sleep(3000)
                     continue
