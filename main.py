@@ -10,7 +10,7 @@ USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-STOP_TIME = "03:00"
+STOP_TIME = "06:00"
 
 def calculate_stop_datetime():
     if not STOP_TIME:
