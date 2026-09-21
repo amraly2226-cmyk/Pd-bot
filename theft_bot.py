@@ -5,7 +5,7 @@ import os
 import sys
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-STOP_TIME = "01:00"
+STOP_TIME = "02:30"
 
 def calculate_stop_datetime():
     if not STOP_TIME:
