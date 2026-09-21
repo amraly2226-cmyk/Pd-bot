@@ -6,6 +6,9 @@ import threading
 import os
 import sys
 
+USERNAME = "amr.aly.2226@gmail.com"
+PASSWORD = "Gun@12345"
+
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
 STOP_TIME = "03:00"
 
@@ -99,7 +102,6 @@ COOKIES = [
 ITEMS = ["Anabolic steroid","Artifacts","Alcohol","Electronics","Plastic jewelry","Stolen paintings","Human beings","Confidential documents","Endangered exotic animals","Organs"]
 STOCKS_INTERVAL = 30 * 60
 JAIL_WAIT = 5 * 60
-TRADE_ACTION_INTERVAL = 30 * 60   # 30 دقيقة الفاصل الثابت بعد كل حركة
 
 def sleep(ms): time.sleep(ms / 1000.0)
 
@@ -147,6 +149,7 @@ def run_stocks_bot():
         time.sleep(5)
 
         def quiet_wait(seconds, reason=""):
+            """ينتظر بدون أي نشاط على اللعبة"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -298,6 +301,7 @@ def run_trade_bot():
         page.set_default_timeout(15000)
 
         def quiet_wait(seconds, reason=""):
+            """ينتظر بدون أي نشاط على اللعبة"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -309,61 +313,6 @@ def run_trade_bot():
                 if should_stop():
                     stop_bot()
 
-        def read_travel_cooldown():
-            try:
-                cd_text = page.evaluate("""() => {
-                    let body = document.body.innerText;
-                    let m = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i);
-                    return m ? m[1].trim() : null;
-                }""")
-                return cd_text
-            except:
-                return None
-
-        def wait_trade_interval_or_go():
-            """
-            1) يستنى 30 دقيقة في about:blank
-            2) يقرا كولداون السفر
-            3) لو 0 → يرجع على طول للسفر
-            4) لو > 0 → يستنى الكولداون بالظبط وبعدين يرجع
-            """
-            # 1) 30 دقيقة الأولى
-            print(f"⏳ [التريد] هستنى 30 دقيقة الأولى (الفاصل الثابت)...")
-            try: page.goto('about:blank')
-            except: pass
-            for _ in range(TRADE_ACTION_INTERVAL):
-                time.sleep(1)
-                if should_stop():
-                    stop_bot()
-
-            # 2) نرجع نقرا الكولداون من صفحة اللعبة
-            try:
-                page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=30000)
-            except: pass
-            sleep(2000)
-
-            cd_text = read_travel_cooldown()
-            cd_sec = parse_cooldown(cd_text) if cd_text else 0
-
-            if cd_sec == 0:
-                print("✅ [التريد] كولداون السفر خلص — نسافر على طول! ✈️")
-                return
-
-            # 3) نستنى الكولداون المتبقي بالظبط
-            print(f"⏳ [التريد] كولداون السفر: {cd_text} — هستنى {int(cd_sec)} ث وبعدين نسافر...")
-            try: page.goto('about:blank')
-            except: pass
-            for _ in range(int(cd_sec)):
-                time.sleep(1)
-                if should_stop():
-                    stop_bot()
-
-            # 4) نرجع للعبة
-            try:
-                page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=30000)
-            except: pass
-            sleep(2000)
-
         try:
             page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=60000)
             print("✅ [التريد] دخلنا")
@@ -374,24 +323,36 @@ def run_trade_bot():
                 if should_stop():
                     stop_bot()
 
-                # لو الصفحة مش على اللعبة، نرجع لصفحة البلاك ماركت
-                if 'project-dark.co.uk' not in page.url:
-                    try:
-                        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=30000)
-                    except: pass
-                    sleep(2000)
-
                 if check_if_jailed(page):
                     print(f"🚔 [التريد] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     quiet_wait(JAIL_WAIT, "سجن")
+                    try:
+                        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
+                    except: pass
                     continue
 
                 # ─── صفحة السفر ───
                 if 'travel' in page.url:
-                    cooldown_text = read_travel_cooldown()
+                    cooldown_text = page.evaluate("""() => {
+                        let body = document.body.innerText;
+                        let cdMatch = body.match(/You cannot travel for:?\\s*([^\\n]+)/i);
+                        if (cdMatch) {
+                            let str = cdMatch[1].trim();
+                            if (str.includes('00:00') || str.includes('0m') || str.includes('0s')) {
+                                if (!/(\\d+[hms])/.test(str)) return null;
+                                if (str.match(/(\\d+)\\s*h/) && parseInt(str.match(/(\\d+)\\s*h/)[1]) > 0) return str;
+                                if (str.match(/(\\d+)\\s*m/) && parseInt(str.match(/(\\d+)\\s*m/)[1]) > 0) return str;
+                                if (str.match(/(\\d+)\\s*s/) && parseInt(str.match(/(\\d+)\\s*s/)[1]) > 0) return str;
+                                return null;
+                            }
+                            return str;
+                        }
+                        return null;
+                    }""")
                     if cooldown_text:
                         ws = parse_cooldown(cooldown_text)
                         if ws > 0:
+                            ws += 10
                             quiet_wait(ws, f"كولداون سفر: {cooldown_text}")
                             print("✅ [التريد] الكولداون خلص — راجع لصفحة السفر...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
@@ -519,7 +480,7 @@ def run_trade_bot():
                             print("✅ [التريد] بيع اللوحات!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                        wait_trade_interval_or_go()
+                        quiet_wait(30 * 60, "بعد بيع اللوحات")
                         continue
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
                         print("📍 [التريد] SF -> STL (سفر)")
@@ -540,7 +501,7 @@ def run_trade_bot():
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 quiet_wait(JAIL_WAIT, "سجن")
-                        wait_trade_interval_or_go()
+                        quiet_wait(30 * 60, "بعد شراء البلاستيك")
                         continue
 
                 elif state['loc'] == "St Louis":
@@ -555,7 +516,7 @@ def run_trade_bot():
                             print("✅ [التريد] بيع البلاستيك!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                        wait_trade_interval_or_go()
+                        quiet_wait(30 * 60, "بعد بيع البلاستيك")
                         continue
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] STL -> SF (سفر)")
@@ -576,7 +537,7 @@ def run_trade_bot():
                             if check_if_jailed(page):
                                 print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 quiet_wait(JAIL_WAIT, "سجن")
-                        wait_trade_interval_or_go()
+                        quiet_wait(30 * 60, "بعد شراء اللوحات")
                         continue
                 else:
                     quiet_wait(60, "مش لاقي المكان")
@@ -593,7 +554,7 @@ def run_trade_bot():
 
 
 if __name__ == "__main__":
-    print("🚀🚀🚀 تشغيل سكريبت نمبر ثري (تريد + أسهم)...")
+    print("🚀🚀🚀 تشغيل سكريبت نمبر وان...")
     if STOP_DATETIME:
         print(f"⏰ وقت الإيقاف: {STOP_DATETIME.strftime('%Y-%m-%d %H:%M')} (بتوقيت مصر)")
     else:
