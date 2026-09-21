@@ -2,7 +2,6 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
 import time
 import re
-import threading
 import os
 import sys
 
@@ -138,7 +137,6 @@ def stop_bot():
 # ═══════════════════════════════════════════════════════════════
 
 def do_stocks_cycle(page, quiet_wait):
-    """يعمل دورة أسهم كاملة (بيع كل + شراء الأخضر) على الصفحة الممررة"""
     print("\n" + "="*50)
     print("📈 [الأسهم] بدأت الدورة (بعد السفر)...")
     print("="*50)
@@ -241,7 +239,8 @@ def do_stocks_cycle(page, quiet_wait):
                     print(f"✅ [الأسهم] تم شراء السهم {bought_count}")
                     sleep(5000)
                 except Exception as e:
-                    print(f"⚠️ [الأسهم] مشكلة: {e}")
+                    # ⚠️ لو مفيش فلوس، ده عادي — نكمل
+                    print(f"ℹ️ [الأسهم] مفيش تأكيد (يمكن مفيش فلوس)")
                     break
             except Exception as e:
                 err = str(e)
@@ -265,7 +264,7 @@ def do_stocks_cycle(page, quiet_wait):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (مع الأسهم بعد السفر)
+# 🌐 بوت التريد
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -278,7 +277,6 @@ def run_trade_bot():
         page.set_default_timeout(15000)
 
         def quiet_wait(seconds, reason=""):
-            """✅ يروح صفحة blank فورًا ويستنى بدون أي نشاط"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -292,7 +290,6 @@ def run_trade_bot():
                     stop_bot()
 
         def read_cooldown_from_page():
-            """يقرا كولداون السفر من الصفحة الحالية"""
             try:
                 cd_text = page.evaluate("""() => {
                     let body = document.body.innerText;
@@ -303,21 +300,25 @@ def run_trade_bot():
             except:
                 return None
 
-        def wait_cooldown_on_blank(where=""):
+        def go_to_travel_now(where=""):
             """
-            ✅ يقرا الكولداون من الصفحة الحالية، وبعدين:
-            - لو 0 → يرجع فورًا (بدون انتظار)
-            - لو > 0 → يروح لصفحة blank فورًا، يستنى لحد ما الكولداون يخلص، وبعدين يرجع
+            ✅ بعد أي حركة ناجحة → يروح لصفحة السفر مباشرة
+            - يقرا كولداون السفر
+            - لو 0 → يكمل عادي (هيسافر)
+            - لو > 0 → يروح blank ويستنى لحد ما يخلص
             """
             cd_text = read_cooldown_from_page()
             cd_sec = parse_cooldown(cd_text) if cd_text else 0
 
-            if cd_sec == 0:
-                print(f"✅ [التريد] كولداون السفر = 0 {where} — نروح على طول! ✈️")
-                return
+            if cd_sec > 0:
+                print(f"⏳ [التريد] كولداون السفر = {cd_text} {where} — هستنى على blank...")
+                quiet_wait(cd_sec + 3, f"كولداون {cd_text}")
 
-            print(f"⏳ [التريد] كولداون السفر = {cd_text} {where} — نروح blank ونستنى...")
-            quiet_wait(cd_sec + 3, f"كولداون {cd_text}")
+            # ✅ يروح لصفحة السفر مباشرة
+            try:
+                page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded', timeout=30000)
+            except: pass
+            sleep(3000)
 
         try:
             page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=60000)
@@ -358,7 +359,6 @@ def run_trade_bot():
                     if cooldown_text:
                         ws = parse_cooldown(cooldown_text)
                         if ws > 0:
-                            # ✅ يروح blank فورًا ويستنى لحد ما الكولداون يخلص
                             quiet_wait(ws + 5, f"كولداون السفر: {cooldown_text}")
                             print("✅ [التريد] العداد خلص، راجع...")
                             page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
@@ -424,7 +424,6 @@ def run_trade_bot():
                             travel_done = True
                     except: pass
 
-                    # ✅ بعد السفر → دورة أسهم واحدة
                     if travel_done:
                         do_stocks_cycle(page, quiet_wait)
 
@@ -433,47 +432,59 @@ def run_trade_bot():
                     continue
 
                 # ─── صفحة البلاك ماركت ───
-                state = page.evaluate("""(items) => {
-                    let body = document.body.innerText;
-                    let loc = null, cd = null, hold = 0, held = null;
-                    let lines = body.split('\\n');
-                    for (let i = 0; i < lines.length; i++) {
-                        if (lines[i].trim().toUpperCase() === 'LOCATION') {
-                            for (let j = i + 1; j < lines.length; j++) {
-                                if (lines[j].trim()) {
-                                    if (lines[j].includes('San Francisco')) loc = 'San Francisco';
-                                    else if (lines[j].includes('St Louis')) loc = 'St Louis';
-                                    break;
-                                }
-                            }
-                            break;
-                        }
-                    }
-                    if (!loc) {
-                        if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
-                        else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
-                    }
-                    let m = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i);
-                    if (m) cd = m[1];
-                    let rows = [...document.querySelectorAll('tr')];
-                    for (let r of rows) {
-                        let t = r.innerText;
-                        if (t.includes('Sell') && !t.includes('Confirm')) {
-                            for (let it of items) {
-                                if (t.toLowerCase().includes(it.toLowerCase())) {
-                                    let cells = [...r.querySelectorAll('td')];
-                                    if (cells.length >= 3) {
-                                        let mt = cells[2].innerText.match(/(\\d+)/);
-                                        if (mt && +mt[1] > 0) { held = it; hold = +mt[1]; break; }
+                try:
+                    state = page.evaluate("""(items) => {
+                        let body = document.body.innerText;
+                        let loc = null, cd = null, hold = 0, held = null;
+                        let lines = body.split('\\n');
+                        for (let i = 0; i < lines.length; i++) {
+                            if (lines[i].trim().toUpperCase() === 'LOCATION') {
+                                for (let j = i + 1; j < lines.length; j++) {
+                                    if (lines[j].trim()) {
+                                        if (lines[j].includes('San Francisco')) loc = 'San Francisco';
+                                        else if (lines[j].includes('St Louis')) loc = 'St Louis';
+                                        break;
                                     }
-                                    break;
+                                }
+                                break;
+                            }
+                        }
+                        if (!loc) {
+                            if (body.includes('Black Market - San Francisco')) loc = 'San Francisco';
+                            else if (body.includes('Black Market - St Louis')) loc = 'St Louis';
+                        }
+                        let m = body.match(/You cannot travel for:?\\s*([0-9hms ]+)/i);
+                        if (m) cd = m[1];
+                        let rows = [...document.querySelectorAll('tr')];
+                        for (let r of rows) {
+                            let t = r.innerText;
+                            if (t.includes('Sell') && !t.includes('Confirm')) {
+                                for (let it of items) {
+                                    if (t.toLowerCase().includes(it.toLowerCase())) {
+                                        let cells = [...r.querySelectorAll('td')];
+                                        if (cells.length >= 3) {
+                                            let mt = cells[2].innerText.match(/(\\d+)/);
+                                            if (mt && +mt[1] > 0) { held = it; hold = +mt[1]; break; }
+                                        }
+                                        break;
+                                    }
                                 }
                             }
                         }
-                    }
-                    if (held === null) { let m2 = body.match(/holding (\\d+) items/i); hold = m2 ? +m2[1] : 0; }
-                    return { loc, cd, hold, held };
-                }""", ITEMS)
+                        if (held === null) { let m2 = body.match(/holding (\\d+) items/i); hold = m2 ? +m2[1] : 0; }
+                        return { loc, cd, hold, held };
+                    }""", ITEMS)
+                except Exception as e:
+                    err = str(e)
+                    if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                        # ✅ الصفحة اتنقلت (لعبة عملت redirect) → نروح للبلاك ماركت ونعيد
+                        print("🔄 [التريد] الصفحة اتنقلت، راجع للبلاك ماركت...")
+                        try:
+                            page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
+                        except: pass
+                        sleep(3000)
+                        continue
+                    raise
 
                 if state['cd']:
                     print(f"⏳ [التريد] كولداون سوق")
@@ -491,12 +502,16 @@ def run_trade_bot():
                             cf.click(force=True)
                             print("✅ [التريد] بيع اللوحات!")
                         except Exception as e:
-                            print(f"⚠️ [التريد] {e}")
-                        # ✅ يقرا الكولداون ويروح blank فورًا لو فيه كولداون
-                        wait_cooldown_on_blank("(بعد بيع اللوحات)")
+                            err = str(e)
+                            if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                                print("🔄 [التريد] الصفحة اتنقلت بعد البيع")
+                            else:
+                                print(f"⚠️ [التريد] {e}")
+                        # ✅ يروح مباشرة لصفحة السفر
+                        go_to_travel_now("(بعد بيع اللوحات)")
                         continue
                     if state['held'] == "Plastic jewelry" and state['hold'] > 0:
-                        print("📍 [التريد] SF -> STL (سفر)")
+                        print("📍 [التريد] SF -> STL")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(4000)
                         continue
@@ -505,16 +520,24 @@ def run_trade_bot():
                         try:
                             page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Plastic jewelry')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            cf = page.locator('button:has-text("BUY MAX")').last
-                            cf.wait_for(state="visible", timeout=10000)
-                            cf.click(force=True)
-                            print("✅ [التريد] شراء بلاستيك!")
+                            try:
+                                cf = page.locator('button:has-text("BUY MAX")').last
+                                cf.wait_for(state="visible", timeout=10000)
+                                cf.click(force=True)
+                                print("✅ [التريد] شراء بلاستيك!")
+                            except:
+                                print("ℹ️ [التريد] مفيش تأكيد الشراء (يمكن مفيش فلوس)")
                         except Exception as e:
-                            print(f"⚠️ [التريد] {e}")
-                            if check_if_jailed(page):
-                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
-                                quiet_wait(JAIL_WAIT, "سجن")
-                        wait_cooldown_on_blank("(بعد شراء البلاستيك)")
+                            err = str(e)
+                            if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                                print("🔄 [التريد] الصفحة اتنقلت بعد الشراء")
+                            else:
+                                print(f"⚠️ [التريد] {e}")
+                        if check_if_jailed(page):
+                            print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
+                            quiet_wait(JAIL_WAIT, "سجن")
+                        # ✅ يروح مباشرة لصفحة السفر
+                        go_to_travel_now("(بعد شراء البلاستيك)")
                         continue
 
                 elif state['loc'] == "St Louis":
@@ -528,11 +551,15 @@ def run_trade_bot():
                             cf.click(force=True)
                             print("✅ [التريد] بيع البلاستيك!")
                         except Exception as e:
-                            print(f"⚠️ [التريد] {e}")
-                        wait_cooldown_on_blank("(بعد بيع البلاستيك)")
+                            err = str(e)
+                            if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                                print("🔄 [التريد] الصفحة اتنقلت بعد البيع")
+                            else:
+                                print(f"⚠️ [التريد] {e}")
+                        go_to_travel_now("(بعد بيع البلاستيك)")
                         continue
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
-                        print("📍 [التريد] STL -> SF (سفر)")
+                        print("📍 [التريد] STL -> SF")
                         page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
                         sleep(4000)
                         continue
@@ -541,16 +568,23 @@ def run_trade_bot():
                         try:
                             page.evaluate("""() => { let rs = [...document.querySelectorAll('tr')]; for (let r of rs) { if (r.innerText.includes('Stolen paintings')) { let b = [...r.querySelectorAll('button')].find(x => x.innerText.trim() === 'Max Buy'); if (b) { b.click(); return true; } } } return false; }""")
                             sleep(3000)
-                            cf = page.locator('button:has-text("BUY MAX")').last
-                            cf.wait_for(state="visible", timeout=10000)
-                            cf.click(force=True)
-                            print("✅ [التريد] شراء لوحات!")
+                            try:
+                                cf = page.locator('button:has-text("BUY MAX")').last
+                                cf.wait_for(state="visible", timeout=10000)
+                                cf.click(force=True)
+                                print("✅ [التريد] شراء لوحات!")
+                            except:
+                                print("ℹ️ [التريد] مفيش تأكيد الشراء (يمكن مفيش فلوس)")
                         except Exception as e:
-                            print(f"⚠️ [التريد] {e}")
-                            if check_if_jailed(page):
-                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
-                                quiet_wait(JAIL_WAIT, "سجن")
-                        wait_cooldown_on_blank("(بعد شراء اللوحات)")
+                            err = str(e)
+                            if 'Execution context was destroyed' in err or 'navigation' in err.lower():
+                                print("🔄 [التريد] الصفحة اتنقلت بعد الشراء")
+                            else:
+                                print(f"⚠️ [التريد] {e}")
+                        if check_if_jailed(page):
+                            print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
+                            quiet_wait(JAIL_WAIT, "سجن")
+                        go_to_travel_now("(بعد شراء اللوحات)")
                         continue
                 else:
                     quiet_wait(60, "مش لاقي المكان")
@@ -558,7 +592,10 @@ def run_trade_bot():
             except Exception as e:
                 err = str(e)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [التريد] الصفحة اتنقلت (سجن محتمل)، هستنى...")
+                    print("🔄 [التريد] الصفحة اتنقلت، راجع للبلاك ماركت...")
+                    try:
+                        page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded')
+                    except: pass
                     sleep(3)
                     continue
                 print(f"⚠️ [التريد] خطأ: {e}")
@@ -576,6 +613,4 @@ if __name__ == "__main__":
     else:
         print("⏰ بدون إيقاف")
     print("="*60)
-
-    # ✅ بوت واحد بس — التريد (الأسهم جواه بعد السفر)
     run_trade_bot()
