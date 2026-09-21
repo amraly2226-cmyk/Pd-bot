@@ -263,7 +263,7 @@ def do_stocks_cycle(page, quiet_wait):
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🌐 بوت التريد (الأصلي + الكولداون على blank + أسهم بعد السفر)
+# 🌐 بوت التريد
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
@@ -276,6 +276,7 @@ def run_trade_bot():
         page.set_default_timeout(15000)
 
         def quiet_wait(seconds, reason=""):
+            """ينتظر على about:blank مع keep-alive كل 20 ثانية"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -283,10 +284,22 @@ def run_trade_bot():
                 mins = int(seconds // 60)
                 secs = int(seconds % 60)
                 print(f"⏳ [التريد] {reason} — هستنى {mins}د {secs}ث على صفحة فاضية...")
-            for _ in range(int(seconds)):
+
+            elapsed = 0
+            last_ping = 0
+            while elapsed < int(seconds):
                 time.sleep(1)
+                elapsed += 1
                 if should_stop():
                     stop_bot()
+                # ✅ keep-alive كل 20 ثانية
+                if elapsed - last_ping >= 20:
+                    try:
+                        page.evaluate("1 + 1")
+                        last_ping = elapsed
+                    except Exception as e:
+                        print(f"⚠️ [keep-alive]: {e}")
+                        last_ping = elapsed
 
         try:
             page.goto('https://www.project-dark.co.uk/blackmarket', wait_until='domcontentloaded', timeout=60000)
@@ -328,10 +341,12 @@ def run_trade_bot():
                         ws = parse_cooldown(cooldown_text)
                         if ws > 0:
                             ws += 10
-                            # ✅ quiet_wait بدل sleep
                             quiet_wait(ws, f"كولداون سفر: {cooldown_text}")
                             print("✅ [التريد] العداد خلص، راجع لصفحة السفر...")
-                            page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded')
+                            try:
+                                page.goto('https://www.project-dark.co.uk/travel', wait_until='domcontentloaded', timeout=30000)
+                            except Exception as e:
+                                print(f"⚠️ [التريد] مشكلة الرجوع: {e}")
                             sleep(5000)
                             continue
 
@@ -394,7 +409,6 @@ def run_trade_bot():
                             travel_done = True
                     except: pass
 
-                    # ✅ بعد السفر: دورة أسهم واحدة
                     if travel_done:
                         do_stocks_cycle(page, quiet_wait)
 
@@ -450,7 +464,6 @@ def run_trade_bot():
                     quiet_wait(60, "كولداون سوق")
                     continue
 
-                # ✅ نفس منطق الأصلي بالظبط — بعد كل حركة sleep(3000) + continue
                 if state['loc'] == "San Francisco":
                     if state['held'] == "Stolen paintings" and state['hold'] > 0:
                         print("📍 [التريد] SF - بيع اللوحات")
