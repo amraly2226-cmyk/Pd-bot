@@ -5,6 +5,13 @@ import re
 import multiprocessing
 import os
 import sys
+import traceback
+
+# ✅ إصلاح multiprocessing على Termux/Android
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass
 
 USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
@@ -552,7 +559,28 @@ def run_trade_bot():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 🚀 التشغيل
+# 🚀 Wrappers (عشان لو حصل خطأ يظهر السبب)
+# ═══════════════════════════════════════════════════════════════
+
+def _wrap_trade():
+    try:
+        run_trade_bot()
+    except Exception as e:
+        print(f"\n❌ [TradeBot] مات فجأة: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+
+def _wrap_stocks():
+    try:
+        run_stocks_bot()
+    except Exception as e:
+        print(f"\n❌ [StocksBot] مات فجأة: {e}")
+        traceback.print_exc()
+        sys.stdout.flush()
+
+
+# ═══════════════════════════════════════════════════════════════
+# 🎯 التشغيل
 # ═══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
@@ -563,8 +591,8 @@ if __name__ == "__main__":
         print("⏰ بدون إيقاف")
     print("="*60)
 
-    p1 = multiprocessing.Process(target=run_trade_bot, name="TradeBot")
-    p2 = multiprocessing.Process(target=run_stocks_bot, name="StocksBot")
+    p1 = multiprocessing.Process(target=_wrap_trade, name="TradeBot")
+    p2 = multiprocessing.Process(target=_wrap_stocks, name="StocksBot")
     p1.start()
     p2.start()
 
