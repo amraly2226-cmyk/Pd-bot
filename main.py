@@ -2,7 +2,7 @@ from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
 import time
 import re
-import threading
+import multiprocessing
 import os
 import sys
 
@@ -149,7 +149,6 @@ def run_stocks_bot():
         time.sleep(5)
 
         def quiet_wait(seconds, reason=""):
-            """ينتظر بدون أي نشاط على اللعبة"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -301,7 +300,6 @@ def run_trade_bot():
         page.set_default_timeout(15000)
 
         def quiet_wait(seconds, reason=""):
-            """ينتظر بدون أي نشاط على اللعبة"""
             try:
                 page.goto('about:blank')
             except: pass
@@ -553,6 +551,10 @@ def run_trade_bot():
                 quiet_wait(15, "خطأ مؤقت")
 
 
+# ═══════════════════════════════════════════════════════════════
+# 🚀 التشغيل
+# ═══════════════════════════════════════════════════════════════
+
 if __name__ == "__main__":
     print("🚀🚀🚀 تشغيل سكريبت نمبر وان...")
     if STOP_DATETIME:
@@ -560,12 +562,23 @@ if __name__ == "__main__":
     else:
         print("⏰ بدون إيقاف")
     print("="*60)
-    t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
-    t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
-    t1.start(); t2.start()
-    print("✅ التريد:", t1.name)
-    print("✅ الأسهم:", t2.name)
+
+    p1 = multiprocessing.Process(target=run_trade_bot, name="TradeBot")
+    p2 = multiprocessing.Process(target=run_stocks_bot, name="StocksBot")
+    p1.start()
+    p2.start()
+
+    print(f"✅ التريد: PID {p1.pid}")
+    print(f"✅ الأسهم: PID {p2.pid}")
     print("="*60)
+
     try:
-        while True: time.sleep(60)
-    except KeyboardInterrupt: print("\n🛑 إيقاف.")
+        p1.join()
+        p2.join()
+    except KeyboardInterrupt:
+        print("\n🛑 إيقاف...")
+        p1.terminate()
+        p2.terminate()
+        p1.join()
+        p2.join()
+        print("👋 تم إيقاف الكل.")
