@@ -5,7 +5,7 @@ import os
 import sys
 
 # ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
-STOP_TIME = "02:30"
+STOP_TIME = "03:00"
 
 def calculate_stop_datetime():
     if not STOP_TIME:
@@ -19,15 +19,87 @@ def calculate_stop_datetime():
 
 STOP_DATETIME = calculate_stop_datetime()
 
+# ✅ سطر الحماية من الكشف
+STEALTH_SCRIPT = """
+    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+    Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
+    Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+    window.chrome = { runtime: {} };
+"""
+
 COOKIES = [
-    {"name": "device_fp_d", "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "_ga_JNKJRQ925S", "value": "GS2.1.s1789558989$o12$g1$t1789559027$j22$l0$h0", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d", "value": "eyJpdiI6IldLaFg3N0dYN2ZkbWZINjBkV2xjdXc9PSIsInZhbHVlIjoiN2hJMEJ6dnQrYUpJb3loQml2TWJ0eUU3dXl4TjNTUWpQNkYzbmVheG9EQ2JHQ2NEaXRaQW5SWjdmL2VKRllFRDlxaVprUGd6bU9pZy9zbEpqaTZLdUpnMHNDY2tCM2YrbkcrRzRwTkhtajNITGxxdkQ5QUhzcmRGUTYxL3lKNERRbTYxdXpnSmQ0N1VaSTU2N3ZOWGNJVEZVcEI2dVFqa3FwMmpzbVlsRDlZZGwxUElNNDZycmV2Z3pTSGpkcTdITkxkcWdmS0w5Rldvb09CUUxFSE9PTDdOaEVDNWc2d3hIODBOcFdNdmRXVT0iLCJtYWMiOiI4ZWVjNmMxMWZkMjQ3NjgwNjhmYTAzMDU2MzM1ODcwZWE2ZjAzY2ZiN2RlNDI4ODU4NzhkMThiNzU5NmRmZmZmIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "device_fp", "value": "00cad2c6896d259a5ecbceded5efe770bb8b3e5407d0d39f4e54990a5f3d9835", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "_ga", "value": "GA1.1.1994605517.1787739453", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "pd_did", "value": "bf7b685500b8b651cae5e2927fa456a0", "domain": "project-dark.co.uk", "path": "/"},
-    {"name": "project-dark-session", "value": "eyJpdiI6IitSbWQvWEJyRkRENE90ZmhkU0kxQ3c9PSIsInZhbHVlIjoiNnV3UG1ncmVmQTZGVHBFYWxlOFFMa2o0Zm4yV1dpbjhhVkx6U0ExdW1yb1ZsM2tTZ1dMRFUrdjEzazY5SnhaUzdadFgveG5kb3RPQzhTbUU1Y2g2SUtOb01nOEFzNnlrSElIN1llaHdvNGRJSWloMmtPOW0wZGpkMzVDcjFQeVAiLCJtYWMiOiJlZGMzNWI2NjEyMjcxZTIyZjYyYTdiN2Q0ZGVlOGYyYTVlODgzMjJhMTlkYzIwZjZkZGUzMDFhOTI0Yzg1N2JhIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"},
-    {"name": "XSRF-TOKEN", "value": "eyJpdiI6ImgrSm9FWm80azN3WUhmUTBHVjA5YUE9PSIsInZhbHVlIjoiRzg0NkMvZFplUDl5dWZEbHF6L094eVdGSFNqLzJMVzN1NjM1WlNYTU9mME5vNHp4YjdpR3VwTFVNNVIwMm9uQnZZbm5zWDlpdzVIQzlQL3NmRUpnSU8wM2lubCtMK1BjYzIzSkE3ZTkrSXhvbUYrNWUwZmY5SXF0dUFpWStHTmkiLCJtYWMiOiIzYzViZDlhYWI3ZTkwOTI0OTRjNjYwNWIwOGU3ZGI2ZjgzYzE2OTU5Y2JkZDlmN2IzMGVkMTRjNTU0NGU2ODFkIiwidGFnIjoiIn0%3D", "domain": ".project-dark.co.uk", "path": "/"}
+    {
+        "name": "device_fp_d",
+        "value": "%7B%22lang%22%3A%22en-US%22%2C%22plat%22%3A%22Linux%20armv81%22%2C%22cores%22%3A8%2C%22mem%22%3Anull%2C%22screen%22%3A%22414x920x24%22%2C%22avail%22%3A%22414x920%22%2C%22tzoff%22%3A-180%2C%22tz%22%3A%22Africa%2FCairo%22%2C%22touch%22%3A1%2C%22mtp%22%3A5%2C%22canvas%22%3A%22ed1357802482%22%7D",
+        "domain": "project-dark.co.uk",
+        "path": "/",
+        "secure": False,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "_ga_JNKJRQ925S",
+        "value": "GS2.1.s1789558989$o12$g1$t1789559027$j22$l0$h0",
+        "domain": ".project-dark.co.uk",
+        "path": "/",
+        "secure": False,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "remember_web_59ba36addc2b2f9401580f014c7f58ea4e30989d",
+        "value": "eyJpdiI6IldLaFg3N0dYN2ZkbWZINjBkV2xjdXc9PSIsInZhbHVlIjoiN2hJMEJ6dnQrYUpJb3loQml2TWJ0eUU3dXl4TjNTUWpQNkYzbmVheG9EQ2JHQ2NEaXRaQW5SWjdmL2VKRllFRDlxaVprUGd6bU9pZy9zbEpqaTZLdUpnMHNDY2tCM2YrbkcrRzRwTkhtajNITGxxdkQ5QUhzcmRGUTYxL3lKNERRbTYxdXpnSmQ0N1VaSTU2N3ZOWGNJVEZVcEI2dVFqa3FwMmpzbVlsRDlZZGwxUElNNDZycmV2Z3pTSGpkcTdITkxkcWdmS0w5Rldvb09CUUxFSE9PTDdOaEVDNWc2d3hIODBOcFdNdmRXVT0iLCJtYWMiOiI4ZWVjNmMxMWZkMjQ3NjgwNjhmYTAzMDU2MzM1ODcwZWE2ZjAzY2ZiN2RlNDI4ODU4NzhkMThiNzU5NmRmZmZmIiwidGFnIjoiIn0%3D",
+        "domain": ".project-dark.co.uk",
+        "path": "/",
+        "secure": True,
+        "httpOnly": True,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "device_fp",
+        "value": "00cad2c6896d259a5ecbceded5efe770bb8b3e5407d0d39f4e54990a5f3d9835",
+        "domain": "project-dark.co.uk",
+        "path": "/",
+        "secure": False,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "_ga",
+        "value": "GA1.1.1994605517.1787739453",
+        "domain": ".project-dark.co.uk",
+        "path": "/",
+        "secure": False,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "pd_did",
+        "value": "bf7b685500b8b651cae5e2927fa456a0",
+        "domain": "project-dark.co.uk",
+        "path": "/",
+        "secure": False,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "project-dark-session",
+        "value": "eyJpdiI6IjVXTGdQM2VMRi9qRmVCdno1M0pvMVE9PSIsInZhbHVlIjoiSkU2NXVxTEJQSEI1ekNnZ2V5Y1hIclhRNUdsR25Gd09Id1ZaS2ZWeWhSUENEeC9NQm10MFhmWGlWb2hLYTVmNkpLRkVMZHlZbW80ZWlDZ1A5cS9HNktDOVRnaTF5YldZektFUnlvRjh6cTFDM3lLelc4Y0V3WTFPMERNUVBrRjMiLCJtYWMiOiIyZDc2ODU4ZThiMjMxZDNkMjA0NTUxOGRjZDFmMzlhNDE1NmY0ZTM2NTA2NDYzZjE5Nzc3NmE5MTM5ZDJlYWEzIiwidGFnIjoiIn0%3D",
+        "domain": ".project-dark.co.uk",
+        "path": "/",
+        "secure": True,
+        "httpOnly": True,
+        "sameSite": "Lax",
+    },
+    {
+        "name": "XSRF-TOKEN",
+        "value": "eyJpdiI6InhOYy9ZcDhPc0ZEYTZqVG16WGtVN3c9PSIsInZhbHVlIjoidVJ6S1RxTlFOMFBxRkNoS1loSGlhOEQvek1EcDVnTVI5Z0NhRDNTeVphNHhLU0ZzTXZKZ3ZVaTlrK3RGSjZqTERqVEFFUmEyU2Erd0lrT2ViUndERFE1OGwvYUxvSGZIVXcwT1JHVWFYVW5TVVZINkdja0FLQ2hkRTJuVFZZMXkiLCJtYWMiOiI2NWFiZDg1N2U5MzgzZGU1Njg1NTUwMGY0MGI1MzFlNzZlM2M3NWEwNzM3OWNmMDA4M2I4MGQ2ZDY4ZTMyNzNiIiwidGFnIjoiIn0%3D",
+        "domain": ".project-dark.co.uk",
+        "path": "/",
+        "secure": True,
+        "httpOnly": False,
+        "sameSite": "Lax",
+    },
 ]
 
 def sleep(ms): time.sleep(ms / 1000.0)
@@ -58,17 +130,18 @@ def run_session():
     SESSION_MAX = 90 * 60
     JAIL_WAIT = 5 * 60
     session_start = time.time()
-    
+
     print("🚗 [Theft] جلسة جديدة بدأت...")
-    
+
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
+        context.add_init_script(STEALTH_SCRIPT)   # ✅ الحماية
         context.add_cookies(COOKIES)
         page = context.new_page()
         page.set_default_timeout(15000)
         time.sleep(5)
-        
+
         try:
             page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
             print("✅ [Theft] دخلنا الصفحة")
@@ -77,23 +150,23 @@ def run_session():
             try: browser.close()
             except: pass
             return
-        
+
         last_clicked_col = ""
         last_click_time = 0
-        
+
         while True:
             try:
                 if should_stop():
                     stop_bot()
-                
+
                 if time.time() - session_start >= SESSION_MAX:
                     print("🔄 [Theft] عدت 90 دقيقة - هعمل restart للمتصفح...")
                     try: browser.close()
                     except: pass
                     return
-                
+
                 if check_if_jailed(page):
-                    print(f"🚔 [Theft] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [Theft] سجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
                         if should_stop():
@@ -105,7 +178,7 @@ def run_session():
                         print(f"⚠️ [Theft] مشكلة الرجوع: {e}")
                     sleep(3)
                     continue
-                
+
                 if '/theft' not in page.url:
                     print(f"⚠️ [Theft] الصفحة اتغيرت لـ {page.url}، هرجع لصفحة السرقة...")
                     try:
@@ -113,7 +186,7 @@ def run_session():
                     except: pass
                     sleep(3)
                     continue
-                
+
                 try:
                     data = page.evaluate("""() => {
                         const btns = [...document.querySelectorAll('button.theft-steal-btn')].map((b, i) => {
@@ -128,7 +201,7 @@ def run_session():
                                 visible: b.offsetWidth > 0 && b.offsetHeight > 0
                             };
                         }).filter(b => b.visible);
-                        
+
                         const readies = [];
                         const seen = new Set();
                         document.querySelectorAll('*').forEach(el => {
@@ -144,7 +217,7 @@ def run_session():
                                 }
                             }
                         });
-                        
+
                         return {btns, readies};
                     }""")
                 except Exception as eval_err:
@@ -155,14 +228,14 @@ def run_session():
                         continue
                     else:
                         raise eval_err
-                
+
                 steal_btns = data['btns']
                 readies = data['readies']
-                
+
                 if len(steal_btns) == 0 or len(readies) == 0:
                     time.sleep(3)
                     continue
-                
+
                 all_sorted = sorted(steal_btns, key=lambda b: (b['cx'], b['top']))
                 columns = []
                 current = [all_sorted[0]]
@@ -173,33 +246,33 @@ def run_session():
                         columns.append(current)
                         current = [all_sorted[i]]
                 columns.append(current)
-                
+
                 col_names = ['Cars', 'Bikes', 'Vans']
                 clicked_any = False
-                
+
                 for ready in readies:
                     col_btns = [b for b in steal_btns if abs(b['cx'] - ready['x']) < 100]
                     if not col_btns:
                         continue
-                    
+
                     col_btns.sort(key=lambda b: b['top'])
                     bottom_btn = col_btns[-1]
-                    
+
                     if not (bottom_btn['isSuccess'] and not bottom_btn['disabled']):
                         continue
-                    
+
                     col_idx = 0
                     for ci, col in enumerate(columns):
                         if bottom_btn in col:
                             col_idx = ci
                             break
                     col_name = col_names[col_idx] if col_idx < len(col_names) else f'Col{col_idx+1}'
-                    
+
                     if col_name == last_clicked_col and (time.time() - last_click_time) < 15:
                         continue
-                    
+
                     print(f"🎯 [Theft] {col_name} جاهز - بدوس على آخر زر Steal...")
-                    
+
                     success = False
                     try:
                         loc = page.locator('button.theft-steal-btn').nth(bottom_btn['idx'])
@@ -209,7 +282,7 @@ def run_session():
                         print(f"✅ [Theft] Playwright click - {col_name}")
                         success = True
                     except: pass
-                    
+
                     if not success:
                         try:
                             loc = page.locator('button.theft-steal-btn').nth(bottom_btn['idx'])
@@ -217,7 +290,7 @@ def run_session():
                             print(f"✅ [Theft] Playwright force - {col_name}")
                             success = True
                         except: pass
-                    
+
                     if not success:
                         try:
                             page.mouse.move(bottom_btn['cx'], bottom_btn['cy'])
@@ -226,7 +299,7 @@ def run_session():
                             print(f"✅ [Theft] mouse.click - {col_name}")
                             success = True
                         except: pass
-                    
+
                     if success:
                         clicked_any = True
                         last_clicked_col = col_name
@@ -240,24 +313,24 @@ def run_session():
                         except: pass
                         sleep(3)
                         break
-                
+
                 if not clicked_any:
                     time.sleep(3)
-                
+
             except Exception as e:
                 err_str = str(e)
                 if 'Execution context was destroyed' in err_str or 'navigation' in err_str.lower():
                     print("🚔 [Theft] الصفحة اتنقلت، هستنى 3 ثواني...")
                     sleep(3)
                     continue
-                
+
                 print(f"⚠️ [Theft] مشكلة مؤقتة: {e}")
                 time.sleep(3)
                 try:
                     if '/theft' not in page.url:
                         page.goto('https://project-dark.co.uk/theft', wait_until='domcontentloaded', timeout=60000)
                 except: pass
-        
+
         try: browser.close()
         except: pass
 
