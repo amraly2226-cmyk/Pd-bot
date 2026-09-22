@@ -24,12 +24,9 @@ def calculate_stop_datetime():
 
 STOP_DATETIME = calculate_stop_datetime()
 
-# ✅ سطر الحماية من الكشف
+# ✅ الحماية البسيطة — سطر واحد بس
 STEALTH_SCRIPT = """
-    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-    Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
-    Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
-    window.chrome = { runtime: {} };
+    Object.defineProperty(navigator, 'webdriver', {get: () => undefined, configurable: true});
 """
 
 COOKIES = [
@@ -151,7 +148,7 @@ def run_stocks_bot():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
-        context.add_init_script(STEALTH_SCRIPT)   # ✅ الحماية
+        context.add_init_script(STEALTH_SCRIPT)
         context.add_cookies(COOKIES)
         page = context.new_page()
         page.set_default_timeout(15000)
@@ -172,7 +169,7 @@ def run_stocks_bot():
                 sleep(1500)
 
                 if check_if_jailed(page):
-                    print(f"🚔 [الأسهم] سجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [الأسهم] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
                         if should_stop():
@@ -205,11 +202,11 @@ def run_stocks_bot():
                 except Exception as e:
                     err = str(e)
                     if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                        print("🚔 [الأسهم] الصفحة اتنقلت، هستنى...")
+                        print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى...")
                         continue
 
                 if check_if_jailed(page):
-                    print(f"🚔 [الأسهم] سجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [الأسهم] دخلنا السجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
                         if should_stop():
@@ -224,7 +221,7 @@ def run_stocks_bot():
                             stop_bot()
 
                         if check_if_jailed(page):
-                            print(f"🚔 [الأسهم] سجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
+                            print(f"🚔 [الأسهم] دخلنا السجن أثناء الشراء! هستنى {JAIL_WAIT // 60} دقايق...")
                             for _ in range(JAIL_WAIT // 60):
                                 time.sleep(60)
                                 if should_stop():
@@ -285,7 +282,7 @@ def run_stocks_bot():
             except Exception as e:
                 err = str(e)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [الأسهم] الصفحة اتنقلت، هستنى ثانية...")
+                    print("🚔 [الأسهم] الصفحة اتنقلت (سجن)، هستنى ثانية...")
                     sleep(3)
                     continue
                 print(f"⚠️ خطأ: {e}")
@@ -306,7 +303,7 @@ def run_trade_bot():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'])
         context = browser.new_context(user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36", viewport={"width": 1920, "height": 1080})
-        context.add_init_script(STEALTH_SCRIPT)   # ✅ الحماية
+        context.add_init_script(STEALTH_SCRIPT)
         context.add_cookies(COOKIES)
         page = context.new_page()
         page.set_default_timeout(15000)
@@ -321,7 +318,7 @@ def run_trade_bot():
                     stop_bot()
 
                 if check_if_jailed(page):
-                    print(f"🚔 [التريد] سجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [التريد] إحنا في السجن! هستنى {JAIL_WAIT // 60} دقايق...")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
                         if should_stop():
@@ -502,7 +499,7 @@ def run_trade_bot():
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
                             if check_if_jailed(page):
-                                print("🚔 [التريد] سجن أثناء الشراء!")
+                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 for _ in range(JAIL_WAIT // 60):
                                     time.sleep(60)
                                     if should_stop():
@@ -541,7 +538,7 @@ def run_trade_bot():
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
                             if check_if_jailed(page):
-                                print("🚔 [التريد] سجن أثناء الشراء!")
+                                print("🚔 [التريد] دخلنا السجن أثناء الشراء!")
                                 for _ in range(JAIL_WAIT // 60):
                                     time.sleep(60)
                                     if should_stop():
@@ -555,7 +552,7 @@ def run_trade_bot():
             except Exception as e:
                 err = str(e)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [التريد] الصفحة اتنقلت، هستنى...")
+                    print("🚔 [التريد] الصفحة اتنقلت (سجن محتمل)، هستنى...")
                     sleep(3)
                     continue
                 print(f"⚠️ [التريد] خطأ: {e}")
