@@ -1,5 +1,6 @@
 from playwright.sync_api import sync_playwright
 from datetime import datetime, timedelta
+from PIL import Image, ImageOps, ImageFilter
 import time
 import re
 import threading
@@ -9,7 +10,6 @@ import io
 import random
 import base64
 import requests
-from PIL import Image
 import pytesseract
 
 USERNAME = "amr.aly.2226@gmail.com"
@@ -79,15 +79,11 @@ def human_sleep(min_sec=2.0, max_sec=5.0):
 
 
 def human_click(page, locator, timeout=5000):
-    """كليك حقيقي بمحاولات متعددة"""
-    # المحاولة 1: كليك مباشر (أسرع)
     try:
         locator.click(timeout=timeout, force=True)
         return True
     except:
         pass
-
-    # المحاولة 2: كليك بمحرك الماوس
     try:
         box = locator.bounding_box(timeout=2000)
         if box and box['width'] > 0:
@@ -101,14 +97,11 @@ def human_click(page, locator, timeout=5000):
             return True
     except:
         pass
-
-    # المحاولة 3: كليك بـ JavaScript
     try:
         locator.evaluate("el => el.click()")
         return True
     except:
         pass
-
     return False
 
 
@@ -296,6 +289,138 @@ def detect_captcha(page):
         return False
 
 
+def build_instruction_patterns():
+    """
+    ترتيب التعليمات بالأهمية:
+    - الأكثر تحديدًا الأول
+    - العام آخر
+    """
+    return [
+        r'type\s+only\s+the\s+letters',
+        r'type\s+only\s+the\s+numbers',
+        r'type\s+the\s+letters\s+only',
+        r'type\s+the\s+numbers\s+only',
+        r'only\s+the\s+letters',
+        r'only\s+the\s+numbers',
+        r'letters\s+only',
+        r'numbers\s+only',
+        r'type\s+the\s+letters',
+        r'type\s+the\s+numbers',
+        r'type\s+it\s+backwards',
+        r'type\s+backwards',
+        r'reverse',
+        r'type\s+the\s+characters',
+        r'type\s+the\s+code',
+        r'enter\s+the\s+code',
+        r'type\s+what\s+you\s+see',
+    ]
+
+
+def parse_instruction(instruction):
+    """يفهم نوع الكابتشا من النص"""
+    ins = instruction.lower()
+
+    # فحص "letters only" — لاحظ إن ممكن تكون "letters only" أو "only letters"
+    wants_letters_only = (
+        ('letter' in ins) and ('only' in ins)
+    ) or ('letters only' in ins) or ('only letters' in ins) or ('only the letters' in ins)
+
+    wants_numbers_only = (
+        ('number' in ins) and ('only' in ins)
+    ) or ('numbers only' in ins) or ('only numbers' in ins) or ('only the numbers' in ins)
+
+    wants_reverse = ('backward' in ins) or ('reverse' in ins)
+
+    return wants_letters_only, wants_numbers_only, wants_reverse
+
+
+def preprocess_images(img_bytes):
+    """
+    يرجع ليستة (اسم, صورة) بمعالجات مختلفة
+    عشان نجرب كل واحدة في OCR
+    """
+    result = []
+    try:
+        img = Image.open(io.BytesIO(img_bytes))
+
+        # 1. مكبرة عادي (RGB)
+        big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
+        result.append(('resized', big))
+
+        # 2. Grayscale مع autocontrast
+        try:
+            gray = big.convert('L')
+            gray = ImageOps.autocontrast(gray, cutoff=2)
+            result.append(('gray_auto', gray))
+
+            # 3. Thresholds مختلفة
+            for t in [80, 100, 120, 140, 160, 180, 200]:
+                bw = gray.point(lambda p, th=t: 255 if p > th else 0)
+                result.append((f'bw_{t}', bw))
+
+            # 4. عكسي
+            inv = gray.point(lambda p: 0 if p > 130 else 255)
+            result.append(('inv', inv))
+
+            # 5. threshold معتدل بعد blur
+            blurred = gray.filter(ImageFilter.MedianFilter(size=3))
+            bw2 = blurred.point(lambda p: 255 if p > 130 else 0)
+            result.append(('bw_blur', bw2))
+        except Exception as e:
+            print(f"⚠️ [preprocess gray] {e}")
+
+        # 6. كل channel من RGB
+        try:
+            r, g, b = big.split()
+            result.append(('r', ImageOps.autocontrast(r)))
+            result.append(('g', ImageOps.autocontrast(g)))
+            result.append(('b', ImageOps.autocontrast(b)))
+        except Exception as e:
+            print(f"⚠️ [preprocess rgb] {e}")
+
+        # 7. HSV - Value channel (بيخلي الحروف الملونة بيضاء)
+        try:
+            hsv = big.convert('HSV')
+            h, s, v = hsv.split()
+            v = ImageOps.autocontrast(v, cutoff=3)
+            result.append(('hsv_v', v))
+            bw_v = v.point(lambda p: 255 if p > 160 else 0)
+            result.append(('hsv_v_bw', bw_v))
+        except Exception as e:
+            print(f"⚠️ [preprocess hsv] {e}")
+
+    except Exception as e:
+        print(f"⚠️ [preprocess] {e}")
+
+    return result
+
+
+def run_ocr_on_images(images):
+    """
+    يجرب OCR على كل صورة بـ configs مختلفة
+    """
+    configs = [
+        '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        '--psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+        '--psm 7',
+        '--psm 8',
+    ]
+
+    results = []
+    for name, img in images:
+        for cfg in configs:
+            try:
+                r = pytesseract.image_to_string(img, config=cfg).strip()
+                r = r.replace(' ', '').replace('\n', '').replace('\t', '')
+                r = ''.join(c for c in r if c.isalnum())
+                if r and len(r) >= 2:
+                    results.append((name, cfg.split()[1] if len(cfg.split()) > 1 else '', r))
+            except:
+                continue
+    return results
+
+
 def solve_captcha(page):
     print("🚨 [كابتشا] ظهرت — بدور على الحل...")
 
@@ -303,44 +428,36 @@ def solve_captcha(page):
     img_bytes = None
 
     try:
+        # ─── 1. نقرا التعليمات ───
         try:
-            instruction = page.evaluate("""() => {
-                let body = document.body.innerText.toLowerCase();
-                const patterns = [
-                    /type\\s+what\\s+you\\s+see/,
-                    /type\\s+only\\s+the\\s+letters/,
-                    /type\\s+only\\s+the\\s+numbers/,
-                    /type\\s+the\\s+letters/,
-                    /type\\s+the\\s+numbers/,
-                    /type\\s+letters\\s+only/,
-                    /type\\s+numbers\\s+only/,
-                    /letters\\s+only/,
-                    /numbers\\s+only/,
-                    /type\\s+it\\s+backwards/,
-                    /type\\s+backwards/,
-                ];
-                for (let p of patterns) {
-                    let m = body.match(p);
-                    if (m) return m[0];
-                }
-                return 'type what you see';
-            }""")
-        except:
-            pass
+            page_text = page.evaluate("() => document.body.innerText")
+            if page_text:
+                text_lower = page_text.lower()
+                for pattern in build_instruction_patterns():
+                    m = re.search(pattern, text_lower)
+                    if m:
+                        instruction = m.group(0)
+                        break
+        except Exception as e:
+            print(f"⚠️ [كابتشا] قراءة التعليمات: {e}")
 
         print(f"📋 [كابتشا] التعليمات: '{instruction}'")
 
+        wants_letters, wants_numbers, wants_reverse = parse_instruction(instruction)
+        print(f"🔧 [كابتشا] تحليل: letters_only={wants_letters} | numbers_only={wants_numbers} | reverse={wants_reverse}")
+
+        # ─── 2. صورة الكابتشا ───
         try:
             img_element = page.locator('img').first
             if img_element.count() > 0:
                 try:
-                    img_element.scroll_into_view_if_needed(timeout=3000)
+                    img_element.scroll_into_view_if_needed(timeout=2000)
                 except:
                     pass
-                time.sleep(1)
+                time.sleep(0.5)
                 try:
-                    img_bytes = img_element.screenshot(timeout=5000)
-                    print("📸 [كابتشا] خدنا صورة العنصر")
+                    img_bytes = img_element.screenshot(timeout=4000)
+                    print("📸 [كابتشا] صورة العنصر")
                 except:
                     pass
         except:
@@ -349,7 +466,7 @@ def solve_captcha(page):
         if not img_bytes:
             try:
                 img_bytes = page.screenshot(full_page=False)
-                print("📸 [كابتشا] خدنا صورة الصفحة")
+                print("📸 [كابتشا] صورة الصفحة")
             except:
                 pass
 
@@ -367,132 +484,76 @@ def solve_captcha(page):
                 }""")
                 if b64:
                     img_bytes = base64.b64decode(b64)
-                    print("📸 [كابتشا] خدنا صورة canvas")
+                    print("📸 [كابتشا] صورة canvas")
             except Exception as e:
-                print(f"⚠️ [كابتشا] canvas فشل: {e}")
+                print(f"⚠️ [كابتشا] canvas: {e}")
 
         if not img_bytes:
             notify_discord(
-                f"🚨 **كابتشا** — مش قادر أاخد صورة\\n"
-                f"📋 التعليمات: `{instruction}`\\n"
+                f"🚨 **كابتشا** — مش قادر أاخد صورة\n"
+                f"📋 التعليمات: `{instruction}`\n"
                 f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها"
             )
             stop_bot("كابتشا — مفيش صورة")
 
-        def try_ocr(img_obj, configs):
-            best = ""
-            for cfg in configs:
-                try:
-                    r = pytesseract.image_to_string(img_obj, config=cfg).strip()
-                    r = r.replace(' ', '').replace('\\n', '').replace('\\t', '')
-                    r = ''.join(c for c in r if c.isalnum())
-                    if len(r) > len(best):
-                        best = r
-                except:
-                    pass
-            return best
+        # ─── 3. معالجة الصورة + OCR ───
+        images = preprocess_images(img_bytes)
+        print(f"🖼️ [كابتشا] عدد الصور المعالجة: {len(images)}")
 
-        configs = [
-            '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            '--psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
-            '--psm 7',
-            '--psm 8',
-        ]
+        all_results = run_ocr_on_images(images)
 
-        all_results = []
+        # نطبع أفضل 5 نتائج
+        unique_results = {}
+        for name, cfg, text in all_results:
+            if text not in unique_results or len(text) > len(unique_results[text]):
+                unique_results[text] = name
 
-        try:
-            img = Image.open(io.BytesIO(img_bytes))
-            img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
-            r = try_ocr(img_big, configs)
-            if r:
-                all_results.append(r)
-                print(f"🔍 [كابتشا] try 1: '{r}'")
-        except:
-            pass
+        print(f"🤖 [كابتشا] نتائج OCR ({len(unique_results)}):")
+        for text, source in sorted(unique_results.items(), key=lambda x: -len(x[0]))[:8]:
+            print(f"   - [{source}] '{text}'")
 
-        try:
-            img = Image.open(io.BytesIO(img_bytes)).convert('L')
-            img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
-            img_bw = img_big.point(lambda p: 255 if p > 100 else 0)
-            r = try_ocr(img_bw, configs)
-            if r:
-                all_results.append(r)
-                print(f"🔍 [كابتشا] try 2: '{r}'")
-
-            img_inv = img_big.point(lambda p: 0 if p > 100 else 255)
-            r = try_ocr(img_inv, configs)
-            if r:
-                all_results.append(r)
-                print(f"🔍 [كابتشا] try 3: '{r}'")
-        except:
-            pass
-
-        for thr in [80, 120, 140, 160]:
-            try:
-                img = Image.open(io.BytesIO(img_bytes)).convert('L')
-                img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
-                img_bw = img_big.point(lambda p, t=thr: 255 if p > t else 0)
-                r = try_ocr(img_bw, configs)
-                if r:
-                    all_results.append(r)
-                    print(f"🔍 [كابتشا] thr {thr}: '{r}'")
-            except:
-                pass
-
-        if not all_results:
+        # ─── 4. نختار الأفضل ───
+        if not unique_results:
             text = ""
         else:
-            filtered = [r for r in all_results if len(r) >= 3]
-            if filtered:
-                text = max(filtered, key=len)
+            # نفلتر اللي طوله >= 3
+            candidates = [t for t in unique_results.keys() if len(t) >= 3]
+            if candidates:
+                text = max(candidates, key=len)
             else:
-                text = max(all_results, key=len)
+                text = max(unique_results.keys(), key=len)
 
-        print(f"🤖 [كابتشا] كل المحاولات: {all_results}")
-        print(f"🤖 [كابتشا] أفضل: '{text}'")
+        print(f"🤖 [كابتشا] الأفضل خام: '{text}'")
 
-        if len(text) < 3:
-            notify_discord(
-                f"🚨 **كابتشا** — OCR مش قادر يقرا\\n"
-                f"📋 التعليمات: `{instruction}`\\n"
-                f"🔍 قرا: `{text}`\\n"
-                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها",
-                img_bytes
-            )
-            stop_bot("كابتشا — OCR فشل")
-
+        # ─── 5. نطبق التعليمات ───
         original = text
-        wants_letters_only = ('letter' in instruction) and ('only' in instruction)
-        wants_numbers_only = ('number' in instruction) and ('only' in instruction)
-        wants_letters = ('letter' in instruction) and not wants_numbers_only
-        wants_numbers = ('number' in instruction) and not wants_letters_only
-        wants_reverse = ('backward' in instruction) or ('reverse' in instruction)
-
-        if wants_letters_only or wants_letters:
+        if wants_letters:
             text = ''.join(c for c in text if c.isalpha())
-        elif wants_numbers_only or wants_numbers:
+        elif wants_numbers:
             text = ''.join(c for c in text if c.isdigit())
 
         if wants_reverse:
             text = text[::-1]
 
+        print(f"📝 [كابتشا] بعد الفلترة: '{text}'")
+
         if len(text) < 2:
             notify_discord(
-                f"🚨 **كابتشا** — بعد الفلترة قصيرة\\n"
-                f"📋 التعليمات: `{instruction}`\\n"
-                f"🔍 OCR: `{original}`\\n"
-                f"🛑 **البوت بيتوقف**",
+                f"🚨 **كابتشا** — OCR فشل\n"
+                f"📋 التعليمات: `{instruction}`\n"
+                f"🔍 قرا: `{original}`\n"
+                f"📝 بعد الفلترة: `{text}`\n"
+                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها",
                 img_bytes
             )
-            stop_bot("كابتشا — بعد الفلترة قصيرة")
+            stop_bot("كابتشا — OCR فشل")
 
-        print(f"📝 [كابتشا] الإجابة النهائية: '{text}'")
-
+        # ─── 6. نكتب الإجابة ───
         try:
             input_field = page.locator('input[type="text"]').first
+            if input_field.count() == 0:
+                input_field = page.locator('input').first
+
             if input_field.count() > 0:
                 input_field.fill('')
                 time.sleep(random.uniform(0.3, 0.7))
@@ -501,42 +562,45 @@ def solve_captcha(page):
 
                 verify_btn = page.locator('button:has-text("Verify")').first
                 human_click(page, verify_btn)
-                print(f"✅ [كابتشا] بعتنا الحل: {text}")
+                print(f"✅ [كابتشا] بعتنا: {text}")
                 time.sleep(4)
             else:
                 notify_discord(
-                    f"🚨 **كابتشا** — مش لاقي مكان الكتابة\\n"
-                    f"✍️ حاولت: `{text}`\\n"
+                    f"🚨 **كابتشا** — مفيش input\n"
+                    f"✍️ حاولت: `{text}`\n"
                     f"🛑 **البوت بيتوقف**",
                     img_bytes
                 )
                 stop_bot("كابتشا — مفيش input")
         except Exception as e:
-            print(f"⚠️ [كابتشا] مشكلة في الكتابة: {e}")
+            print(f"⚠️ [كابتشا] مشكلة الكتابة: {e}")
 
+        # ─── 7. النتيجة ───
         if '/verify' not in page.url.lower():
             print("🎉 [كابتشا] اتخطيناها!")
-            notify_discord(f"✅ **كابتشا** — اتحلت بـ OCR: `{text}`")
+            notify_discord(f"✅ **كابتشا** — اتحلت: `{text}`")
             return True
         else:
             notify_discord(
-                f"🚨 **كابتشا** — OCR غلط\\n"
-                f"📋 التعليمات: `{instruction}`\\n"
-                f"❌ حاولت بـ: `{text}`\\n"
-                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها",
+                f"🚨 **كابتشا** — OCR غلط\n"
+                f"📋 التعليمات: `{instruction}`\n"
+                f"❌ حاولت بـ: `{text}`\n"
+                f"🛑 **البوت بيتوقف**",
                 img_bytes
             )
             stop_bot("كابتشا — OCR غلط")
 
     except Exception as e:
         print(f"⚠️ [كابتشا] خطأ: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             notify_discord(
-                f"🚨 **كابتشا** — خطأ: {e}\\n🛑 **البوت بيتوقف**",
+                f"🚨 **كابتشا** — خطأ: `{e}`\n🛑 **البوت بيتوقف**",
                 img_bytes
             )
         except:
-            notify_discord(f"🚨 **كابتشا** — خطأ: {e}\\n🛑 **البوت بيتوقف**")
+            pass
         stop_bot(f"كابتشا — خطأ: {e}")
 
 
@@ -592,7 +656,7 @@ def run_stocks_bot():
                 print("=" * 50)
                 page.goto('https://project-dark.co.uk/stocks',
                           wait_until='domcontentloaded', timeout=60000)
-                print("✅ [الأسهم] دخلنا الصفحة")
+                print("✅ [الأسهم] دخلنا")
                 human_sleep(1.5, 3.0)
 
                 handle_captcha_if_any(page)
@@ -617,7 +681,7 @@ def run_stocks_bot():
                     sell_btn = page.locator('button:has-text("Sell All")').first
                     if sell_btn.count() > 0:
                         if human_click(page, sell_btn):
-                            print("✅ [الأسهم] داس على Sell All")
+                            print("✅ [الأسهم] داس Sell All")
                             human_sleep(2.0, 3.5)
                             try:
                                 cf = page.locator('button:has-text("SELL ALL")').last
