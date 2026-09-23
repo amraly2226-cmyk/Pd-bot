@@ -14,11 +14,9 @@ import pytesseract
 USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
-# ⏰ وقت الإيقاف بتوقيت مصر (24 ساعة)
 STOP_TIME = "03:00"
 
-# 🔔 Discord Webhook
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1552270091968585790/zGJGquDwOpthh749ebjFpWQ7WccQ3z-4dJm90rK6r5zva4p7198gZxhwXKYNiRuaoIBL"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1552282827150860389/1x5A1zhour3DadjDx1f-ZPxFphYm450-v2pK0ubyJuFbr_sAxwb1RZYhqFejL-wK6tzh"
 
 
 def calculate_stop_datetime():
