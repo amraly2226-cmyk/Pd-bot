@@ -7,6 +7,7 @@ import os
 import sys
 import io
 import random
+import base64
 import requests
 from PIL import Image
 import pytesseract
@@ -14,13 +15,16 @@ import pytesseract
 USERNAME = "amr.aly.2226@gmail.com"
 PASSWORD = "Gun@12345"
 
-STOP_TIME = "03:00"
+# ═══════════════════════════════════════════════════════════════
+# ⏰ المواعيد
+# ═══════════════════════════════════════════════════════════════
+
+WORK_START = "10:00"
+WORK_END = "22:00"
+
+# ═══════════════════════════════════════════════════════════════
 
 DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1552282827150860389/1x5A1zhour3DadjDx1f-ZPxFphYm450-v2pK0ubyJuFbr_sAxwb1RZYhqFejL-wK6tzh"
-
-# ═══════════════════════════════════════════════════════════════
-# 🛡️ الحمايات
-# ═══════════════════════════════════════════════════════════════
 
 STEALTH_SCRIPT = """
     Object.defineProperty(navigator, 'webdriver', {get: () => undefined, configurable: true});
@@ -38,36 +42,54 @@ MOBILE_UA = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like 
 MOBILE_VIEWPORT = {"width": 414, "height": 920}
 
 
+def is_work_time():
+    now = datetime.now()
+    start_h, start_m = map(int, WORK_START.split(':'))
+    end_h, end_m = map(int, WORK_END.split(':'))
+    start_min = start_h * 60 + start_m
+    end_min = end_h * 60 + end_m
+    current_min = now.hour * 60 + now.minute
+    return start_min <= current_min < end_min
+
+
+def seconds_until_work():
+    now = datetime.now()
+    start_h, start_m = map(int, WORK_START.split(':'))
+    target = now.replace(hour=start_h, minute=start_m, second=0, microsecond=0)
+    if now >= target:
+        target += timedelta(days=1)
+    return int((target - now).total_seconds())
+
+
+def wait_for_work_time(label=""):
+    while not is_work_time():
+        secs = seconds_until_work()
+        hours = secs // 3600
+        mins = (secs % 3600) // 60
+        print(f"😴 [{label}] مش وقت الشغل ({WORK_START} - {WORK_END}) — هستنى {hours}س {mins}د...")
+        for _ in range(secs):
+            time.sleep(1)
+            if is_work_time():
+                print(f"🌅 [{label}] وقت الشغل بدأ!")
+                return
+
+
 def human_sleep(min_sec=2.0, max_sec=5.0):
-    """تأخير عشوائي بشري"""
     time.sleep(random.uniform(min_sec, max_sec))
 
 
 def human_click(page, locator, timeout=8000):
-    """
-    كليك حقيقي بحركة ماوس بشرية
-    - scroll للأزرار
-    - حركة ماوس في منحنى
-    - كليك حقيقي (isTrusted = True)
-    """
     try:
         locator.scroll_into_view_if_needed()
         time.sleep(random.uniform(0.3, 0.9))
-        
         box = locator.bounding_box(timeout=timeout)
         if not box:
             locator.click(timeout=timeout, force=True)
             return True
-        
-        # نقطة عشوائية داخل الزر (مش بالظبط في النص)
         target_x = box['x'] + box['width'] * random.uniform(0.35, 0.65)
         target_y = box['y'] + box['height'] * random.uniform(0.35, 0.65)
-        
-        # حركة الماوس في خطوات
         page.mouse.move(target_x, target_y, steps=random.randint(12, 25))
         time.sleep(random.uniform(0.08, 0.25))
-        
-        # كليك حقيقي
         page.mouse.down()
         time.sleep(random.uniform(0.04, 0.12))
         page.mouse.up()
@@ -82,7 +104,6 @@ def human_click(page, locator, timeout=8000):
 
 
 def random_mouse_moves(page, count=None):
-    """حركات ماوس عشوائية في الصفحة"""
     if count is None:
         count = random.randint(1, 3)
     for _ in range(count):
@@ -96,7 +117,6 @@ def random_mouse_moves(page, count=None):
 
 
 def maybe_scroll(page):
-    """سكرول عشوائي خفيف"""
     if random.random() < 0.35:
         try:
             page.mouse.wheel(0, random.randint(-150, 300))
@@ -106,7 +126,6 @@ def maybe_scroll(page):
 
 
 def random_break(short=False):
-    """بريك عشوائي بشري"""
     if short:
         if random.random() < 0.20:
             b = random.randint(15, 60)
@@ -120,19 +139,6 @@ def random_break(short=False):
 
 
 # ═══════════════════════════════════════════════════════════════
-
-def calculate_stop_datetime():
-    if not STOP_TIME:
-        return None
-    now = datetime.now()
-    hour, minute = map(int, STOP_TIME.split(':'))
-    target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    if now >= target:
-        target += timedelta(days=1)
-    return target
-
-
-STOP_DATETIME = calculate_stop_datetime()
 
 COOKIES = [
     {
@@ -237,14 +243,8 @@ def check_if_jailed(page):
         return False
 
 
-def should_stop():
-    if not STOP_DATETIME:
-        return False
-    return datetime.now() >= STOP_DATETIME
-
-
-def stop_bot():
-    print(f"\n🛑 وصلنا للوقت المحدد ({STOP_TIME}) - بيقفل البرنامج...")
+def stop_bot(reason="الوقت المحدد"):
+    print(f"\n🛑 البرنامج بيتوقف — السبب: {reason}")
     print("💤 هنام كويس، باي باي! 👋")
     sys.stdout.flush()
     time.sleep(2)
@@ -290,69 +290,174 @@ def detect_captcha(page):
 def solve_captcha(page):
     print("🚨 [كابتشا] ظهرت — بدور على الحل...")
 
+    instruction = "type what you see"
+    img_bytes = None
+
     try:
-        instruction = page.evaluate("""() => {
-            let body = document.body.innerText.toLowerCase();
-            const patterns = [
-                /type\\s+what\\s+you\\s+see/,
-                /type\\s+only\\s+the\\s+letters/,
-                /type\\s+only\\s+the\\s+numbers/,
-                /type\\s+the\\s+letters\\s+only/,
-                /type\\s+the\\s+numbers\\s+only/,
-                /type\\s+the\\s+letters/,
-                /type\\s+the\\s+numbers/,
-                /type\\s+letters\\s+only/,
-                /type\\s+numbers\\s+only/,
-                /letters\\s+only/,
-                /numbers\\s+only/,
-                /type\\s+it\\s+backwards/,
-                /type\\s+backwards/,
-                /type\\s+the\\s+characters/,
-                /type\\s+the\\s+code/,
-                /enter\\s+the\\s+code/,
-            ];
-            for (let p of patterns) {
-                let m = body.match(p);
-                if (m) return m[0];
-            }
-            return 'type what you see';
-        }""")
-
-        print(f"📋 [كابتشا] التعليمات: '{instruction}'")
-
-        img_element = page.locator('img').first
-        if img_element.count() == 0:
-            print("⚠️ [كابتشا] مش لاقي صورة")
-            return False
-
-        img_bytes = img_element.screenshot()
-        img = Image.open(io.BytesIO(img_bytes))
-        img = img.resize((img.width * 3, img.height * 3), Image.LANCZOS)
-        img = img.convert('L')
-
-        text = ""
         try:
-            text = pytesseract.image_to_string(img, config='--psm 7').strip()
-            text = text.replace(' ', '').replace('\\n', '').replace('\\t', '')
+            instruction = page.evaluate("""() => {
+                let body = document.body.innerText.toLowerCase();
+                const patterns = [
+                    /type\\s+what\\s+you\\s+see/,
+                    /type\\s+only\\s+the\\s+letters/,
+                    /type\\s+only\\s+the\\s+numbers/,
+                    /type\\s+the\\s+letters/,
+                    /type\\s+the\\s+numbers/,
+                    /type\\s+letters\\s+only/,
+                    /type\\s+numbers\\s+only/,
+                    /letters\\s+only/,
+                    /numbers\\s+only/,
+                    /type\\s+it\\s+backwards/,
+                    /type\\s+backwards/,
+                ];
+                for (let p of patterns) {
+                    let m = body.match(p);
+                    if (m) return m[0];
+                }
+                return 'type what you see';
+            }""")
         except:
             pass
 
-        if len(text) < 4:
+        print(f"📋 [كابتشا] التعليمات: '{instruction}'")
+
+        # ─── صورة الكابتشا ───
+        try:
+            img_element = page.locator('img').first
+            if img_element.count() > 0:
+                try:
+                    img_element.scroll_into_view_if_needed(timeout=3000)
+                except:
+                    pass
+                time.sleep(1)
+                try:
+                    img_bytes = img_element.screenshot(timeout=5000)
+                    print("📸 [كابتشا] خدنا صورة العنصر")
+                except:
+                    pass
+        except:
+            pass
+
+        if not img_bytes:
             try:
-                text = pytesseract.image_to_string(img, config='--psm 8').strip()
-                text = text.replace(' ', '').replace('\\n', '').replace('\\t', '')
+                img_bytes = page.screenshot(full_page=False)
+                print("📸 [كابتشا] خدنا صورة الصفحة")
             except:
                 pass
 
-        print(f"🤖 [كابتشا] OCR قرا: '{text}'")
+        if not img_bytes:
+            try:
+                b64 = page.evaluate("""() => {
+                    const img = document.querySelector('img');
+                    if (!img) return null;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.naturalWidth || img.width;
+                    canvas.height = img.naturalHeight || img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    return canvas.toDataURL('image/png').split(',')[1];
+                }""")
+                if b64:
+                    img_bytes = base64.b64decode(b64)
+                    print("📸 [كابتشا] خدنا صورة canvas")
+            except Exception as e:
+                print(f"⚠️ [كابتشا] canvas فشل: {e}")
 
-        if len(text) < 2:
+        if not img_bytes:
             notify_discord(
-                f"🚨 **كابتشا — حللها!**\\n📋 التعليمات: `{instruction}`\\n❌ OCR مش قادر يقرا",
+                f"🚨 **كابتشا** — مش قادر أاخد صورة\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها"
+            )
+            stop_bot("كابتشا — مفيش صورة")
+
+        # ─── OCR بمحاولات متعددة ───
+        def try_ocr(img_obj, configs):
+            best = ""
+            for cfg in configs:
+                try:
+                    r = pytesseract.image_to_string(img_obj, config=cfg).strip()
+                    r = r.replace(' ', '').replace('\\n', '').replace('\\t', '')
+                    r = ''.join(c for c in r if c.isalnum())
+                    if len(r) > len(best):
+                        best = r
+                except:
+                    pass
+            return best
+
+        configs = [
+            '--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            '--psm 8 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            '--psm 13 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            '--psm 6 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+            '--psm 7',
+            '--psm 8',
+        ]
+
+        all_results = []
+
+        try:
+            img = Image.open(io.BytesIO(img_bytes))
+            img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
+            r = try_ocr(img_big, configs)
+            if r:
+                all_results.append(r)
+                print(f"🔍 [كابتشا] try 1: '{r}'")
+        except:
+            pass
+
+        try:
+            img = Image.open(io.BytesIO(img_bytes)).convert('L')
+            img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
+            img_bw = img_big.point(lambda p: 255 if p > 100 else 0)
+            r = try_ocr(img_bw, configs)
+            if r:
+                all_results.append(r)
+                print(f"🔍 [كابتشا] try 2: '{r}'")
+
+            img_inv = img_big.point(lambda p: 0 if p > 100 else 255)
+            r = try_ocr(img_inv, configs)
+            if r:
+                all_results.append(r)
+                print(f"🔍 [كابتشا] try 3: '{r}'")
+        except:
+            pass
+
+        for thr in [80, 120, 140, 160]:
+            try:
+                img = Image.open(io.BytesIO(img_bytes)).convert('L')
+                img_big = img.resize((img.width * 5, img.height * 5), Image.LANCZOS)
+                img_bw = img_big.point(lambda p, t=thr: 255 if p > t else 0)
+                r = try_ocr(img_bw, configs)
+                if r:
+                    all_results.append(r)
+                    print(f"🔍 [كابتشا] thr {thr}: '{r}'")
+            except:
+                pass
+
+        if not all_results:
+            text = ""
+        else:
+            filtered = [r for r in all_results if len(r) >= 3]
+            if filtered:
+                text = max(filtered, key=len)
+            else:
+                text = max(all_results, key=len)
+
+        print(f"🤖 [كابتشا] كل المحاولات: {all_results}")
+        print(f"🤖 [كابتشا] أفضل: '{text}'")
+
+        if len(text) < 3:
+            notify_discord(
+                f"🚨 **كابتشا** — OCR مش قادر يقرا\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"🔍 قرا: `{text}`\\n"
+                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها",
                 img_bytes
             )
-            return False
+            stop_bot("كابتشا — OCR فشل")
 
+        # ─── نطبّق التعليمات ───
         original = text
         wants_letters_only = ('letter' in instruction) and ('only' in instruction)
         wants_numbers_only = ('number' in instruction) and ('only' in instruction)
@@ -370,66 +475,71 @@ def solve_captcha(page):
 
         if len(text) < 2:
             notify_discord(
-                f"🚨 **كابتشا — حللها!**\\n📋 التعليمات: `{instruction}`\\n🔍 OCR: `{original}`\\n✂️ بعد الفلترة: `{text}`",
+                f"🚨 **كابتشا** — بعد الفلترة قصيرة\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"🔍 OCR: `{original}`\\n"
+                f"🛑 **البوت بيتوقف**",
                 img_bytes
             )
-            return False
+            stop_bot("كابتشا — بعد الفلترة قصيرة")
 
-        print(f"📝 [كابتشا] الإجابة: '{text}'")
+        print(f"📝 [كابتشا] الإجابة النهائية: '{text}'")
 
-        input_field = page.locator('input[type="text"]').first
-        input_field.fill('')
-        time.sleep(random.uniform(0.3, 0.7))
-        input_field.type(text, delay=random.randint(80, 220))
-        time.sleep(random.uniform(0.4, 1.0))
+        # ─── نكتب الإجابة ───
+        try:
+            input_field = page.locator('input[type="text"]').first
+            if input_field.count() > 0:
+                input_field.fill('')
+                time.sleep(random.uniform(0.3, 0.7))
+                input_field.type(text, delay=random.randint(80, 220))
+                time.sleep(random.uniform(0.4, 1.0))
 
-        verify_btn = page.locator('button:has-text("Verify")').first
-        human_click(page, verify_btn)
+                verify_btn = page.locator('button:has-text("Verify")').first
+                human_click(page, verify_btn)
+                print(f"✅ [كابتشا] بعتنا الحل: {text}")
+                time.sleep(4)
+            else:
+                notify_discord(
+                    f"🚨 **كابتشا** — مش لاقي مكان الكتابة\\n"
+                    f"✍️ حاولت: `{text}`\\n"
+                    f"🛑 **البوت بيتوقف**",
+                    img_bytes
+                )
+                stop_bot("كابتشا — مفيش input")
+        except Exception as e:
+            print(f"⚠️ [كابتشا] مشكلة في الكتابة: {e}")
 
-        print(f"✅ [كابتشا] بعتنا الحل: {text}")
-        time.sleep(3)
-
+        # ─── نتحقق من النتيجة ───
         if '/verify' not in page.url.lower():
             print("🎉 [كابتشا] اتخطيناها!")
+            notify_discord(f"✅ **كابتشا** — اتحلت بـ OCR: `{text}`")
             return True
         else:
             notify_discord(
-                f"🚨 **كابتشا — حللها!**\\n📋 التعليمات: `{instruction}`\\n❌ حاولت بـ: `{text}` وفشلت",
+                f"🚨 **كابتشا** — OCR غلط\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"❌ حاولت بـ: `{text}`\\n"
+                f"🛑 **البوت بيتوقف** — افتح اللعبة وحلها",
                 img_bytes
             )
-            return False
+            stop_bot("كابتشا — OCR غلط")
 
     except Exception as e:
         print(f"⚠️ [كابتشا] خطأ: {e}")
-        notify_discord(f"🚨 **كابتشا** — خطأ في الحل: {e}")
-        return False
-
-
-def wait_for_manual_solve(page, max_wait=15 * 60):
-    print("⏳ [كابتشا] مستني منك تحلها يدويًا...")
-    notify_discord("🚨 **البوت واقف** — افتح اللعبة وحل الكابتشا يدويًا!")
-
-    for i in range(max_wait):
-        time.sleep(1)
-        if should_stop():
-            stop_bot()
-        if not detect_captcha(page):
-            print("✅ [كابتشا] اتحلت — البوت رجع!")
-            notify_discord("✅ تم حل الكابتشا — البوت رجع يشتغل!")
-            return True
-
-    print("⏰ [كابتشا] استنيت كتير — لسه موجودة")
-    return False
+        try:
+            notify_discord(
+                f"🚨 **كابتشا** — خطأ: {e}\\n🛑 **البوت بيتوقف**",
+                img_bytes
+            )
+        except:
+            notify_discord(f"🚨 **كابتشا** — خطأ: {e}\\n🛑 **البوت بيتوقف**")
+        stop_bot(f"كابتشا — خطأ: {e}")
 
 
 def handle_captcha_if_any(page):
     if not detect_captcha(page):
         return True
-    if solve_captcha(page):
-        return True
-    if wait_for_manual_solve(page):
-        return True
-    return False
+    return solve_captcha(page)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -437,6 +547,8 @@ def handle_captcha_if_any(page):
 # ═══════════════════════════════════════════════════════════════
 
 def run_stocks_bot():
+    wait_for_work_time("الأسهم")
+
     print("📈 [الأسهم] بدأ التشغيل...")
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -465,8 +577,11 @@ def run_stocks_bot():
 
         while True:
             try:
-                if should_stop():
-                    stop_bot()
+                if not is_work_time():
+                    print("\n🌙 [الأسهم] وقت الشغل خلص — بينام")
+                    try: page.goto('about:blank')
+                    except: pass
+                    wait_for_work_time("الأسهم")
 
                 print("\n" + "=" * 50)
                 print("📈 [الأسهم] جاري الدخول...")
@@ -476,8 +591,7 @@ def run_stocks_bot():
                 print("✅ [الأسهم] دخلنا الصفحة")
                 human_sleep(1.5, 3.0)
 
-                if not handle_captcha_if_any(page):
-                    continue
+                handle_captcha_if_any(page)
 
                 try:
                     page.wait_for_selector('tr', timeout=20000)
@@ -489,14 +603,11 @@ def run_stocks_bot():
                 maybe_scroll(page)
 
                 if check_if_jailed(page):
-                    print(f"🚔 [الأسهم] سجن! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [الأسهم] سجن!")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
-                        if should_stop():
-                            stop_bot()
                     continue
 
-                # ─── بيع ───
                 print("\n🔴 [الأسهم] [1/2] بيع...")
                 try:
                     sell_btn = page.locator('button:has-text("Sell All")').first
@@ -504,7 +615,6 @@ def run_stocks_bot():
                         if human_click(page, sell_btn):
                             print("✅ [الأسهم] داس على Sell All")
                             human_sleep(2.0, 3.5)
-                            # زر التأكيد
                             try:
                                 cf = page.locator('button:has-text("SELL ALL")').last
                                 cf.wait_for(state="visible", timeout=10000)
@@ -516,31 +626,23 @@ def run_stocks_bot():
                 except Exception as e:
                     err = str(e)
                     if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                        print("🚔 [الأسهم] الصفحة اتنقلت، هستنى...")
+                        print("🚔 [الأسهم] الصفحة اتنقلت")
                         continue
 
                 if check_if_jailed(page):
-                    print(f"🚔 [الأسهم] سجن بعد البيع! هستنى {JAIL_WAIT // 60} دقايق...")
+                    print(f"🚔 [الأسهم] سجن بعد البيع!")
                     for _ in range(JAIL_WAIT // 60):
                         time.sleep(60)
-                        if should_stop():
-                            stop_bot()
                     continue
 
-                # ─── شراء ───
                 print("\n🟢 [الأسهم] [2/2] شراء...")
                 bought_count = 0
                 for attempt in range(15):
                     try:
-                        if should_stop():
-                            stop_bot()
-
                         if check_if_jailed(page):
-                            print(f"🚔 [الأسهم] سجن أثناء الشراء!")
+                            print(f"🚔 [الأسهم] سجن!")
                             for _ in range(JAIL_WAIT // 60):
                                 time.sleep(60)
-                                if should_stop():
-                                    stop_bot()
                             break
 
                         found_green = False
@@ -552,7 +654,6 @@ def run_stocks_bot():
                                 if ('↑' in row_text or '▲' in row_text):
                                     max_btn = row.locator('button:has-text("Max Buy")').first
                                     if max_btn.count() > 0:
-                                        # حركات ماوس عشوائية قبل الكليك
                                         random_mouse_moves(page, 1)
                                         maybe_scroll(page)
                                         if human_click(page, max_btn):
@@ -583,7 +684,7 @@ def run_stocks_bot():
                     except Exception as e:
                         err = str(e)
                         if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                            print("🚔 [الأسهم] الصفحة اتنقلت، هستنى...")
+                            print("🚔 [الأسهم] الصفحة اتنقلت")
                             break
                         print(f"⚠️ [الأسهم] مشكلة: {e}")
                         break
@@ -596,19 +697,18 @@ def run_stocks_bot():
             except Exception as e:
                 err = str(e)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [الأسهم] الصفحة اتنقلت، هستنى ثانية...")
+                    print("🚔 [الأسهم] الصفحة اتنقلت")
                     sleep(3)
                     continue
                 print(f"⚠️ خطأ: {e}")
 
-            # ⏰ انتظار عشوائي 28-32 دقيقة
             wait_min = random.uniform(28 * 60, 32 * 60)
             print(f"⏰ [الأسهم] هستنى {int(wait_min/60)}د {int(wait_min%60)}ث...")
             end = time.time() + wait_min
             while time.time() < end:
                 time.sleep(1)
-                if should_stop():
-                    stop_bot()
+                if not is_work_time():
+                    break
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -616,6 +716,8 @@ def run_stocks_bot():
 # ═══════════════════════════════════════════════════════════════
 
 def run_trade_bot():
+    wait_for_work_time("التريد")
+
     print("🌐 [التريد] بدأ التشغيل...")
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -653,15 +755,11 @@ def run_trade_bot():
 
         while True:
             try:
-                if should_stop():
-                    stop_bot()
-
-                if check_if_jailed(page):
-                    print(f"🚔 [التريد] سجن! هستنى {JAIL_WAIT // 60} دقايق...")
-                    for _ in range(JAIL_WAIT // 60):
-                        time.sleep(60)
-                        if should_stop():
-                            stop_bot()
+                if not is_work_time():
+                    print("\n🌙 [التريد] وقت الشغل خلص — بينام")
+                    try: page.goto('about:blank')
+                    except: pass
+                    wait_for_work_time("التريد")
                     try:
                         page.goto('https://www.project-dark.co.uk/blackmarket',
                                   wait_until='domcontentloaded')
@@ -669,10 +767,19 @@ def run_trade_bot():
                         pass
                     continue
 
-                # ─── صفحة السفر ───
+                if check_if_jailed(page):
+                    print(f"🚔 [التريد] سجن!")
+                    for _ in range(JAIL_WAIT // 60):
+                        time.sleep(60)
+                    try:
+                        page.goto('https://www.project-dark.co.uk/blackmarket',
+                                  wait_until='domcontentloaded')
+                    except:
+                        pass
+                    continue
+
                 if 'travel' in page.url:
                     random_mouse_moves(page)
-                    
                     cooldown_text = page.evaluate("""() => {
                         let body = document.body.innerText;
                         let cdMatch = body.match(/You cannot travel for:?\\s*([^\\n]+)/i);
@@ -689,7 +796,6 @@ def run_trade_bot():
                         }
                         return null;
                     }""")
-                    
                     if cooldown_text:
                         ws = parse_cooldown(cooldown_text)
                         if ws > 0:
@@ -697,9 +803,6 @@ def run_trade_bot():
                             print(f"⏳ [التريد] كولداون: {cooldown_text} - هستنى {ws} ث...")
                             for _ in range(int(ws)):
                                 time.sleep(1)
-                                if should_stop():
-                                    stop_bot()
-                            print("✅ [التريد] العداد خلص...")
                             page.goto('https://www.project-dark.co.uk/travel',
                                       wait_until='domcontentloaded')
                             human_sleep(4.0, 6.0)
@@ -774,7 +877,6 @@ def run_trade_bot():
                     human_sleep(2.5, 4.0)
                     continue
 
-                # ─── صفحة البلاك ماركت ───
                 random_mouse_moves(page, 1)
 
                 state = page.evaluate("""(items) => {
@@ -860,12 +962,6 @@ def run_trade_bot():
                                 print("✅ [التريد] شراء بلاستيك!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                            if check_if_jailed(page):
-                                print("🚔 [التريد] سجن أثناء الشراء!")
-                                for _ in range(JAIL_WAIT // 60):
-                                    time.sleep(60)
-                                    if should_stop():
-                                        stop_bot()
                         human_sleep(2.5, 4.5)
                         continue
 
@@ -905,12 +1001,6 @@ def run_trade_bot():
                                 print("✅ [التريد] شراء لوحات!")
                         except Exception as e:
                             print(f"⚠️ [التريد] {e}")
-                            if check_if_jailed(page):
-                                print("🚔 [التريد] سجن أثناء الشراء!")
-                                for _ in range(JAIL_WAIT // 60):
-                                    time.sleep(60)
-                                    if should_stop():
-                                        stop_bot()
                         human_sleep(2.5, 4.5)
                         continue
                 else:
@@ -923,13 +1013,12 @@ def run_trade_bot():
             except Exception as e:
                 err = str(e)
                 if 'Execution context was destroyed' in err or 'navigation' in err.lower():
-                    print("🚔 [التريد] الصفحة اتنقلت، هستنى...")
+                    print("🚔 [التريد] الصفحة اتنقلت")
                     sleep(3)
                     continue
                 print(f"⚠️ [التريد] خطأ: {e}")
                 human_sleep(10, 20)
 
-            # ⏰ انتظار عشوائي 8-15 ثانية
             human_sleep(8, 15)
             random_break(short=True)
 
@@ -940,10 +1029,11 @@ def run_trade_bot():
 
 if __name__ == "__main__":
     print("🚀🚀🚀 تشغيل بوتين (تريد + أسهم)...")
-    if STOP_DATETIME:
-        print(f"⏰ وقت الإيقاف: {STOP_DATETIME.strftime('%Y-%m-%d %H:%M')} (بتوقيت مصر)")
-    else:
-        print("⏰ بدون إيقاف")
+    print(f"⏰ مواعيد الشغل: من {WORK_START} لـ {WORK_END} (بتوقيت مصر)")
+    print("=" * 60)
+    if not is_work_time():
+        secs = seconds_until_work()
+        print(f"😴 الوقت الحالي خارج ساعات الشغل — هيبدأ بعد {secs//3600}س {(secs%3600)//60}د")
     print("=" * 60)
     t1 = threading.Thread(target=run_trade_bot, daemon=True, name="TradeBot")
     t2 = threading.Thread(target=run_stocks_bot, daemon=True, name="StocksBot")
