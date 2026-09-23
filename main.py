@@ -163,10 +163,10 @@ def notify_discord(msg, image_bytes=None):
                 DISCORD_WEBHOOK,
                 data={"content": msg},
                 files={"file": ("captcha.png", image_bytes, "image/png")},
-                timeout=10
+                timeout=15
             )
         else:
-            requests.post(DISCORD_WEBHOOK, json={"content": msg}, timeout=10)
+            requests.post(DISCORD_WEBHOOK, json={"content": msg}, timeout=15)
     except Exception as e:
         print(f"⚠️ [Discord] مشكلة: {e}")
 
@@ -189,6 +189,37 @@ def solve_captcha(page):
     print("🚨 [كابتشا] ظهرت — بدور على الحل...")
 
     try:
+        # 1. نقرا التعليمات
+        instruction = page.evaluate("""() => {
+            let body = document.body.innerText.toLowerCase();
+            const patterns = [
+                /type\\s+what\\s+you\\s+see/,
+                /type\\s+only\\s+the\\s+letters/,
+                /type\\s+only\\s+the\\s+numbers/,
+                /type\\s+the\\s+letters\\s+only/,
+                /type\\s+the\\s+numbers\\s+only/,
+                /type\\s+the\\s+letters/,
+                /type\\s+the\\s+numbers/,
+                /type\\s+letters\\s+only/,
+                /type\\s+numbers\\s+only/,
+                /letters\\s+only/,
+                /numbers\\s+only/,
+                /type\\s+it\\s+backwards/,
+                /type\\s+backwards/,
+                /type\\s+the\\s+characters/,
+                /type\\s+the\\s+code/,
+                /enter\\s+the\\s+code/,
+            ];
+            for (let p of patterns) {
+                let m = body.match(p);
+                if (m) return m[0];
+            }
+            return 'type what you see';
+        }""")
+
+        print(f"📋 [كابتشا] التعليمات: '{instruction}'")
+
+        # 2. نلقط صورة الكابتشا
         img_element = page.locator('img').first
         if img_element.count() == 0:
             print("⚠️ [كابتشا] مش لاقي صورة")
@@ -199,18 +230,68 @@ def solve_captcha(page):
         img = img.resize((img.width * 3, img.height * 3), Image.LANCZOS)
         img = img.convert('L')
 
-        text = pytesseract.image_to_string(
-            img,
-            config='--psm 7 -c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        ).strip().replace(' ', '')
+        # 3. نحاول نقرا الكابتشا
+        text = ""
+        try:
+            text = pytesseract.image_to_string(img, config='--psm 7').strip()
+            text = text.replace(' ', '').replace('\\n', '').replace('\\t', '')
+        except:
+            pass
+
+        if len(text) < 4:
+            try:
+                text = pytesseract.image_to_string(img, config='--psm 8').strip()
+                text = text.replace(' ', '').replace('\\n', '').replace('\\t', '')
+            except:
+                pass
 
         print(f"🤖 [كابتشا] OCR قرا: '{text}'")
 
-        if len(text) < 4:
+        if len(text) < 2:
             print(f"⚠️ [كابتشا] النتيجة قصيرة — هبعتلك على Discord")
-            notify_discord(f"🚨 **كابتشا — حللها!**\nالنص اللي ظهر: `{text}`", img_bytes)
+            notify_discord(
+                f"🚨 **كابتشا — حللها!**\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"❌ OCR مش قادر يقرا",
+                img_bytes
+            )
             return False
 
+        # 4. نطبّق التعليمات
+        original = text
+        wants_letters_only = ('letter' in instruction) and ('only' in instruction)
+        wants_numbers_only = ('number' in instruction) and ('only' in instruction)
+        wants_letters = ('letter' in instruction) and not wants_numbers_only
+        wants_numbers = ('number' in instruction) and not wants_letters_only
+        wants_reverse = ('backward' in instruction) or ('reverse' in instruction)
+
+        print(f"🔧 [كابتشا] حروف بس؟ {wants_letters_only} | أرقام بس؟ {wants_numbers_only} | بالعكس؟ {wants_reverse}")
+
+        if wants_letters_only or wants_letters:
+            text = ''.join(c for c in text if c.isalpha())
+            print(f"✂️ [كابتشا] فلتر حروف: '{text}'")
+        elif wants_numbers_only or wants_numbers:
+            text = ''.join(c for c in text if c.isdigit())
+            print(f"✂️ [كابتشا] فلتر أرقام: '{text}'")
+
+        if wants_reverse:
+            text = text[::-1]
+            print(f"🔄 [كابتشا] بعد العكس: '{text}'")
+
+        if len(text) < 2:
+            print(f"⚠️ [كابتشا] بعد الفلترة قصيرة — هبعتلك على Discord")
+            notify_discord(
+                f"🚨 **كابتشا — حللها!**\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"🔍 OCR قرا: `{original}`\\n"
+                f"✂️ بعد الفلترة: `{text}`",
+                img_bytes
+            )
+            return False
+
+        print(f"📝 [كابتشا] الإجابة النهائية: '{text}'")
+
+        # 5. نكتب الإجابة
         input_field = page.locator('input[type="text"]').first
         input_field.fill('')
         input_field.type(text, delay=random.randint(80, 200))
@@ -227,7 +308,12 @@ def solve_captcha(page):
             return True
         else:
             print("❌ [كابتشا] فشلنا — هبعتلك على Discord")
-            notify_discord(f"🚨 **كابتشا — حللها!**\nحاولت بـ: `{text}` لكن فشل", img_bytes)
+            notify_discord(
+                f"🚨 **كابتشا — حللها!**\\n"
+                f"📋 التعليمات: `{instruction}`\\n"
+                f"❌ حاولت بـ: `{text}` وفشلت",
+                img_bytes
+            )
             return False
 
     except Exception as e:
