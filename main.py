@@ -78,29 +78,38 @@ def human_sleep(min_sec=2.0, max_sec=5.0):
     time.sleep(random.uniform(min_sec, max_sec))
 
 
-def human_click(page, locator, timeout=8000):
+def human_click(page, locator, timeout=5000):
+    """كليك حقيقي بمحاولات متعددة"""
+    # المحاولة 1: كليك مباشر (أسرع)
     try:
-        locator.scroll_into_view_if_needed()
-        time.sleep(random.uniform(0.3, 0.9))
-        box = locator.bounding_box(timeout=timeout)
-        if not box:
-            locator.click(timeout=timeout, force=True)
-            return True
-        target_x = box['x'] + box['width'] * random.uniform(0.35, 0.65)
-        target_y = box['y'] + box['height'] * random.uniform(0.35, 0.65)
-        page.mouse.move(target_x, target_y, steps=random.randint(12, 25))
-        time.sleep(random.uniform(0.08, 0.25))
-        page.mouse.down()
-        time.sleep(random.uniform(0.04, 0.12))
-        page.mouse.up()
+        locator.click(timeout=timeout, force=True)
         return True
-    except Exception as e:
-        print(f"⚠️ [human_click] {e}")
-        try:
-            locator.click(timeout=timeout, force=True)
+    except:
+        pass
+
+    # المحاولة 2: كليك بمحرك الماوس
+    try:
+        box = locator.bounding_box(timeout=2000)
+        if box and box['width'] > 0:
+            target_x = box['x'] + box['width'] / 2
+            target_y = box['y'] + box['height'] / 2
+            page.mouse.move(target_x, target_y, steps=random.randint(8, 15))
+            time.sleep(random.uniform(0.1, 0.3))
+            page.mouse.down()
+            time.sleep(random.uniform(0.05, 0.1))
+            page.mouse.up()
             return True
-        except:
-            return False
+    except:
+        pass
+
+    # المحاولة 3: كليك بـ JavaScript
+    try:
+        locator.evaluate("el => el.click()")
+        return True
+    except:
+        pass
+
+    return False
 
 
 def random_mouse_moves(page, count=None):
@@ -321,7 +330,6 @@ def solve_captcha(page):
 
         print(f"📋 [كابتشا] التعليمات: '{instruction}'")
 
-        # ─── صورة الكابتشا ───
         try:
             img_element = page.locator('img').first
             if img_element.count() > 0:
@@ -371,7 +379,6 @@ def solve_captcha(page):
             )
             stop_bot("كابتشا — مفيش صورة")
 
-        # ─── OCR بمحاولات متعددة ───
         def try_ocr(img_obj, configs):
             best = ""
             for cfg in configs:
@@ -457,7 +464,6 @@ def solve_captcha(page):
             )
             stop_bot("كابتشا — OCR فشل")
 
-        # ─── نطبّق التعليمات ───
         original = text
         wants_letters_only = ('letter' in instruction) and ('only' in instruction)
         wants_numbers_only = ('number' in instruction) and ('only' in instruction)
@@ -485,7 +491,6 @@ def solve_captcha(page):
 
         print(f"📝 [كابتشا] الإجابة النهائية: '{text}'")
 
-        # ─── نكتب الإجابة ───
         try:
             input_field = page.locator('input[type="text"]').first
             if input_field.count() > 0:
@@ -509,7 +514,6 @@ def solve_captcha(page):
         except Exception as e:
             print(f"⚠️ [كابتشا] مشكلة في الكتابة: {e}")
 
-        # ─── نتحقق من النتيجة ───
         if '/verify' not in page.url.lower():
             print("🎉 [كابتشا] اتخطيناها!")
             notify_discord(f"✅ **كابتشا** — اتحلت بـ OCR: `{text}`")
